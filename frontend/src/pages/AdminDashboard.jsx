@@ -367,8 +367,8 @@ export default function AdminDashboard() {
                   <p className="text-vault-text-secondary text-sm">820 Hwy 59 N Heavener, OK, 74937</p>
                   <p className="text-vault-text-secondary text-sm">Phone: 918-653-7801</p>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[500px]">
+                <CardContent className="p-0 overflow-x-auto">
+                  <div className="min-w-[1200px]">
                     <Table>
                       <TableHeader>
                         <TableRow className="table-header border-vault-border hover:bg-transparent">
@@ -415,9 +415,14 @@ export default function AdminDashboard() {
                         )}
                       </TableBody>
                     </Table>
-                  </ScrollArea>
+                  </div>
                 </CardContent>
               </Card>
+              
+              {/* Mobile hint */}
+              <p className="text-vault-text-secondary text-xs text-center md:hidden">
+                ← Swipe table horizontally to see all columns →
+              </p>
             </>
           )}
 
