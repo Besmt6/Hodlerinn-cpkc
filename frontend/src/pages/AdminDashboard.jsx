@@ -268,9 +268,11 @@ export default function AdminDashboard() {
       <div className="md:hidden fixed top-0 left-0 right-0 bg-vault-surface border-b border-vault-border p-4 z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-vault-gold rounded-lg flex items-center justify-center">
-              <span className="font-outfit font-bold text-black text-sm">H</span>
-            </div>
+            <img 
+              src="https://customer-assets.emergentagent.com/job_guest-hotel-mgmt/artifacts/56yphta2_17721406444867042425090808501904.jpg" 
+              alt="Hodler Inn Logo" 
+              className="w-8 h-8 rounded-lg object-cover"
+            />
             <span className="font-outfit font-bold text-vault-text">HODLER INN</span>
           </div>
           <button 
