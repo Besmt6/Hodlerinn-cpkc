@@ -665,6 +665,237 @@ async def export_billing_report():
         headers={"Content-Disposition": "attachment; filename=hodler_inn_billing_report.xlsx"}
     )
 
+# Admin - Export Sign-In Sheet as PNG
+@api_router.get("/admin/export-png")
+async def export_signin_png():
+    bookings = await db.bookings.find({}, {"_id": 0}).to_list(1000)
+    
+    # Batch fetch all guests
+    employee_numbers = [b['employee_number'] for b in bookings]
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
+    # Image dimensions
+    row_height = 60
+    header_height = 150
+    sig_width = 80
+    sig_height = 40
+    col_widths = [40, 100, 180, 100, sig_width+20, sig_width+20, 100, 80, 100, 80, 80]
+    total_width = sum(col_widths) + 20
+    total_height = header_height + (len(bookings) + 1) * row_height + 50
+    
+    # Create image
+    img = Image.new('RGB', (total_width, max(total_height, 400)), color='white')
+    draw = ImageDraw.Draw(img)
+    
+    # Try to use a font, fallback to default
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+        font_bold = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+        font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+    except:
+        font = ImageFont.load_default()
+        font_bold = font
+        font_title = font
+    
+    # Header
+    draw.rectangle([0, 0, total_width, 120], fill='#fbbf24')
+    draw.text((total_width//2 - 80, 20), "Hodler Inn", fill='black', font=font_title)
+    draw.text((total_width//2 - 140, 55), "820 Hwy 59 N Heavener, OK, 74937", fill='black', font=font)
+    draw.text((total_width//2 - 80, 80), "Phone: 918-653-7801", fill='black', font=font)
+    
+    # Column headers
+    headers = ["#", "Stay Type", "Name", "Emp ID", "Sign In", "Sign Out", "Date In", "Time In", "Date Out", "Time Out", "Room"]
+    y = header_height
+    x = 10
+    draw.rectangle([0, y, total_width, y + row_height], fill='#f0f0f0')
+    for i, header in enumerate(headers):
+        draw.text((x + 5, y + 20), header, fill='black', font=font_bold)
+        x += col_widths[i]
+    
+    # Data rows
+    y += row_height
+    for idx, booking in enumerate(bookings):
+        guest = guests_dict.get(booking['employee_number'])
+        if guest:
+            decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+            decrypted_sig = decrypt_data(guest.get('signature_encrypted', guest.get('signature', '')))
+            has_sig = bool(decrypted_sig)
+            is_checked_out = booking.get('is_checked_out', False)
+            
+            # Alternating row color
+            if idx % 2 == 0:
+                draw.rectangle([0, y, total_width, y + row_height], fill='#fafafa')
+            
+            x = 10
+            # Row data
+            data = [
+                str(idx + 1),
+                "Single Stay",
+                decrypted_name[:18],
+                booking['employee_number'],
+                "",  # Signature In placeholder
+                "",  # Signature Out placeholder
+                booking['check_in_date'],
+                booking['check_in_time'],
+                booking.get('check_out_date', '-'),
+                booking.get('check_out_time', '-'),
+                booking['room_number']
+            ]
+            
+            for i, val in enumerate(data):
+                if i == 4 and has_sig and decrypted_sig:  # Signature In
+                    try:
+                        sig_data = decrypted_sig.split(',')[1] if ',' in decrypted_sig else decrypted_sig
+                        sig_bytes = base64.b64decode(sig_data)
+                        sig_img = Image.open(io.BytesIO(sig_bytes)).convert('RGBA')
+                        sig_img = sig_img.resize((sig_width, sig_height))
+                        img.paste(sig_img, (x + 5, y + 10), sig_img)
+                    except:
+                        draw.text((x + 5, y + 20), "Signed", fill='green', font=font)
+                elif i == 5 and has_sig and is_checked_out and decrypted_sig:  # Signature Out
+                    try:
+                        sig_data = decrypted_sig.split(',')[1] if ',' in decrypted_sig else decrypted_sig
+                        sig_bytes = base64.b64decode(sig_data)
+                        sig_img = Image.open(io.BytesIO(sig_bytes)).convert('RGBA')
+                        sig_img = sig_img.resize((sig_width, sig_height))
+                        img.paste(sig_img, (x + 5, y + 10), sig_img)
+                    except:
+                        draw.text((x + 5, y + 20), "Signed", fill='green', font=font)
+                else:
+                    draw.text((x + 5, y + 20), str(val), fill='black', font=font)
+                x += col_widths[i]
+            
+            y += row_height
+    
+    # Draw grid lines
+    y = header_height
+    for i in range(len(bookings) + 2):
+        draw.line([(0, y), (total_width, y)], fill='#cccccc', width=1)
+        y += row_height
+    
+    # Save to bytes
+    output = io.BytesIO()
+    img.save(output, format='PNG')
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="image/png",
+        headers={"Content-Disposition": "attachment; filename=hodler_inn_sign_in_sheet.png"}
+    )
+
+# Admin - Export Billing Report as PNG
+@api_router.get("/admin/export-billing-png")
+async def export_billing_png():
+    bookings = await db.bookings.find({"is_checked_out": True}, {"_id": 0}).to_list(1000)
+    
+    # Batch fetch all guests
+    employee_numbers = [b['employee_number'] for b in bookings]
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
+    # Image dimensions
+    row_height = 60
+    header_height = 150
+    sig_width = 80
+    sig_height = 40
+    col_widths = [40, 180, 100, 80, 150, 150, 80, 80, sig_width+20]
+    total_width = sum(col_widths) + 20
+    total_height = header_height + (len(bookings) + 2) * row_height + 50
+    
+    # Create image
+    img = Image.new('RGB', (total_width, max(total_height, 400)), color='white')
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+        font_bold = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+        font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+    except:
+        font = ImageFont.load_default()
+        font_bold = font
+        font_title = font
+    
+    # Header
+    draw.rectangle([0, 0, total_width, 120], fill='#fbbf24')
+    draw.text((total_width//2 - 120, 20), "Hodler Inn - Billing Report", fill='black', font=font_title)
+    draw.text((total_width//2 - 140, 55), "820 Hwy 59 N Heavener, OK, 74937", fill='black', font=font)
+    draw.text((total_width//2 - 80, 80), "Phone: 918-653-7801", fill='black', font=font)
+    
+    # Column headers
+    headers = ["#", "Name", "Emp ID", "Room", "Check-In", "Check-Out", "Hours", "Nights", "Signature"]
+    y = header_height
+    x = 10
+    draw.rectangle([0, y, total_width, y + row_height], fill='#f0f0f0')
+    for i, header in enumerate(headers):
+        draw.text((x + 5, y + 20), header, fill='black', font=font_bold)
+        x += col_widths[i]
+    
+    # Data rows
+    y += row_height
+    total_nights = 0
+    for idx, booking in enumerate(bookings):
+        guest = guests_dict.get(booking['employee_number'])
+        if guest:
+            decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+            decrypted_sig = decrypt_data(guest.get('signature_encrypted', guest.get('signature', '')))
+            has_sig = bool(decrypted_sig)
+            
+            hours, nights = calculate_stay_duration(
+                booking['check_in_date'],
+                booking['check_in_time'],
+                booking['check_out_date'],
+                booking['check_out_time']
+            )
+            total_nights += nights if nights else 0
+            
+            if idx % 2 == 0:
+                draw.rectangle([0, y, total_width, y + row_height], fill='#fafafa')
+            
+            x = 10
+            data = [
+                str(idx + 1),
+                decrypted_name[:20],
+                booking['employee_number'],
+                booking['room_number'],
+                f"{booking['check_in_date']} {booking['check_in_time']}",
+                f"{booking['check_out_date']} {booking['check_out_time']}",
+                f"{hours}h" if hours else "-",
+                str(nights) if nights else "-",
+                ""  # Signature placeholder
+            ]
+            
+            for i, val in enumerate(data):
+                if i == 8 and has_sig and decrypted_sig:  # Signature
+                    try:
+                        sig_data = decrypted_sig.split(',')[1] if ',' in decrypted_sig else decrypted_sig
+                        sig_bytes = base64.b64decode(sig_data)
+                        sig_img = Image.open(io.BytesIO(sig_bytes)).convert('RGBA')
+                        sig_img = sig_img.resize((sig_width, sig_height))
+                        img.paste(sig_img, (x + 5, y + 10), sig_img)
+                    except:
+                        draw.text((x + 5, y + 20), "Yes", fill='green', font=font)
+                else:
+                    draw.text((x + 5, y + 20), str(val), fill='black', font=font)
+                x += col_widths[i]
+            
+            y += row_height
+    
+    # Total row
+    draw.rectangle([0, y, total_width, y + row_height], fill='#e0e0e0')
+    draw.text((200, y + 20), f"TOTAL NIGHTS BILLED: {total_nights}", fill='black', font=font_bold)
+    
+    output = io.BytesIO()
+    img.save(output, format='PNG')
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="image/png",
+        headers={"Content-Disposition": "attachment; filename=hodler_inn_billing_report.png"}
+    )
+
 # Include the router in the main app
 app.include_router(api_router)
 
