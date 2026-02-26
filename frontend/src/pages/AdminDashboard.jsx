@@ -98,7 +98,26 @@ export default function AdminDashboard() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success("Sign-In Sheet exported!");
+      toast.success("Sign-In Sheet (Excel) exported!");
+    } catch (error) {
+      toast.error("Failed to export");
+    }
+  };
+
+  const handleExportSignInPng = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/export-png`, {
+        responseType: "blob"
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "hodler_inn_sign_in_sheet.png");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Sign-In Sheet (PNG) exported!");
     } catch (error) {
       toast.error("Failed to export");
     }
@@ -117,7 +136,26 @@ export default function AdminDashboard() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success("Billing Report exported!");
+      toast.success("Billing Report (Excel) exported!");
+    } catch (error) {
+      toast.error("Failed to export");
+    }
+  };
+
+  const handleExportBillingPng = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/export-billing-png`, {
+        responseType: "blob"
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "hodler_inn_billing_report.png");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Billing Report (PNG) exported!");
     } catch (error) {
       toast.error("Failed to export");
     }
