@@ -480,11 +480,63 @@ export default function AdminDashboard() {
                               <TableCell className="text-vault-text">Single Stay</TableCell>
                               <TableCell className="text-vault-text font-medium">{record.employee_name}</TableCell>
                               <TableCell className="font-mono text-vault-text">{record.employee_number}</TableCell>
-                              <TableCell className="text-vault-success font-medium">
-                                {record.signature ? "Signed" : "—"}
+                              <TableCell>
+                                {record.signature ? (
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <button className="flex items-center gap-1 text-vault-success hover:text-vault-gold transition-colors cursor-pointer">
+                                        <img 
+                                          src={record.signature} 
+                                          alt="Signature" 
+                                          className="w-12 h-8 object-contain bg-black/30 rounded border border-vault-border"
+                                        />
+                                      </button>
+                                    </DialogTrigger>
+                                    <DialogContent className="bg-vault-surface border-vault-border">
+                                      <DialogHeader>
+                                        <DialogTitle className="font-outfit text-vault-text">
+                                          Signature - {record.employee_name}
+                                        </DialogTitle>
+                                      </DialogHeader>
+                                      <div className="bg-black/50 rounded-lg p-4">
+                                        <img 
+                                          src={record.signature} 
+                                          alt="Signature"
+                                          className="w-full h-40 object-contain"
+                                        />
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+                                ) : "—"}
                               </TableCell>
-                              <TableCell className="text-vault-success font-medium">
-                                {record.is_checked_out && record.signature ? "Signed" : "—"}
+                              <TableCell>
+                                {record.is_checked_out && record.signature ? (
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <button className="flex items-center gap-1 text-vault-success hover:text-vault-gold transition-colors cursor-pointer">
+                                        <img 
+                                          src={record.signature} 
+                                          alt="Signature" 
+                                          className="w-12 h-8 object-contain bg-black/30 rounded border border-vault-border"
+                                        />
+                                      </button>
+                                    </DialogTrigger>
+                                    <DialogContent className="bg-vault-surface border-vault-border">
+                                      <DialogHeader>
+                                        <DialogTitle className="font-outfit text-vault-text">
+                                          Signature - {record.employee_name}
+                                        </DialogTitle>
+                                      </DialogHeader>
+                                      <div className="bg-black/50 rounded-lg p-4">
+                                        <img 
+                                          src={record.signature} 
+                                          alt="Signature"
+                                          className="w-full h-40 object-contain"
+                                        />
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+                                ) : "—"}
                               </TableCell>
                               <TableCell className="text-vault-text">{record.check_in_date}</TableCell>
                               <TableCell className="font-mono text-vault-text">{record.check_in_time}</TableCell>
