@@ -32,7 +32,9 @@ import {
   FileSpreadsheet,
   Eye,
   CheckCircle,
-  XCircle
+  XCircle,
+  Receipt,
+  ClipboardList
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -73,9 +75,28 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleExport = async () => {
+  const handleExportSignIn = async () => {
     try {
       const response = await axios.get(`${API}/admin/export`, {
+        responseType: "blob"
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "hodler_inn_sign_in_sheet.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Sign-In Sheet exported!");
+    } catch (error) {
+      toast.error("Failed to export");
+    }
+  };
+
+  const handleExportBilling = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/export-billing`, {
         responseType: "blob"
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -86,9 +107,9 @@ export default function AdminDashboard() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success("Report exported successfully!");
+      toast.success("Billing Report exported!");
     } catch (error) {
-      toast.error("Failed to export report");
+      toast.error("Failed to export");
     }
   };
 
@@ -126,9 +147,13 @@ export default function AdminDashboard() {
             <LayoutDashboard className="w-4 h-4" />
             <span className="font-manrope text-sm">Dashboard</span>
           </div>
-          <div className="admin-nav-item cursor-pointer" onClick={handleExport} data-testid="nav-export-btn">
-            <FileSpreadsheet className="w-4 h-4" />
-            <span className="font-manrope text-sm">Export Report</span>
+          <div className="admin-nav-item cursor-pointer" onClick={handleExportSignIn} data-testid="nav-signin-export-btn">
+            <ClipboardList className="w-4 h-4" />
+            <span className="font-manrope text-sm">Sign-In Sheet</span>
+          </div>
+          <div className="admin-nav-item cursor-pointer" onClick={handleExportBilling} data-testid="nav-billing-export-btn">
+            <Receipt className="w-4 h-4" />
+            <span className="font-manrope text-sm">Billing Report</span>
           </div>
         </nav>
 
@@ -156,14 +181,24 @@ export default function AdminDashboard() {
               <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Dashboard</h1>
               <p className="text-vault-text-secondary font-manrope mt-1">Manage guest check-ins and billing</p>
             </div>
-            <Button 
-              onClick={handleExport}
-              className="vault-btn-primary flex items-center gap-2"
-              data-testid="export-btn"
-            >
-              <Download className="w-4 h-4" />
-              Export to Excel
-            </Button>
+            <div className="flex gap-3">
+              <Button 
+                onClick={handleExportSignIn}
+                className="vault-btn-secondary flex items-center gap-2"
+                data-testid="export-signin-btn"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Sign-In Sheet
+              </Button>
+              <Button 
+                onClick={handleExportBilling}
+                className="vault-btn-primary flex items-center gap-2"
+                data-testid="export-billing-btn"
+              >
+                <Receipt className="w-4 h-4" />
+                Billing Report
+              </Button>
+            </div>
           </div>
 
           {/* Stats Cards */}
