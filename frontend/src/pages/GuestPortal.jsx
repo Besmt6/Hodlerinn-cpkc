@@ -348,7 +348,7 @@ function CheckInForm({ setView }) {
                   data-testid="checkin-date-btn"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 text-vault-text-secondary" />
-                  {date ? format(date, "PPP") : "Select date"}
+                  {date ? format(date, "dd MMM yyyy") : "Select date"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
@@ -469,7 +469,7 @@ function CheckOutForm({ setView }) {
                   data-testid="checkout-date-btn"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4 text-vault-text-secondary" />
-                  {date ? format(date, "PPP") : "Select date"}
+                  {date ? format(date, "dd MMM yyyy") : "Select date"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
