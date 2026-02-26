@@ -252,64 +252,97 @@ async def get_dashboard_stats():
         "completed_stays": completed_stays
     }
 
-# Admin - Export to Excel
+# Admin - Export to Excel (Sign-In Sheet Format)
 @api_router.get("/admin/export")
 async def export_to_excel():
     bookings = await db.bookings.find({}, {"_id": 0}).to_list(1000)
     
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-    worksheet = workbook.add_worksheet("Billing Report")
+    worksheet = workbook.add_worksheet("Sign-In Sheet")
     
     # Styles
+    title_format = workbook.add_format({
+        'bold': True,
+        'font_size': 14,
+        'align': 'center',
+        'valign': 'vcenter'
+    })
+    subtitle_format = workbook.add_format({
+        'font_size': 10,
+        'align': 'center',
+        'valign': 'vcenter'
+    })
     header_format = workbook.add_format({
         'bold': True,
         'bg_color': '#fbbf24',
         'border': 1,
-        'align': 'center'
+        'align': 'center',
+        'valign': 'vcenter',
+        'text_wrap': True
     })
-    cell_format = workbook.add_format({'border': 1, 'align': 'center'})
+    cell_format = workbook.add_format({
+        'border': 1,
+        'align': 'center',
+        'valign': 'vcenter'
+    })
+    signed_format = workbook.add_format({
+        'border': 1,
+        'align': 'center',
+        'valign': 'vcenter',
+        'font_color': '#10b981'
+    })
     
-    # Headers
+    # Company Header
+    worksheet.merge_range('A1:K1', 'Hodler Inn', title_format)
+    worksheet.merge_range('A2:K2', '820 Hwy 59 N Heavener, OK, 74937', subtitle_format)
+    worksheet.merge_range('A3:K3', 'Phone: 918-653-7801', subtitle_format)
+    worksheet.set_row(0, 25)
+    worksheet.set_row(1, 18)
+    worksheet.set_row(2, 18)
+    
+    # Column Headers (Row 5, index 4)
     headers = [
-        "Employee ID", "Employee Name", "Room Number",
-        "Check-In Date", "Check-In Time",
-        "Check-Out Date", "Check-Out Time",
-        "Total Hours", "Nights Billed"
+        "#", "Stay Type", "Name", "Employee ID", 
+        "Signature In", "Signature Out",
+        "Date In", "Time In", "Date Out", "Time Out", "Room #"
     ]
     
-    for col, header in enumerate(headers):
-        worksheet.write(0, col, header, header_format)
-        worksheet.set_column(col, col, 15)
+    col_widths = [5, 12, 20, 12, 12, 12, 12, 10, 12, 10, 8]
+    for col, (header, width) in enumerate(zip(headers, col_widths)):
+        worksheet.write(4, col, header, header_format)
+        worksheet.set_column(col, col, width)
     
-    # Data rows
-    row = 1
+    # Data rows starting from row 6 (index 5)
+    row = 5
+    row_num = 1
     for booking in bookings:
         guest = await db.guests.find_one({"employee_number": booking['employee_number']}, {"_id": 0})
         if guest:
-            total_hours = ""
-            total_nights = ""
+            has_signature = bool(guest.get('signature'))
+            is_checked_out = booking.get('is_checked_out', False)
             
-            if booking.get('is_checked_out') and booking.get('check_out_date'):
-                hours, nights = calculate_stay_duration(
-                    booking['check_in_date'],
-                    booking['check_in_time'],
-                    booking['check_out_date'],
-                    booking['check_out_time']
-                )
-                total_hours = hours if hours else ""
-                total_nights = nights if nights else ""
-            
-            worksheet.write(row, 0, booking['employee_number'], cell_format)
-            worksheet.write(row, 1, guest['name'], cell_format)
-            worksheet.write(row, 2, booking['room_number'], cell_format)
-            worksheet.write(row, 3, booking['check_in_date'], cell_format)
-            worksheet.write(row, 4, booking['check_in_time'], cell_format)
-            worksheet.write(row, 5, booking.get('check_out_date', ''), cell_format)
-            worksheet.write(row, 6, booking.get('check_out_time', ''), cell_format)
-            worksheet.write(row, 7, total_hours, cell_format)
-            worksheet.write(row, 8, total_nights, cell_format)
+            worksheet.write(row, 0, row_num, cell_format)
+            worksheet.write(row, 1, "Single Stay", cell_format)
+            worksheet.write(row, 2, guest['name'], cell_format)
+            worksheet.write(row, 3, booking['employee_number'], cell_format)
+            worksheet.write(row, 4, "Signed" if has_signature else "", signed_format if has_signature else cell_format)
+            worksheet.write(row, 5, "Signed" if (has_signature and is_checked_out) else "", signed_format if (has_signature and is_checked_out) else cell_format)
+            worksheet.write(row, 6, booking['check_in_date'], cell_format)
+            worksheet.write(row, 7, booking['check_in_time'], cell_format)
+            worksheet.write(row, 8, booking.get('check_out_date', ''), cell_format)
+            worksheet.write(row, 9, booking.get('check_out_time', ''), cell_format)
+            worksheet.write(row, 10, booking['room_number'], cell_format)
             row += 1
+            row_num += 1
+    
+    # Add empty rows for manual entries (like the paper form)
+    for i in range(row_num, 17):
+        worksheet.write(row, 0, i, cell_format)
+        worksheet.write(row, 1, "Single Stay", cell_format)
+        for col in range(2, 11):
+            worksheet.write(row, col, "", cell_format)
+        row += 1
     
     workbook.close()
     output.seek(0)
@@ -317,7 +350,7 @@ async def export_to_excel():
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=hodler_inn_billing_report.xlsx"}
+        headers={"Content-Disposition": "attachment; filename=hodler_inn_sign_in_sheet.xlsx"}
     )
 
 # Include the router in the main app
