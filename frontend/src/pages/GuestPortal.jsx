@@ -289,9 +289,39 @@ function CheckInForm({ setView }) {
   const [date, setDate] = useState(new Date());
   const [time, setTime] = useState(format(new Date(), "HH:mm"));
   const [loading, setLoading] = useState(false);
+  const [verifiedEmployee, setVerifiedEmployee] = useState(null);
+  const [verifying, setVerifying] = useState(false);
+
+  const handleVerifyEmployee = async () => {
+    if (!employeeNumber) {
+      toast.error("Please enter employee number");
+      return;
+    }
+
+    setVerifying(true);
+    try {
+      const response = await axios.get(`${API}/guests/${employeeNumber}`);
+      setVerifiedEmployee(response.data);
+      toast.success(`Employee found: ${response.data.name}`);
+    } catch (error) {
+      toast.error("Employee not found. Please register first.");
+      setVerifiedEmployee(null);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleClearVerification = () => {
+    setVerifiedEmployee(null);
+    setEmployeeNumber("");
+  };
 
   const handleCheckIn = async () => {
-    if (!employeeNumber || !roomNumber || !date || !time) {
+    if (!verifiedEmployee) {
+      toast.error("Please verify employee number first");
+      return;
+    }
+    if (!roomNumber || !date || !time) {
       toast.error("Please fill in all fields");
       return;
     }
