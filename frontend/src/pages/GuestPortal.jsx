@@ -118,7 +118,7 @@ function MainMenu({ setView }) {
           </div>
           <Button
             onClick={() => setView("register")}
-            className="w-full vault-btn-secondary h-14 text-lg flex items-center justify-center gap-3"
+            className="w-full h-14 text-lg flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase tracking-wide"
             data-testid="register-btn"
           >
             <UserPlus className="w-5 h-5" />
