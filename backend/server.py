@@ -213,6 +213,17 @@ async def check_out(input: CheckOutCreate):
     if not booking:
         raise HTTPException(status_code=404, detail="No active booking found for this room")
     
+    # Get guest info for notification
+    guest = await db.guests.find_one({"employee_number": booking['employee_number']}, {"_id": 0})
+    
+    # Calculate stay duration
+    total_hours, total_nights = calculate_stay_duration(
+        booking['check_in_date'],
+        booking['check_in_time'],
+        input.check_out_date,
+        input.check_out_time
+    )
+    
     # Update booking with checkout info
     await db.bookings.update_one(
         {"id": booking['id']},
@@ -223,6 +234,19 @@ async def check_out(input: CheckOutCreate):
                 "is_checked_out": True
             }
         }
+    )
+    
+    # Send Telegram notification for check-out
+    guest_name = guest['name'] if guest else "Unknown"
+    await send_telegram_notification(
+        f"👋 <b>CHECK-OUT</b>\n\n"
+        f"👤 <b>Guest:</b> {guest_name}\n"
+        f"🆔 <b>Employee ID:</b> {booking['employee_number']}\n"
+        f"🚪 <b>Room:</b> {input.room_number}\n"
+        f"📅 <b>Date:</b> {input.check_out_date}\n"
+        f"⏰ <b>Time:</b> {input.check_out_time}\n"
+        f"⏱️ <b>Duration:</b> {total_hours}h\n"
+        f"🌙 <b>Nights Billed:</b> {total_nights}"
     )
     
     return {"message": "Check-out successful", "booking_id": booking['id']}
