@@ -50,9 +50,11 @@ export default function GuestPortal() {
     <div className="kiosk-container grid-bg min-h-screen relative">
       {/* Logo Header */}
       <div className="absolute top-6 left-6 flex items-center gap-3">
-        <div className="w-10 h-10 bg-vault-gold rounded-lg flex items-center justify-center">
-          <span className="font-outfit font-bold text-black text-xl">H</span>
-        </div>
+        <img 
+          src="https://customer-assets.emergentagent.com/job_guest-hotel-mgmt/artifacts/56yphta2_17721406444867042425090808501904.jpg" 
+          alt="Hodler Inn Logo" 
+          className="w-12 h-12 rounded-lg object-cover"
+        />
         <div>
           <h1 className="font-outfit font-bold text-vault-text text-xl tracking-tight">HODLER INN</h1>
           <p className="font-mono text-[10px] text-vault-gold uppercase tracking-widest">Immutable Comfort</p>
