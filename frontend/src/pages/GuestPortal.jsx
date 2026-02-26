@@ -53,10 +53,11 @@ export default function GuestPortal() {
       {/* Admin Link */}
       <button 
         onClick={() => navigate("/admin")}
-        className="absolute top-6 right-6 text-vault-text-secondary hover:text-vault-gold transition-colors"
+        className="absolute top-6 right-6 flex items-center gap-2 text-vault-text-secondary hover:text-vault-gold transition-colors bg-vault-surface/50 px-3 py-2 rounded-lg border border-vault-border"
         data-testid="admin-link"
       >
-        <Settings className="w-5 h-5" />
+        <Settings className="w-4 h-4" />
+        <span className="text-sm font-mono">Admin</span>
       </button>
 
       <AnimatePresence mode="wait">
