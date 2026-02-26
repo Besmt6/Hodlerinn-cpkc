@@ -176,27 +176,30 @@ export default function AdminDashboard() {
           transition={{ duration: 0.4 }}
         >
           {/* Header */}
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Dashboard</h1>
-              <p className="text-vault-text-secondary font-manrope mt-1">Manage guest check-ins and billing</p>
+          <div className="mb-8">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Dashboard</h1>
+                <p className="text-vault-text-secondary font-manrope mt-1">Manage guest check-ins and billing</p>
+              </div>
             </div>
-            <div className="flex gap-3">
+            {/* Export Buttons */}
+            <div className="flex gap-3 mt-6">
               <Button 
                 onClick={handleExportSignIn}
-                className="vault-btn-secondary flex items-center gap-2"
+                className="vault-btn-secondary flex items-center gap-2 px-6 py-3"
                 data-testid="export-signin-btn"
               >
-                <ClipboardList className="w-4 h-4" />
-                Sign-In Sheet
+                <ClipboardList className="w-5 h-5" />
+                Export Sign-In Sheet
               </Button>
               <Button 
                 onClick={handleExportBilling}
-                className="vault-btn-primary flex items-center gap-2"
+                className="vault-btn-primary flex items-center gap-2 px-6 py-3"
                 data-testid="export-billing-btn"
               >
-                <Receipt className="w-4 h-4" />
-                Billing Report
+                <Receipt className="w-5 h-5" />
+                Export Billing Report
               </Button>
             </div>
           </div>
