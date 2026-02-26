@@ -402,11 +402,15 @@ async def get_all_records():
                     booking['check_out_time']
                 )
             
+            # Decrypt sensitive data
+            decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+            decrypted_signature = decrypt_data(guest.get('signature_encrypted', guest.get('signature', '')))
+            
             records.append(GuestRecord(
                 id=booking['id'],
                 employee_number=booking['employee_number'],
-                employee_name=guest['name'],
-                signature=guest['signature'],
+                employee_name=decrypted_name,
+                signature=decrypted_signature,
                 room_number=booking['room_number'],
                 check_in_date=booking['check_in_date'],
                 check_in_time=booking['check_in_time'],
