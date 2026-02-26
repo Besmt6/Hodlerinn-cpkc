@@ -130,8 +130,8 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-vault-bg grid-bg" data-testid="admin-dashboard">
-      {/* Sidebar */}
-      <div className="fixed left-0 top-0 h-full w-60 admin-sidebar p-6 flex flex-col">
+      {/* Sidebar - Hidden on mobile */}
+      <div className="fixed left-0 top-0 h-full w-60 admin-sidebar p-6 flex-col hidden md:flex">
         {/* Logo */}
         <div className="flex items-center gap-3 mb-10">
           <div className="w-10 h-10 bg-vault-gold rounded-lg flex items-center justify-center">
