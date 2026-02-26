@@ -110,13 +110,19 @@ function MainMenu({ setView }) {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-3 mb-2">
+            <p className="text-vault-text-secondary text-sm text-center">
+              <span className="text-vault-gold font-medium">Note:</span> Register only if this is your <span className="text-vault-gold">first time</span>. 
+              Already registered? Go directly to <span className="text-vault-gold">Check In</span>.
+            </p>
+          </div>
           <Button
             onClick={() => setView("register")}
-            className="w-full vault-btn-primary h-14 text-lg flex items-center justify-center gap-3"
+            className="w-full vault-btn-secondary h-14 text-lg flex items-center justify-center gap-3"
             data-testid="register-btn"
           >
             <UserPlus className="w-5 h-5" />
-            Register
+            Register (First Time Only)
           </Button>
           <Button
             onClick={() => setView("checkin")}
