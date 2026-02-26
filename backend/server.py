@@ -14,6 +14,8 @@ import io
 import xlsxwriter
 import math
 import httpx
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -35,6 +37,42 @@ api_router = APIRouter(prefix="/api")
 
 # Admin password (simple protection)
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'hodlerinn2024')
+
+# ==================== Scheduler for Monthly Reset ====================
+
+scheduler = AsyncIOScheduler()
+
+async def monthly_data_reset():
+    """Reset all guest and booking data on 1st of each month"""
+    try:
+        bookings_result = await db.bookings.delete_many({})
+        guests_result = await db.guests.delete_many({})
+        
+        logging.info(f"Monthly reset: Deleted {bookings_result.deleted_count} bookings and {guests_result.deleted_count} guests")
+        
+        # Send Telegram notification about reset
+        await send_telegram_notification(
+            f"🔄 <b>MONTHLY DATA RESET</b>\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"📅 Date: {datetime.now().strftime('%Y-%m-%d')}\n"
+            f"🗑️ Bookings cleared: {bookings_result.deleted_count}\n"
+            f"🗑️ Guests cleared: {guests_result.deleted_count}\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"✅ System ready for new month!"
+        )
+    except Exception as e:
+        logging.error(f"Monthly reset failed: {e}")
+
+@app.on_event("startup")
+async def start_scheduler():
+    # Run on 1st of every month at 00:00 (midnight)
+    scheduler.add_job(monthly_data_reset, CronTrigger(day=1, hour=0, minute=0))
+    scheduler.start()
+    logging.info("Monthly reset scheduler started - will reset data on 1st of each month")
+
+@app.on_event("shutdown")
+async def shutdown_scheduler():
+    scheduler.shutdown()
 
 # ==================== Telegram Notification ====================
 
