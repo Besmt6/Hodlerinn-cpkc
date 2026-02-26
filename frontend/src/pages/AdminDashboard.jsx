@@ -648,6 +648,102 @@ export default function AdminDashboard() {
           )}
         </motion.div>
       </div>
+      
+      {/* Edit Dialog */}
+      {editingRecord && (
+        <Dialog open={!!editingRecord} onOpenChange={() => setEditingRecord(null)}>
+          <DialogContent className="bg-vault-surface border-vault-border">
+            <DialogHeader>
+              <DialogTitle className="font-outfit text-vault-text">
+                Edit Record - {editingRecord.employee_name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Number</label>
+                <Input
+                  value={editForm.room_number}
+                  onChange={(e) => setEditForm({...editForm, room_number: e.target.value})}
+                  className="bg-black/50 border-vault-border text-vault-text"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Check-In Date</label>
+                  <Input
+                    type="date"
+                    value={editForm.check_in_date}
+                    onChange={(e) => setEditForm({...editForm, check_in_date: e.target.value})}
+                    className="bg-black/50 border-vault-border text-vault-text"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Check-In Time</label>
+                  <Input
+                    type="time"
+                    value={editForm.check_in_time}
+                    onChange={(e) => setEditForm({...editForm, check_in_time: e.target.value})}
+                    className="bg-black/50 border-vault-border text-vault-text"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Check-Out Date</label>
+                  <Input
+                    type="date"
+                    value={editForm.check_out_date}
+                    onChange={(e) => setEditForm({...editForm, check_out_date: e.target.value})}
+                    className="bg-black/50 border-vault-border text-vault-text"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Check-Out Time</label>
+                  <Input
+                    type="time"
+                    value={editForm.check_out_time}
+                    onChange={(e) => setEditForm({...editForm, check_out_time: e.target.value})}
+                    className="bg-black/50 border-vault-border text-vault-text"
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setEditingRecord(null)} className="text-vault-text-secondary">
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdit} className="vault-btn-primary">
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirm && (
+        <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+          <DialogContent className="bg-vault-surface border-vault-border">
+            <DialogHeader>
+              <DialogTitle className="font-outfit text-vault-text">
+                Delete Record
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-vault-text-secondary py-4">
+              Are you sure you want to delete the record for <span className="text-vault-gold font-medium">{deleteConfirm.employee_name}</span> in room <span className="text-vault-gold font-medium">{deleteConfirm.room_number}</span>?
+            </p>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setDeleteConfirm(null)} className="text-vault-text-secondary">
+                Cancel
+              </Button>
+              <Button onClick={() => handleDelete(deleteConfirm.id)} className="bg-red-600 hover:bg-red-700 text-white">
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       <div className="noise-overlay" />
     </div>
   );
