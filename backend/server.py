@@ -368,6 +368,11 @@ async def export_to_excel():
 async def export_billing_report():
     bookings = await db.bookings.find({"is_checked_out": True}, {"_id": 0}).to_list(1000)
     
+    # Batch fetch all guests to avoid N+1 query
+    employee_numbers = [b['employee_number'] for b in bookings]
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
     worksheet = workbook.add_worksheet("Billing Report")
