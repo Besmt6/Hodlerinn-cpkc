@@ -368,81 +368,114 @@ function CheckInForm({ setView }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div>
-            <label className="vault-label">Employee Number</label>
-            <div className="relative">
-              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
-              <Input
-                value={employeeNumber}
-                onChange={(e) => setEmployeeNumber(e.target.value)}
-                placeholder="Enter employee number"
-                className="vault-input pl-10"
-                data-testid="checkin-employee-input"
-              />
+          {/* Employee Verification Section */}
+          {!verifiedEmployee ? (
+            <div className="space-y-4">
+              <div>
+                <label className="vault-label">Employee Number</label>
+                <div className="relative">
+                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                  <Input
+                    value={employeeNumber}
+                    onChange={(e) => setEmployeeNumber(e.target.value)}
+                    placeholder="Enter employee number"
+                    className="vault-input pl-10"
+                    data-testid="checkin-employee-input"
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleVerifyEmployee}
+                disabled={verifying}
+                className="w-full vault-btn-primary h-12"
+                data-testid="verify-employee-btn"
+              >
+                {verifying ? "Verifying..." : "Verify Employee"}
+              </Button>
             </div>
-          </div>
-          <div>
-            <label className="vault-label">Room Number</label>
-            <div className="relative">
-              <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
-              <Input
-                value={roomNumber}
-                onChange={(e) => setRoomNumber(e.target.value)}
-                placeholder="Enter room number"
-                className="vault-input pl-10"
-                data-testid="checkin-room-input"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="vault-label">Check-In Date</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full vault-input justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                  data-testid="checkin-date-btn"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4 text-vault-text-secondary" />
-                  {date ? format(date, "dd MMM yyyy") : "Select date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  initialFocus
-                  className="bg-vault-surface text-vault-text"
-                  data-testid="checkin-calendar"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div>
-            <label className="vault-label">Check-In Time</label>
-            <div className="relative">
-              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
-              <Input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="vault-input pl-10"
-                data-testid="checkin-time-input"
-              />
-            </div>
-          </div>
-          <Button
-            onClick={handleCheckIn}
-            disabled={loading}
-            className="w-full vault-btn-primary h-12"
-            data-testid="submit-checkin-btn"
-          >
-            {loading ? "Processing..." : "Complete Check-In"}
-          </Button>
+          ) : (
+            <>
+              {/* Verified Employee Info */}
+              <div className="bg-vault-success/10 border border-vault-success/30 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-vault-success text-xs uppercase tracking-wider mb-1">Verified Employee</p>
+                    <p className="text-vault-text font-bold text-lg">{verifiedEmployee.name}</p>
+                    <p className="text-vault-text-secondary font-mono text-sm">ID: {verifiedEmployee.employee_number}</p>
+                  </div>
+                  <button 
+                    onClick={handleClearVerification}
+                    className="text-vault-text-secondary hover:text-vault-gold text-xs underline"
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="vault-label">Room Number</label>
+                <div className="relative">
+                  <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                  <Input
+                    value={roomNumber}
+                    onChange={(e) => setRoomNumber(e.target.value)}
+                    placeholder="Enter room number"
+                    className="vault-input pl-10"
+                    data-testid="checkin-room-input"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="vault-label">Check-In Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full vault-input justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
+                      )}
+                      data-testid="checkin-date-btn"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-vault-text-secondary" />
+                      {date ? format(date, "dd MMM yyyy") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={setDate}
+                      initialFocus
+                      className="bg-vault-surface text-vault-text"
+                      data-testid="checkin-calendar"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <label className="vault-label">Check-In Time</label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                  <Input
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="vault-input pl-10"
+                    data-testid="checkin-time-input"
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleCheckIn}
+                disabled={loading}
+                className="w-full vault-btn-primary h-12"
+                data-testid="submit-checkin-btn"
+              >
+                {loading ? "Processing..." : "Complete Check-In"}
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
     </motion.div>
