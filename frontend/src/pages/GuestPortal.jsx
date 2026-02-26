@@ -485,7 +485,7 @@ function CheckInForm({ setView }) {
 function CheckOutForm({ setView }) {
   const [roomNumber, setRoomNumber] = useState("");
   const [date, setDate] = useState(new Date());
-  const [time, setTime] = useState(format(new Date(), "HH:mm"));
+  const [time, setTime] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleCheckOut = async () => {
