@@ -469,14 +469,24 @@ export default function AdminDashboard() {
                     <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Sign-In Sheet</h1>
                     <p className="text-vault-text-secondary font-manrope mt-1">View all guest sign-in records</p>
                   </div>
-                  <Button 
-                    onClick={handleExportSignIn}
-                    className="vault-btn-primary flex items-center gap-2"
-                    data-testid="export-signin-btn"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export to Excel
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleExportSignIn}
+                      className="vault-btn-primary flex items-center gap-2"
+                      data-testid="export-signin-excel-btn"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Excel
+                    </Button>
+                    <Button 
+                      onClick={handleExportSignInPng}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+                      data-testid="export-signin-png-btn"
+                    >
+                      <Image className="w-4 h-4" />
+                      PNG
+                    </Button>
+                  </div>
                 </div>
               </div>
 
