@@ -128,6 +128,39 @@ export default function AdminDashboard() {
     navigate("/admin");
   };
 
+  const handleEdit = (record) => {
+    setEditingRecord(record);
+    setEditForm({
+      room_number: record.room_number,
+      check_in_date: record.check_in_date,
+      check_in_time: record.check_in_time,
+      check_out_date: record.check_out_date || "",
+      check_out_time: record.check_out_time || ""
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      await axios.put(`${API}/admin/bookings/${editingRecord.id}`, editForm);
+      toast.success("Record updated successfully");
+      setEditingRecord(null);
+      fetchData();
+    } catch (error) {
+      toast.error("Failed to update record");
+    }
+  };
+
+  const handleDelete = async (bookingId) => {
+    try {
+      await axios.delete(`${API}/admin/bookings/${bookingId}`);
+      toast.success("Record deleted successfully");
+      setDeleteConfirm(null);
+      fetchData();
+    } catch (error) {
+      toast.error("Failed to delete record");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-vault-bg flex items-center justify-center">
