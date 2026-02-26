@@ -204,10 +204,15 @@ async def admin_login(input: AdminLogin):
 @api_router.get("/admin/records", response_model=List[GuestRecord])
 async def get_all_records():
     bookings = await db.bookings.find({}, {"_id": 0}).to_list(1000)
-    records = []
     
+    # Batch fetch all guests to avoid N+1 query
+    employee_numbers = [b['employee_number'] for b in bookings]
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
+    records = []
     for booking in bookings:
-        guest = await db.guests.find_one({"employee_number": booking['employee_number']}, {"_id": 0})
+        guest = guests_dict.get(booking['employee_number'])
         if guest:
             total_hours = None
             total_nights = None
