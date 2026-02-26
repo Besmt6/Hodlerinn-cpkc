@@ -510,12 +510,14 @@ async def export_to_excel():
     for booking in bookings:
         guest = guests_dict.get(booking['employee_number'])
         if guest:
-            has_signature = bool(guest.get('signature'))
+            # Decrypt data
+            decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+            has_signature = bool(guest.get('signature_encrypted') or guest.get('signature'))
             is_checked_out = booking.get('is_checked_out', False)
             
             worksheet.write(row, 0, row_num, cell_format)
             worksheet.write(row, 1, "Single Stay", cell_format)
-            worksheet.write(row, 2, guest['name'], cell_format)
+            worksheet.write(row, 2, decrypted_name, cell_format)
             worksheet.write(row, 3, booking['employee_number'], cell_format)
             worksheet.write(row, 4, "Signed" if has_signature else "", signed_format if has_signature else cell_format)
             worksheet.write(row, 5, "Signed" if (has_signature and is_checked_out) else "", signed_format if (has_signature and is_checked_out) else cell_format)
