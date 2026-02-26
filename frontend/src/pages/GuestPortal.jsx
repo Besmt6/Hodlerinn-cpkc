@@ -497,8 +497,16 @@ function CheckOutForm({ setView }) {
   const [loading, setLoading] = useState(false);
 
   const handleCheckOut = async () => {
-    if (!roomNumber || !date || !time) {
-      toast.error("Please fill in all fields");
+    if (!roomNumber) {
+      toast.error("Please enter room number");
+      return;
+    }
+    if (!date) {
+      toast.error("Please select check-out date");
+      return;
+    }
+    if (!time) {
+      toast.error("Please select check-out time");
       return;
     }
 
