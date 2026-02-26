@@ -353,6 +353,116 @@ async def export_to_excel():
         headers={"Content-Disposition": "attachment; filename=hodler_inn_sign_in_sheet.xlsx"}
     )
 
+# Admin - Export Billing Report
+@api_router.get("/admin/export-billing")
+async def export_billing_report():
+    bookings = await db.bookings.find({"is_checked_out": True}, {"_id": 0}).to_list(1000)
+    
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    worksheet = workbook.add_worksheet("Billing Report")
+    
+    # Styles
+    title_format = workbook.add_format({
+        'bold': True,
+        'font_size': 14,
+        'align': 'center',
+        'valign': 'vcenter'
+    })
+    subtitle_format = workbook.add_format({
+        'font_size': 10,
+        'align': 'center',
+        'valign': 'vcenter'
+    })
+    header_format = workbook.add_format({
+        'bold': True,
+        'bg_color': '#fbbf24',
+        'border': 1,
+        'align': 'center',
+        'valign': 'vcenter',
+        'text_wrap': True
+    })
+    cell_format = workbook.add_format({
+        'border': 1,
+        'align': 'center',
+        'valign': 'vcenter'
+    })
+    number_format = workbook.add_format({
+        'border': 1,
+        'align': 'center',
+        'valign': 'vcenter',
+        'num_format': '0.00'
+    })
+    total_format = workbook.add_format({
+        'bold': True,
+        'border': 1,
+        'align': 'center',
+        'valign': 'vcenter',
+        'bg_color': '#e5e7eb'
+    })
+    
+    # Company Header
+    worksheet.merge_range('A1:I1', 'Hodler Inn - Billing Report', title_format)
+    worksheet.merge_range('A2:I2', '820 Hwy 59 N Heavener, OK, 74937 | Phone: 918-653-7801', subtitle_format)
+    worksheet.set_row(0, 25)
+    worksheet.set_row(1, 18)
+    
+    # Column Headers
+    headers = [
+        "#", "Name", "Employee ID", "Room #",
+        "Check-In", "Check-Out", "Total Hours", "Nights Billed", "Signed"
+    ]
+    
+    col_widths = [5, 20, 12, 8, 18, 18, 12, 12, 10]
+    for col, (header, width) in enumerate(zip(headers, col_widths)):
+        worksheet.write(3, col, header, header_format)
+        worksheet.set_column(col, col, width)
+    
+    # Data rows
+    row = 4
+    row_num = 1
+    total_nights = 0
+    
+    for booking in bookings:
+        guest = await db.guests.find_one({"employee_number": booking['employee_number']}, {"_id": 0})
+        if guest:
+            hours, nights = calculate_stay_duration(
+                booking['check_in_date'],
+                booking['check_in_time'],
+                booking['check_out_date'],
+                booking['check_out_time']
+            )
+            
+            has_signature = bool(guest.get('signature'))
+            total_nights += nights if nights else 0
+            
+            worksheet.write(row, 0, row_num, cell_format)
+            worksheet.write(row, 1, guest['name'], cell_format)
+            worksheet.write(row, 2, booking['employee_number'], cell_format)
+            worksheet.write(row, 3, booking['room_number'], cell_format)
+            worksheet.write(row, 4, f"{booking['check_in_date']} {booking['check_in_time']}", cell_format)
+            worksheet.write(row, 5, f"{booking['check_out_date']} {booking['check_out_time']}", cell_format)
+            worksheet.write(row, 6, hours if hours else 0, number_format)
+            worksheet.write(row, 7, nights if nights else 0, cell_format)
+            worksheet.write(row, 8, "Yes" if has_signature else "No", cell_format)
+            row += 1
+            row_num += 1
+    
+    # Total row
+    worksheet.write(row, 0, "", total_format)
+    worksheet.merge_range(row, 1, row, 6, "TOTAL NIGHTS BILLED", total_format)
+    worksheet.write(row, 7, total_nights, total_format)
+    worksheet.write(row, 8, "", total_format)
+    
+    workbook.close()
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=hodler_inn_billing_report.xlsx"}
+    )
+
 # Include the router in the main app
 app.include_router(api_router)
 
