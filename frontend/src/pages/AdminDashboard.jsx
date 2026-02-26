@@ -661,9 +661,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
-                  </Button>
-                </div>
-              </div>
 
               {/* Billing Summary */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
