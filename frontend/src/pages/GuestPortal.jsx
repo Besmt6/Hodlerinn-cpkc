@@ -43,7 +43,7 @@ const pageVariants = {
 };
 
 export default function GuestPortal() {
-  const [view, setView] = useState("menu"); // menu, register, checkin, checkout
+  const [view, setView] = useState("menu"); // menu, register, checkin, checkout, signin
   const navigate = useNavigate();
 
   return (
@@ -81,6 +81,9 @@ export default function GuestPortal() {
         )}
         {view === "checkout" && (
           <CheckOutForm key="checkout" setView={setView} />
+        )}
+        {view === "signin" && (
+          <SignInSheetView key="signin" setView={setView} />
         )}
       </AnimatePresence>
     </div>
