@@ -16,6 +16,7 @@ import math
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from cryptography.fernet import Fernet
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -29,6 +30,10 @@ db = client[os.environ['DB_NAME']]
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
 
+# Encryption configuration
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', '')
+fernet = Fernet(ENCRYPTION_KEY.encode()) if ENCRYPTION_KEY else None
+
 # Create the main app without a prefix
 app = FastAPI()
 
@@ -37,6 +42,28 @@ api_router = APIRouter(prefix="/api")
 
 # Admin password (simple protection)
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'hodlerinn2024')
+
+# ==================== Encryption Functions ====================
+
+def encrypt_data(data: str) -> str:
+    """Encrypt sensitive data"""
+    if not fernet or not data:
+        return data
+    try:
+        return fernet.encrypt(data.encode()).decode()
+    except Exception as e:
+        logging.error(f"Encryption error: {e}")
+        return data
+
+def decrypt_data(encrypted_data: str) -> str:
+    """Decrypt sensitive data"""
+    if not fernet or not encrypted_data:
+        return encrypted_data
+    try:
+        return fernet.decrypt(encrypted_data.encode()).decode()
+    except Exception as e:
+        # If decryption fails, data might not be encrypted (old data)
+        return encrypted_data
 
 # ==================== Scheduler for Monthly Reset ====================
 
