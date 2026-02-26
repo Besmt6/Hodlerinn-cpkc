@@ -56,6 +56,9 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedSignature, setSelectedSignature] = useState(null);
   const [activeView, setActiveView] = useState("dashboard");
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
