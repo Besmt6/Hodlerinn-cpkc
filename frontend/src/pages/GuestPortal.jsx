@@ -118,7 +118,7 @@ function MainMenu({ setView }) {
           </div>
           <Button
             onClick={() => setView("register")}
-            className="w-full h-14 text-lg flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase tracking-wide"
+            className="w-full h-14 text-lg flex items-center justify-center gap-3 bg-amber-500 hover:bg-amber-600 text-black font-bold uppercase tracking-wide"
             data-testid="register-btn"
           >
             <UserPlus className="w-5 h-5" />
@@ -126,7 +126,7 @@ function MainMenu({ setView }) {
           </Button>
           <Button
             onClick={() => setView("checkin")}
-            className="w-full vault-btn-primary h-14 text-lg flex items-center justify-center gap-3"
+            className="w-full h-14 text-lg flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase tracking-wide"
             data-testid="checkin-btn"
           >
             <LogIn className="w-5 h-5" />
@@ -134,7 +134,7 @@ function MainMenu({ setView }) {
           </Button>
           <Button
             onClick={() => setView("checkout")}
-            className="w-full vault-btn-primary h-14 text-lg flex items-center justify-center gap-3"
+            className="w-full h-14 text-lg flex items-center justify-center gap-3 bg-red-600 hover:bg-red-700 text-white font-bold uppercase tracking-wide"
             data-testid="checkout-btn"
           >
             <LogOut className="w-5 h-5" />
