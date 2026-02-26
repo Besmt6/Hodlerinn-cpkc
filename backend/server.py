@@ -439,7 +439,7 @@ async def export_billing_report():
     total_nights = 0
     
     for booking in bookings:
-        guest = await db.guests.find_one({"employee_number": booking['employee_number']}, {"_id": 0})
+        guest = guests_dict.get(booking['employee_number'])
         if guest:
             hours, nights = calculate_stay_duration(
                 booking['check_in_date'],
