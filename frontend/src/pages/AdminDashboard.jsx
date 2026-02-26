@@ -181,8 +181,47 @@ export default function AdminDashboard() {
         </button>
       </div>
 
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-vault-surface border-b border-vault-border p-4 z-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-vault-gold rounded-lg flex items-center justify-center">
+              <span className="font-outfit font-bold text-black text-sm">H</span>
+            </div>
+            <span className="font-outfit font-bold text-vault-text">HODLER INN</span>
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="text-vault-text-secondary hover:text-vault-gold"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
+        {/* Mobile Nav Tabs */}
+        <div className="flex gap-2 mt-3 overflow-x-auto">
+          <button 
+            onClick={() => setActiveView('dashboard')}
+            className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'dashboard' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
+          >
+            Dashboard
+          </button>
+          <button 
+            onClick={() => setActiveView('signin')}
+            className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'signin' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
+          >
+            Sign-In Sheet
+          </button>
+          <button 
+            onClick={() => setActiveView('billing')}
+            className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'billing' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
+          >
+            Billing Report
+          </button>
+        </div>
+      </div>
+
       {/* Main Content */}
-      <div className="ml-60 p-8">
+      <div className="md:ml-60 p-4 md:p-8 pt-28 md:pt-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
