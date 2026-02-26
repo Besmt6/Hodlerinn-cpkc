@@ -255,6 +255,41 @@ async def check_out(input: CheckOutCreate):
     
     return {"message": "Check-out successful", "booking_id": booking['id']}
 
+# ==================== Edit/Delete Bookings ====================
+
+class BookingUpdate(BaseModel):
+    room_number: Optional[str] = None
+    check_in_date: Optional[str] = None
+    check_in_time: Optional[str] = None
+    check_out_date: Optional[str] = None
+    check_out_time: Optional[str] = None
+
+# Edit a booking
+@api_router.put("/admin/bookings/{booking_id}")
+async def update_booking(booking_id: str, input: BookingUpdate):
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    update_data = {k: v for k, v in input.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No data to update")
+    
+    await db.bookings.update_one({"id": booking_id}, {"$set": update_data})
+    
+    return {"message": "Booking updated successfully"}
+
+# Delete a booking
+@api_router.delete("/admin/bookings/{booking_id}")
+async def delete_booking(booking_id: str):
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    await db.bookings.delete_one({"id": booking_id})
+    
+    return {"message": "Booking deleted successfully"}
+
 # Admin Login
 @api_router.post("/admin/login")
 async def admin_login(input: AdminLogin):
