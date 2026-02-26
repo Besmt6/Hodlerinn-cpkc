@@ -631,11 +631,13 @@ async def export_billing_report():
                 booking['check_out_time']
             )
             
-            has_signature = bool(guest.get('signature'))
+            # Decrypt data
+            decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+            has_signature = bool(guest.get('signature_encrypted') or guest.get('signature'))
             total_nights += nights if nights else 0
             
             worksheet.write(row, 0, row_num, cell_format)
-            worksheet.write(row, 1, guest['name'], cell_format)
+            worksheet.write(row, 1, decrypted_name, cell_format)
             worksheet.write(row, 2, booking['employee_number'], cell_format)
             worksheet.write(row, 3, booking['room_number'], cell_format)
             worksheet.write(row, 4, f"{booking['check_in_date']} {booking['check_in_time']}", cell_format)
