@@ -262,6 +262,11 @@ async def get_dashboard_stats():
 async def export_to_excel():
     bookings = await db.bookings.find({}, {"_id": 0}).to_list(1000)
     
+    # Batch fetch all guests to avoid N+1 query
+    employee_numbers = [b['employee_number'] for b in bookings]
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
     worksheet = workbook.add_worksheet("Sign-In Sheet")
@@ -322,7 +327,7 @@ async def export_to_excel():
     row = 5
     row_num = 1
     for booking in bookings:
-        guest = await db.guests.find_one({"employee_number": booking['employee_number']}, {"_id": 0})
+        guest = guests_dict.get(booking['employee_number'])
         if guest:
             has_signature = bool(guest.get('signature'))
             is_checked_out = booking.get('is_checked_out', False)
