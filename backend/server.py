@@ -319,7 +319,7 @@ async def check_out(input: CheckOutCreate):
     )
     
     # Send Telegram notification for check-out
-    guest_name = guest['name'] if guest else "Unknown"
+    guest_name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown'))) if guest else "Unknown"
     await send_telegram_notification(
         f"🔴🔴🔴 <b>CHECK-OUT</b> 🔴🔴🔴\n"
         f"━━━━━━━━━━━━━━━\n"
