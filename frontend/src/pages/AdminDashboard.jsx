@@ -215,9 +215,11 @@ export default function AdminDashboard() {
       <div className="fixed left-0 top-0 h-full w-60 admin-sidebar p-6 flex-col hidden md:flex">
         {/* Logo */}
         <div className="flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 bg-vault-gold rounded-lg flex items-center justify-center">
-            <span className="font-outfit font-bold text-black text-xl">H</span>
-          </div>
+          <img 
+            src="https://customer-assets.emergentagent.com/job_guest-hotel-mgmt/artifacts/56yphta2_17721406444867042425090808501904.jpg" 
+            alt="Hodler Inn Logo" 
+            className="w-12 h-12 rounded-lg object-cover"
+          />
           <div>
             <h1 className="font-outfit font-bold text-vault-text text-lg tracking-tight">HODLER INN</h1>
             <p className="font-mono text-[9px] text-vault-gold uppercase tracking-widest">Admin Panel</p>
