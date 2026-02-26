@@ -463,12 +463,13 @@ export default function AdminDashboard() {
                           <TableHead className="text-vault-gold">Date Out</TableHead>
                           <TableHead className="text-vault-gold">Time Out</TableHead>
                           <TableHead className="text-vault-gold">Room #</TableHead>
+                          <TableHead className="text-vault-gold">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {records.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={11} className="text-center text-vault-text-secondary py-8">
+                            <TableCell colSpan={12} className="text-center text-vault-text-secondary py-8">
                               No records found
                             </TableCell>
                           </TableRow>
@@ -490,6 +491,28 @@ export default function AdminDashboard() {
                               <TableCell className="text-vault-text">{record.check_out_date || "—"}</TableCell>
                               <TableCell className="font-mono text-vault-text">{record.check_out_time || "—"}</TableCell>
                               <TableCell className="font-mono text-vault-gold font-bold">{record.room_number}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-vault-text-secondary hover:text-vault-gold h-8 w-8 p-0"
+                                    onClick={() => handleEdit(record)}
+                                    data-testid={`edit-${record.id}`}
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-vault-text-secondary hover:text-red-500 h-8 w-8 p-0"
+                                    onClick={() => setDeleteConfirm(record)}
+                                    data-testid={`delete-${record.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
                             </TableRow>
                           ))
                         )}
