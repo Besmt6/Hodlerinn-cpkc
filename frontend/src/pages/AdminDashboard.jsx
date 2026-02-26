@@ -670,8 +670,36 @@ export default function AdminDashboard() {
                               </TableCell>
                               <TableCell className="font-mono text-vault-text">{record.total_hours}h</TableCell>
                               <TableCell className="font-mono text-vault-gold font-bold text-lg">{record.total_nights}</TableCell>
-                              <TableCell className="text-vault-success font-medium">
-                                {record.signature ? "Yes" : "No"}
+                              <TableCell>
+                                {record.signature ? (
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <button className="cursor-pointer">
+                                        <img 
+                                          src={record.signature} 
+                                          alt="Signature" 
+                                          className="w-16 h-10 object-contain bg-black/30 rounded border border-vault-border hover:border-vault-gold transition-colors"
+                                        />
+                                      </button>
+                                    </DialogTrigger>
+                                    <DialogContent className="bg-vault-surface border-vault-border">
+                                      <DialogHeader>
+                                        <DialogTitle className="font-outfit text-vault-text">
+                                          Signature - {record.employee_name}
+                                        </DialogTitle>
+                                      </DialogHeader>
+                                      <div className="bg-black/50 rounded-lg p-4">
+                                        <img 
+                                          src={record.signature} 
+                                          alt="Signature"
+                                          className="w-full h-40 object-contain"
+                                        />
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+                                ) : (
+                                  <span className="text-vault-text-secondary">No</span>
+                                )}
                               </TableCell>
                             </TableRow>
                           ))
