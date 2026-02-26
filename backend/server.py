@@ -273,7 +273,7 @@ async def check_in(input: CheckInCreate):
     await send_telegram_notification(
         f"🟢🟢🟢 <b>CHECK-IN</b> 🟢🟢🟢\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"✅ <b>Guest:</b> {guest['name']}\n"
+        f"✅ <b>Guest:</b> {guest_name}\n"
         f"✅ <b>Employee ID:</b> {input.employee_number}\n"
         f"✅ <b>Room:</b> {input.room_number}\n"
         f"✅ <b>Date:</b> {input.check_in_date}\n"
