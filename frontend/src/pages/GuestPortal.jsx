@@ -134,6 +134,16 @@ function MainMenu({ setView }) {
             <LogOut className="w-5 h-5" />
             Check Out
           </Button>
+          <div className="pt-4 border-t border-vault-border">
+            <Button
+              onClick={() => setView("signin")}
+              className="w-full vault-btn-secondary h-12 flex items-center justify-center gap-3"
+              data-testid="signin-sheet-btn"
+            >
+              <ClipboardList className="w-5 h-5" />
+              View Sign-In Sheet
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </motion.div>
