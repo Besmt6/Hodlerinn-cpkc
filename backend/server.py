@@ -244,6 +244,9 @@ async def check_in(input: CheckInCreate):
     if not guest:
         raise HTTPException(status_code=404, detail="Employee not registered. Please register first.")
     
+    # Decrypt guest name for notification
+    guest_name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown')))
+    
     # Check if room is already occupied
     active_booking = await db.bookings.find_one({
         "room_number": input.room_number,
