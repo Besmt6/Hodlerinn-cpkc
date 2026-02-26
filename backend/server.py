@@ -191,12 +191,14 @@ async def check_in(input: CheckInCreate):
     
     # Send Telegram notification for check-in
     await send_telegram_notification(
-        f"🏨 <b>NEW CHECK-IN</b>\n\n"
-        f"👤 <b>Guest:</b> {guest['name']}\n"
-        f"🆔 <b>Employee ID:</b> {input.employee_number}\n"
-        f"🚪 <b>Room:</b> {input.room_number}\n"
-        f"📅 <b>Date:</b> {input.check_in_date}\n"
-        f"⏰ <b>Time:</b> {input.check_in_time}"
+        f"🟢🟢🟢 <b>CHECK-IN</b> 🟢🟢🟢\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"✅ <b>Guest:</b> {guest['name']}\n"
+        f"✅ <b>Employee ID:</b> {input.employee_number}\n"
+        f"✅ <b>Room:</b> {input.room_number}\n"
+        f"✅ <b>Date:</b> {input.check_in_date}\n"
+        f"✅ <b>Time:</b> {input.check_in_time}\n"
+        f"━━━━━━━━━━━━━━━"
     )
     
     return checkin
