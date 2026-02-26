@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import io
 import xlsxwriter
 import math
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -22,6 +23,10 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Telegram configuration
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
+
 # Create the main app without a prefix
 app = FastAPI()
 
@@ -30,6 +35,24 @@ api_router = APIRouter(prefix="/api")
 
 # Admin password (simple protection)
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'hodlerinn2024')
+
+# ==================== Telegram Notification ====================
+
+async def send_telegram_notification(message: str):
+    """Send notification to Telegram"""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        async with httpx.AsyncClient() as client:
+            await client.post(url, json={
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": message,
+                "parse_mode": "HTML"
+            })
+    except Exception as e:
+        logging.error(f"Failed to send Telegram notification: {e}")
 
 # ==================== Models ====================
 
