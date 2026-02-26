@@ -533,3 +533,112 @@ function CheckOutForm({ setView }) {
     </motion.div>
   );
 }
+
+
+function SignInSheetView({ setView }) {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchRecords();
+  }, []);
+
+  const fetchRecords = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/records`);
+      setRecords(response.data);
+    } catch (error) {
+      toast.error("Failed to load records");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="w-full max-w-6xl px-4"
+    >
+      <Card className="glass-card" data-testid="signin-sheet-view-card">
+        <CardHeader className="pb-4">
+          <button 
+            onClick={() => setView("menu")} 
+            className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
+            data-testid="back-btn"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Menu
+          </button>
+          <div className="text-center">
+            <CardTitle className="font-outfit text-2xl font-bold text-vault-gold tracking-tight">
+              Hodler Inn
+            </CardTitle>
+            <p className="text-vault-text-secondary text-sm mt-1">820 Hwy 59 N Heavener, OK, 74937</p>
+            <p className="text-vault-text-secondary text-sm">Phone: 918-653-7801</p>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          {loading ? (
+            <div className="text-center py-8 text-vault-text-secondary">Loading...</div>
+          ) : (
+            <div className="min-w-[1000px]">
+              <Table>
+                <TableHeader>
+                  <TableRow className="table-header border-vault-border hover:bg-transparent">
+                    <TableHead className="text-vault-gold w-12">#</TableHead>
+                    <TableHead className="text-vault-gold">Stay Type</TableHead>
+                    <TableHead className="text-vault-gold">Name</TableHead>
+                    <TableHead className="text-vault-gold">Employee ID</TableHead>
+                    <TableHead className="text-vault-gold">Signature In</TableHead>
+                    <TableHead className="text-vault-gold">Signature Out</TableHead>
+                    <TableHead className="text-vault-gold">Date In</TableHead>
+                    <TableHead className="text-vault-gold">Time In</TableHead>
+                    <TableHead className="text-vault-gold">Date Out</TableHead>
+                    <TableHead className="text-vault-gold">Time Out</TableHead>
+                    <TableHead className="text-vault-gold">Room #</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {records.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center text-vault-text-secondary py-8">
+                        No records found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    records.map((record, index) => (
+                      <TableRow key={record.id} className="table-row border-vault-border">
+                        <TableCell className="font-mono text-vault-text">{index + 1}</TableCell>
+                        <TableCell className="text-vault-text">Single Stay</TableCell>
+                        <TableCell className="text-vault-text font-medium">{record.employee_name}</TableCell>
+                        <TableCell className="font-mono text-vault-text">{record.employee_number}</TableCell>
+                        <TableCell className="text-vault-success font-medium">
+                          {record.signature ? "Signed" : "—"}
+                        </TableCell>
+                        <TableCell className="text-vault-success font-medium">
+                          {record.is_checked_out && record.signature ? "Signed" : "—"}
+                        </TableCell>
+                        <TableCell className="text-vault-text">{record.check_in_date}</TableCell>
+                        <TableCell className="font-mono text-vault-text">{record.check_in_time}</TableCell>
+                        <TableCell className="text-vault-text">{record.check_out_date || "—"}</TableCell>
+                        <TableCell className="font-mono text-vault-text">{record.check_out_time || "—"}</TableCell>
+                        <TableCell className="font-mono text-vault-gold font-bold">{record.room_number}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <p className="text-vault-text-secondary text-xs text-center py-4 md:hidden">
+            ← Swipe table horizontally to see all columns →
+          </p>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
