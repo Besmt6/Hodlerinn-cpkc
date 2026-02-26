@@ -214,6 +214,11 @@ async def register_guest(input: GuestRegistrationCreate):
     doc = guest.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     
+    # Encrypt sensitive data before storing
+    doc['name_encrypted'] = encrypt_data(doc['name'])
+    doc['signature_encrypted'] = encrypt_data(doc['signature'])
+    # Keep employee_number unencrypted for lookups
+    
     await db.guests.insert_one(doc)
     return guest
 
@@ -222,6 +227,13 @@ async def get_guest(employee_number: str):
     guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
     if not guest:
         raise HTTPException(status_code=404, detail="Guest not found")
+    
+    # Decrypt data before returning
+    if 'name_encrypted' in guest:
+        guest['name'] = decrypt_data(guest['name_encrypted'])
+    if 'signature_encrypted' in guest:
+        guest['signature'] = decrypt_data(guest['signature_encrypted'])
+    
     return guest
 
 # Check-In
