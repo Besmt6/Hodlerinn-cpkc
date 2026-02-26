@@ -145,15 +145,26 @@ export default function AdminDashboard() {
 
         {/* Navigation */}
         <nav className="space-y-2 flex-1">
-          <div className="admin-nav-item active">
+          <div 
+            className={`admin-nav-item cursor-pointer ${activeView === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setActiveView('dashboard')}
+          >
             <LayoutDashboard className="w-4 h-4" />
             <span className="font-manrope text-sm">Dashboard</span>
           </div>
-          <div className="admin-nav-item cursor-pointer" onClick={handleExportSignIn} data-testid="nav-signin-export-btn">
+          <div 
+            className={`admin-nav-item cursor-pointer ${activeView === 'signin' ? 'active' : ''}`}
+            onClick={() => setActiveView('signin')}
+            data-testid="nav-signin-view-btn"
+          >
             <ClipboardList className="w-4 h-4" />
             <span className="font-manrope text-sm">Sign-In Sheet</span>
           </div>
-          <div className="admin-nav-item cursor-pointer" onClick={handleExportBilling} data-testid="nav-billing-export-btn">
+          <div 
+            className={`admin-nav-item cursor-pointer ${activeView === 'billing' ? 'active' : ''}`}
+            onClick={() => setActiveView('billing')}
+            data-testid="nav-billing-view-btn"
+          >
             <Receipt className="w-4 h-4" />
             <span className="font-manrope text-sm">Billing Report</span>
           </div>
