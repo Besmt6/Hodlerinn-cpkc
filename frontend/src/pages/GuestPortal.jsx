@@ -321,8 +321,16 @@ function CheckInForm({ setView }) {
       toast.error("Please verify employee number first");
       return;
     }
-    if (!roomNumber || !date || !time) {
-      toast.error("Please fill in all fields");
+    if (!roomNumber) {
+      toast.error("Please enter room number");
+      return;
+    }
+    if (!date) {
+      toast.error("Please select check-in date");
+      return;
+    }
+    if (!time) {
+      toast.error("Please select check-in time");
       return;
     }
 
