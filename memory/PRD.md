@@ -88,6 +88,24 @@ Build a two-part application for a hotel named "Hodler Inn":
 - Guest history/loyalty tracking
 - Room availability calendar view
 
+### P3 (Saved for Later - Advanced Features)
+- **Blockchain Integration:**
+  - Immutable guest records (tamper-proof audit trail)
+  - Smart contract billing (automatic payment on check-out)
+  - NFT room keys (digital keys as NFTs)
+  - Transparent pricing (rate agreements on-chain)
+  - Loyalty tokens (reward frequent guests)
+  - Network options: Polygon (recommended), Ethereum, Solana, or Base
+  
+- **AI Phone Bot:**
+  - 24/7 automated call answering
+  - Provide info (rates, availability, directions)
+  - Take reservation requests
+  - Check booking status
+  - Transfer to human staff when needed
+  - Multi-language support
+  - Provider options: Vapi.ai (recommended), Retell AI, Twilio + OpenAI
+
 ## Access Credentials
 - **Admin Dashboard**: /admin → Password: hodlerinn2024
 - **Guest Sign-In Sheet**: Password: cpkc (or valid employee ID)
