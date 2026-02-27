@@ -454,6 +454,34 @@ function CheckInForm({ setView }) {
                   />
                 </div>
               </div>
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="vault-label mb-0">Signature</label>
+                  <button 
+                    onClick={clearSignature}
+                    className="text-vault-text-secondary hover:text-vault-gold text-xs flex items-center gap-1 transition-colors"
+                    data-testid="clear-checkin-signature-btn"
+                  >
+                    <Eraser className="w-3 h-3" />
+                    Clear
+                  </button>
+                </div>
+                <div className="signature-wrapper">
+                  <SignatureCanvas
+                    ref={sigRef}
+                    canvasProps={{
+                      className: "signature-canvas w-full h-32 bg-transparent",
+                      style: { width: "100%", height: "128px" }
+                    }}
+                    penColor="#fbbf24"
+                    backgroundColor="transparent"
+                    data-testid="checkin-signature-canvas"
+                  />
+                </div>
+                <p className="text-vault-text-secondary text-xs mt-1">
+                  This signature will be used for both check-in and check-out.
+                </p>
+              </div>
               <Button
                 onClick={handleCheckIn}
                 disabled={loading}
