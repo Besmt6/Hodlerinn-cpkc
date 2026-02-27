@@ -72,9 +72,15 @@ Build a two-part application for a hotel named "Hodler Inn":
 - Room Management (add/edit/delete)
 - Date Range Filtering
 
-### P1 (Blocked)
-- **Elox Smart Lock Integration**: Send digital keys to guest phones after check-in
-  - Status: BLOCKED - waiting for user to provide Elox API documentation
+### P1 (Future Integration - Saved for Later)
+- **UnlockOS Smart Lock Integration**: Automatic digital key delivery to guests after check-in
+  - **Website:** https://unlockos.io
+  - **What it does:** Connects payments with access control, auto-issues keys when guest pays
+  - **Supported locks:** Yale, Schlage, August, and other major brands
+  - **Pricing:** $0 setup, $0 monthly, $0.17 per check-in
+  - **API Status:** Full Developer API/SDK coming in 2026
+  - **Current Option:** Can use payment links for simple integration now
+  - **Status:** SAVED FOR LATER - revisit when ready
 
 ### P2 (Future)
 - Email notifications on check-in/out
