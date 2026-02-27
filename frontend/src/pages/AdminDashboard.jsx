@@ -1063,20 +1063,23 @@ export default function AdminDashboard() {
           {/* Room Management View */}
           {activeView === 'rooms' && (
             <>
-              {/* Header */}
+              {/* Header with Add Room Button */}
               <div className="mb-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
+                <div className="flex flex-wrap justify-between items-start gap-4">
+                  <div className="flex-1 min-w-0">
                     <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Room Management</h1>
                     <p className="text-vault-text-secondary font-manrope mt-1">Add, edit, and manage hotel rooms</p>
                   </div>
+                </div>
+                {/* Add Room Button - Separate row for visibility */}
+                <div className="mt-4">
                   <Button 
                     onClick={() => {
                       setEditingRoom(null);
                       setRoomForm({ room_number: "", room_type: "Standard", floor: "1", notes: "" });
                       setShowRoomDialog(true);
                     }}
-                    className="vault-btn-primary flex items-center gap-2 shrink-0"
+                    className="vault-btn-primary flex items-center gap-2"
                     data-testid="add-room-btn"
                   >
                     <Plus className="w-4 h-4" />
