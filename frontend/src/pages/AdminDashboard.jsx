@@ -412,6 +412,14 @@ export default function AdminDashboard() {
             <Receipt className="w-4 h-4" />
             <span className="font-manrope text-sm">Billing Report</span>
           </div>
+          <div 
+            className={`admin-nav-item cursor-pointer ${activeView === 'rooms' ? 'active' : ''}`}
+            onClick={() => setActiveView('rooms')}
+            data-testid="nav-rooms-view-btn"
+          >
+            <Bed className="w-4 h-4" />
+            <span className="font-manrope text-sm">Room Management</span>
+          </div>
         </nav>
 
         {/* Logout */}
