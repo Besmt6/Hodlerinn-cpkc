@@ -134,13 +134,11 @@ class GuestRegistration(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     employee_number: str
     name: str
-    signature: str  # Base64 encoded signature image
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class GuestRegistrationCreate(BaseModel):
     employee_number: str
     name: str
-    signature: str
 
 class CheckIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -151,6 +149,7 @@ class CheckIn(BaseModel):
     check_in_time: str  # HH:MM format
     check_out_date: Optional[str] = None
     check_out_time: Optional[str] = None
+    signature: Optional[str] = None  # Signature captured at check-in
     is_checked_out: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -159,6 +158,7 @@ class CheckInCreate(BaseModel):
     room_number: str
     check_in_date: str
     check_in_time: str
+    signature: str  # Required at check-in
 
 class CheckOutCreate(BaseModel):
     room_number: str
