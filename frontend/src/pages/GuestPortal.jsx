@@ -624,13 +624,43 @@ function CheckOutForm({ setView }) {
 
 function SignInSheetView({ setView }) {
   const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [accessCode, setAccessCode] = useState("");
+  const [isVerified, setIsVerified] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
-  useEffect(() => {
-    fetchRecords();
-  }, []);
+  const handleVerifyAccess = async () => {
+    if (!accessCode) {
+      toast.error("Please enter company name or employee ID");
+      return;
+    }
+
+    setVerifying(true);
+    
+    // Check if it's the company code "cpkc" (case insensitive)
+    if (accessCode.toLowerCase() === "cpkc") {
+      setIsVerified(true);
+      fetchRecords();
+      toast.success("Access granted");
+      setVerifying(false);
+      return;
+    }
+
+    // Check if it's a valid employee number
+    try {
+      await axios.get(`${API}/guests/${accessCode}`);
+      setIsVerified(true);
+      fetchRecords();
+      toast.success("Access granted");
+    } catch (error) {
+      toast.error("Invalid company name or employee ID");
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const fetchRecords = async () => {
+    setLoading(true);
     try {
       const response = await axios.get(`${API}/admin/records`);
       setRecords(response.data);
@@ -640,6 +670,64 @@ function SignInSheetView({ setView }) {
       setLoading(false);
     }
   };
+
+  // Access verification screen
+  if (!isVerified) {
+    return (
+      <motion.div
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full max-w-md"
+      >
+        <Card className="glass-card p-8" data-testid="signin-access-card">
+          <CardHeader className="pb-6">
+            <button 
+              onClick={() => setView("menu")} 
+              className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
+              data-testid="back-btn"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+            <CardTitle className="font-outfit text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
+              <ClipboardList className="w-6 h-6 text-vault-gold" />
+              View Sign-In Sheet
+            </CardTitle>
+            <p className="text-vault-text-secondary font-manrope mt-2 text-sm">
+              Enter your company name or employee ID to view records
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <label className="vault-label">Company Name or Employee ID</label>
+              <div className="relative">
+                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                <Input
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value)}
+                  placeholder="Enter company name or employee ID"
+                  className="vault-input pl-10"
+                  data-testid="access-code-input"
+                  onKeyDown={(e) => e.key === 'Enter' && handleVerifyAccess()}
+                />
+              </div>
+            </div>
+            <Button
+              onClick={handleVerifyAccess}
+              disabled={verifying}
+              className="w-full vault-btn-primary h-12"
+              data-testid="verify-access-btn"
+            >
+              {verifying ? "Verifying..." : "View Sign-In Sheet"}
+            </Button>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
