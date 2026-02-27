@@ -471,6 +471,12 @@ export default function AdminDashboard() {
           >
             Billing Report
           </button>
+          <button 
+            onClick={() => setActiveView('rooms')}
+            className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'rooms' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
+          >
+            Rooms
+          </button>
         </div>
       </div>
 
