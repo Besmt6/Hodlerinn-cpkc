@@ -683,7 +683,8 @@ async def export_billing_report():
             
             # Decrypt data
             decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
-            has_signature = bool(guest.get('signature_encrypted') or guest.get('signature'))
+            # Signature is now in booking
+            has_signature = bool(booking.get('signature_encrypted'))
             total_nights += nights if nights else 0
             
             worksheet.write(row, 0, row_num, cell_format)
