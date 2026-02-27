@@ -1150,7 +1150,8 @@ async def export_billing_pdf(
         guest = guests_dict.get(booking['employee_number'])
         if guest:
             decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
-            has_sig = bool(guest.get('signature_encrypted') or guest.get('signature'))
+            # Signature is now in booking
+            has_sig = bool(booking.get('signature_encrypted'))
             
             hours, nights = calculate_stay_duration(
                 booking['check_in_date'],
