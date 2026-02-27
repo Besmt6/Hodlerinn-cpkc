@@ -183,6 +183,30 @@ class GuestRecord(BaseModel):
     total_nights: Optional[int] = None
     is_checked_out: bool
 
+# Room Management Models
+class Room(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    room_number: str
+    room_type: str = "Standard"  # Standard, Deluxe, Suite
+    floor: str = "1"
+    status: str = "available"  # available, occupied, maintenance
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class RoomCreate(BaseModel):
+    room_number: str
+    room_type: str = "Standard"
+    floor: str = "1"
+    notes: Optional[str] = None
+
+class RoomUpdate(BaseModel):
+    room_number: Optional[str] = None
+    room_type: Optional[str] = None
+    floor: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
 # ==================== Helper Functions ====================
 
 def calculate_stay_duration(check_in_date: str, check_in_time: str, check_out_date: str, check_out_time: str):
