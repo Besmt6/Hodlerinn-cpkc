@@ -265,7 +265,7 @@ async def get_guest(employee_number: str):
     
     return guest
 
-# Check-In
+# Check-In (signature captured here)
 @api_router.post("/checkin", response_model=CheckIn)
 async def check_in(input: CheckInCreate):
     # Verify employee is registered
@@ -295,6 +295,11 @@ async def check_in(input: CheckInCreate):
     checkin = CheckIn(**input.model_dump())
     doc = checkin.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
+    
+    # Encrypt signature before storing
+    if doc.get('signature'):
+        doc['signature_encrypted'] = encrypt_data(doc['signature'])
+        del doc['signature']  # Don't store unencrypted
     
     await db.bookings.insert_one(doc)
     
