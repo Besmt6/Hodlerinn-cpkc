@@ -940,6 +940,261 @@ async def export_billing_png():
         headers={"Content-Disposition": "attachment; filename=hodler_inn_billing_report.png"}
     )
 
+# ==================== Room Management ====================
+
+@api_router.get("/admin/rooms")
+async def get_all_rooms():
+    rooms = await db.rooms.find({}, {"_id": 0}).to_list(1000)
+    
+    # Update room status based on active bookings
+    active_bookings = await db.bookings.find({"is_checked_out": False}, {"_id": 0}).to_list(1000)
+    occupied_rooms = {b['room_number'] for b in active_bookings}
+    
+    for room in rooms:
+        if room['room_number'] in occupied_rooms:
+            room['status'] = 'occupied'
+        elif room.get('status') != 'maintenance':
+            room['status'] = 'available'
+    
+    return rooms
+
+@api_router.post("/admin/rooms")
+async def create_room(input: RoomCreate):
+    # Check if room already exists
+    existing = await db.rooms.find_one({"room_number": input.room_number}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Room already exists")
+    
+    room = Room(**input.model_dump())
+    doc = room.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.rooms.insert_one(doc)
+    return {"message": "Room created successfully", "room": doc}
+
+@api_router.put("/admin/rooms/{room_id}")
+async def update_room(room_id: str, input: RoomUpdate):
+    room = await db.rooms.find_one({"id": room_id}, {"_id": 0})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    update_data = {k: v for k, v in input.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No data to update")
+    
+    await db.rooms.update_one({"id": room_id}, {"$set": update_data})
+    return {"message": "Room updated successfully"}
+
+@api_router.delete("/admin/rooms/{room_id}")
+async def delete_room(room_id: str):
+    room = await db.rooms.find_one({"id": room_id}, {"_id": 0})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    # Check if room has active booking
+    active_booking = await db.bookings.find_one({
+        "room_number": room['room_number'],
+        "is_checked_out": False
+    }, {"_id": 0})
+    if active_booking:
+        raise HTTPException(status_code=400, detail="Cannot delete room with active booking")
+    
+    await db.rooms.delete_one({"id": room_id})
+    return {"message": "Room deleted successfully"}
+
+# ==================== PDF Export ====================
+
+@api_router.get("/admin/export-pdf")
+async def export_signin_pdf(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None)
+):
+    """Export Sign-In Sheet as PDF"""
+    query = {}
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date
+        if date_filter:
+            query["check_in_date"] = date_filter
+    
+    bookings = await db.bookings.find(query, {"_id": 0}).to_list(1000)
+    
+    employee_numbers = [b['employee_number'] for b in bookings]
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=landscape(letter), topMargin=0.5*inch, bottomMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Title
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=20, alignment=TA_CENTER, textColor=colors.HexColor('#fbbf24'))
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, textColor=colors.gray)
+    
+    elements.append(Paragraph("Hodler Inn - Sign-In Sheet", title_style))
+    elements.append(Paragraph("820 Hwy 59 N Heavener, OK, 74937 | Phone: 918-653-7801", subtitle_style))
+    if start_date or end_date:
+        date_range = f"Date Range: {start_date or 'Start'} to {end_date or 'Present'}"
+        elements.append(Paragraph(date_range, subtitle_style))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Table data
+    table_data = [['#', 'Stay Type', 'Name', 'Employee ID', 'Sig In', 'Sig Out', 'Date In', 'Time In', 'Date Out', 'Time Out', 'Room']]
+    
+    for idx, booking in enumerate(bookings):
+        guest = guests_dict.get(booking['employee_number'])
+        if guest:
+            decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+            has_sig = bool(guest.get('signature_encrypted') or guest.get('signature'))
+            is_out = booking.get('is_checked_out', False)
+            
+            table_data.append([
+                str(idx + 1),
+                'Single Stay',
+                decrypted_name[:20],
+                booking['employee_number'],
+                'Yes' if has_sig else '-',
+                'Yes' if (has_sig and is_out) else '-',
+                booking['check_in_date'],
+                booking['check_in_time'],
+                booking.get('check_out_date', '-'),
+                booking.get('check_out_time', '-'),
+                booking['room_number']
+            ])
+    
+    if len(table_data) == 1:
+        table_data.append(['-', '-', 'No records found', '-', '-', '-', '-', '-', '-', '-', '-'])
+    
+    table = Table(table_data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fbbf24')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f5f5f5')]),
+    ]))
+    elements.append(table)
+    
+    doc.build(elements)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=hodler_inn_sign_in_sheet.pdf"}
+    )
+
+@api_router.get("/admin/export-billing-pdf")
+async def export_billing_pdf(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None)
+):
+    """Export Billing Report as PDF"""
+    query = {"is_checked_out": True}
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date
+        if date_filter:
+            query["check_in_date"] = date_filter
+    
+    bookings = await db.bookings.find(query, {"_id": 0}).to_list(1000)
+    
+    employee_numbers = [b['employee_number'] for b in bookings]
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=landscape(letter), topMargin=0.5*inch, bottomMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Title
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=20, alignment=TA_CENTER, textColor=colors.HexColor('#fbbf24'))
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, textColor=colors.gray)
+    
+    elements.append(Paragraph("Hodler Inn - Billing Report", title_style))
+    elements.append(Paragraph("820 Hwy 59 N Heavener, OK, 74937 | Phone: 918-653-7801", subtitle_style))
+    if start_date or end_date:
+        date_range = f"Date Range: {start_date or 'Start'} to {end_date or 'Present'}"
+        elements.append(Paragraph(date_range, subtitle_style))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Table data
+    table_data = [['#', 'Name', 'Employee ID', 'Room', 'Check-In', 'Check-Out', 'Hours', 'Nights', 'Signed']]
+    total_nights = 0
+    total_hours = 0
+    
+    for idx, booking in enumerate(bookings):
+        guest = guests_dict.get(booking['employee_number'])
+        if guest:
+            decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+            has_sig = bool(guest.get('signature_encrypted') or guest.get('signature'))
+            
+            hours, nights = calculate_stay_duration(
+                booking['check_in_date'],
+                booking['check_in_time'],
+                booking['check_out_date'],
+                booking['check_out_time']
+            )
+            total_nights += nights if nights else 0
+            total_hours += hours if hours else 0
+            
+            table_data.append([
+                str(idx + 1),
+                decrypted_name[:20],
+                booking['employee_number'],
+                booking['room_number'],
+                f"{booking['check_in_date']} {booking['check_in_time']}",
+                f"{booking['check_out_date']} {booking['check_out_time']}",
+                f"{hours}h" if hours else '-',
+                str(nights) if nights else '-',
+                'Yes' if has_sig else 'No'
+            ])
+    
+    if len(table_data) == 1:
+        table_data.append(['-', 'No completed stays', '-', '-', '-', '-', '-', '-', '-'])
+    else:
+        # Add total row
+        table_data.append(['', 'TOTAL', '', '', '', '', f'{total_hours:.1f}h', str(total_nights), ''])
+    
+    table = Table(table_data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fbbf24')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f5f5f5')]),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e0e0e0')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+    ]))
+    elements.append(table)
+    
+    doc.build(elements)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=hodler_inn_billing_report.pdf"}
+    )
+
 # Include the router in the main app
 app.include_router(api_router)
 
