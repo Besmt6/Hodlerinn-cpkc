@@ -1059,6 +1059,136 @@ export default function AdminDashboard() {
               </Card>
             </>
           )}
+
+          {/* Room Management View */}
+          {activeView === 'rooms' && (
+            <>
+              {/* Header */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Room Management</h1>
+                    <p className="text-vault-text-secondary font-manrope mt-1">Add, edit, and manage hotel rooms</p>
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      setEditingRoom(null);
+                      setRoomForm({ room_number: "", room_type: "Standard", floor: "1", notes: "" });
+                      setShowRoomDialog(true);
+                    }}
+                    className="vault-btn-primary flex items-center gap-2"
+                    data-testid="add-room-btn"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Room
+                  </Button>
+                </div>
+              </div>
+
+              {/* Room Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <StatCard 
+                  icon={<Bed className="w-6 h-6" />}
+                  label="Total Rooms"
+                  value={rooms.length}
+                  testId="stat-total-rooms"
+                />
+                <StatCard 
+                  icon={<CheckCircle className="w-6 h-6" />}
+                  label="Available"
+                  value={rooms.filter(r => r.status === 'available').length}
+                  testId="stat-available-rooms"
+                />
+                <StatCard 
+                  icon={<DoorOpen className="w-6 h-6" />}
+                  label="Occupied"
+                  value={rooms.filter(r => r.status === 'occupied').length}
+                  testId="stat-occupied-rooms"
+                />
+                <StatCard 
+                  icon={<XCircle className="w-6 h-6" />}
+                  label="Maintenance"
+                  value={rooms.filter(r => r.status === 'maintenance').length}
+                  testId="stat-maintenance-rooms"
+                />
+              </div>
+
+              {/* Rooms Table */}
+              <Card className="bg-vault-surface border-vault-border" data-testid="rooms-table-card">
+                <CardHeader className="border-b border-vault-border">
+                  <CardTitle className="font-outfit text-xl text-vault-text flex items-center gap-2">
+                    <Bed className="w-5 h-5 text-vault-gold" />
+                    All Rooms
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[400px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="table-header border-vault-border hover:bg-transparent">
+                          <TableHead className="text-vault-gold">Room #</TableHead>
+                          <TableHead className="text-vault-gold">Type</TableHead>
+                          <TableHead className="text-vault-gold">Floor</TableHead>
+                          <TableHead className="text-vault-gold">Status</TableHead>
+                          <TableHead className="text-vault-gold">Notes</TableHead>
+                          <TableHead className="text-vault-gold">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rooms.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-vault-text-secondary py-8">
+                              No rooms added yet. Click "Add Room" to get started.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          rooms.map((room) => (
+                            <TableRow key={room.id} className="table-row border-vault-border" data-testid={`room-row-${room.id}`}>
+                              <TableCell className="font-mono text-vault-gold font-bold">{room.room_number}</TableCell>
+                              <TableCell className="text-vault-text">{room.room_type}</TableCell>
+                              <TableCell className="text-vault-text">{room.floor}</TableCell>
+                              <TableCell>
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  room.status === 'available' ? 'bg-green-500/20 text-green-400' :
+                                  room.status === 'occupied' ? 'bg-amber-500/20 text-amber-400' :
+                                  'bg-red-500/20 text-red-400'
+                                }`}>
+                                  {room.status.charAt(0).toUpperCase() + room.status.slice(1)}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-vault-text-secondary text-sm">{room.notes || "-"}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-vault-text-secondary hover:text-vault-gold h-8 w-8 p-0"
+                                    onClick={() => handleEditRoom(room)}
+                                    data-testid={`edit-room-${room.id}`}
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-vault-text-secondary hover:text-red-500 h-8 w-8 p-0"
+                                    onClick={() => setDeleteRoomConfirm(room)}
+                                    data-testid={`delete-room-${room.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </motion.div>
       </div>
       
