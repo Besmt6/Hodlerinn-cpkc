@@ -225,6 +225,105 @@ export default function AdminDashboard() {
     }
   };
 
+  // PDF Export functions
+  const handleExportSignInPdf = async () => {
+    try {
+      let url = `${API}/admin/export-pdf`;
+      const params = new URLSearchParams();
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      if (params.toString()) url += `?${params.toString()}`;
+      
+      const response = await axios.get(url, { responseType: "blob" });
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", "hodler_inn_sign_in_sheet.pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success("Sign-In Sheet (PDF) exported!");
+    } catch (error) {
+      toast.error("Failed to export PDF");
+    }
+  };
+
+  const handleExportBillingPdf = async () => {
+    try {
+      let url = `${API}/admin/export-billing-pdf`;
+      const params = new URLSearchParams();
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      if (params.toString()) url += `?${params.toString()}`;
+      
+      const response = await axios.get(url, { responseType: "blob" });
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute("download", "hodler_inn_billing_report.pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success("Billing Report (PDF) exported!");
+    } catch (error) {
+      toast.error("Failed to export PDF");
+    }
+  };
+
+  // Room management functions
+  const handleCreateRoom = async () => {
+    if (!roomForm.room_number) {
+      toast.error("Room number is required");
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/rooms`, roomForm);
+      toast.success("Room created successfully");
+      setShowRoomDialog(false);
+      setRoomForm({ room_number: "", room_type: "Standard", floor: "1", notes: "" });
+      fetchRooms();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to create room");
+    }
+  };
+
+  const handleEditRoom = (room) => {
+    setEditingRoom(room);
+    setRoomForm({
+      room_number: room.room_number,
+      room_type: room.room_type,
+      floor: room.floor,
+      notes: room.notes || ""
+    });
+    setShowRoomDialog(true);
+  };
+
+  const handleUpdateRoom = async () => {
+    try {
+      await axios.put(`${API}/admin/rooms/${editingRoom.id}`, roomForm);
+      toast.success("Room updated successfully");
+      setShowRoomDialog(false);
+      setEditingRoom(null);
+      setRoomForm({ room_number: "", room_type: "Standard", floor: "1", notes: "" });
+      fetchRooms();
+    } catch (error) {
+      toast.error("Failed to update room");
+    }
+  };
+
+  const handleDeleteRoom = async (roomId) => {
+    try {
+      await axios.delete(`${API}/admin/rooms/${roomId}`);
+      toast.success("Room deleted successfully");
+      setDeleteRoomConfirm(null);
+      fetchRooms();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to delete room");
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem("adminAuth");
     navigate("/admin");
