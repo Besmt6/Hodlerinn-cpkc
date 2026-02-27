@@ -67,12 +67,30 @@ export default function AdminDashboard() {
     completed_stays: 0
   });
   const [records, setRecords] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSignature, setSelectedSignature] = useState(null);
   const [activeView, setActiveView] = useState("dashboard");
   const [editingRecord, setEditingRecord] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  
+  // Date filter state
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [isFiltered, setIsFiltered] = useState(false);
+  
+  // Room management state
+  const [showRoomDialog, setShowRoomDialog] = useState(false);
+  const [editingRoom, setEditingRoom] = useState(null);
+  const [roomForm, setRoomForm] = useState({
+    room_number: "",
+    room_type: "Standard",
+    floor: "1",
+    notes: ""
+  });
+  const [deleteRoomConfirm, setDeleteRoomConfirm] = useState(null);
+  
   const navigate = useNavigate();
 
   useEffect(() => {
