@@ -125,6 +125,8 @@ Build a two-part application for a hotel named "Hodler Inn":
 - GET /api/admin/records?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
 
 ## Next Tasks
-1. Elox Smart Lock Integration (waiting for API docs from user)
+1. UnlockOS Smart Lock Integration (saved for later)
 2. Email notifications on check-in/out
 3. Room availability calendar view
+4. Blockchain integration (saved for later)
+5. AI Phone Bot (saved for later)
