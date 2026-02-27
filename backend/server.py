@@ -561,7 +561,8 @@ async def export_to_excel():
         if guest:
             # Decrypt data
             decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
-            has_signature = bool(guest.get('signature_encrypted') or guest.get('signature'))
+            # Signature is now in booking, not guest
+            has_signature = bool(booking.get('signature_encrypted'))
             is_checked_out = booking.get('is_checked_out', False)
             
             worksheet.write(row, 0, row_num, cell_format)
