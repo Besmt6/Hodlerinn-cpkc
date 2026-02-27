@@ -234,7 +234,7 @@ def calculate_stay_duration(check_in_date: str, check_in_time: str, check_out_da
 async def root():
     return {"message": "Hodler Inn API - Welcome"}
 
-# Guest Registration
+# Guest Registration (no signature - signature is captured at check-in)
 @api_router.post("/guests/register", response_model=GuestRegistration)
 async def register_guest(input: GuestRegistrationCreate):
     # Check if employee already registered
@@ -248,8 +248,7 @@ async def register_guest(input: GuestRegistrationCreate):
     
     # Encrypt sensitive data before storing
     doc['name_encrypted'] = encrypt_data(doc['name'])
-    doc['signature_encrypted'] = encrypt_data(doc['signature'])
-    # Keep employee_number unencrypted for lookups
+    # No signature at registration - captured at check-in
     
     await db.guests.insert_one(doc)
     return guest
@@ -263,8 +262,6 @@ async def get_guest(employee_number: str):
     # Decrypt data before returning
     if 'name_encrypted' in guest:
         guest['name'] = decrypt_data(guest['name_encrypted'])
-    if 'signature_encrypted' in guest:
-        guest['signature'] = decrypt_data(guest['signature_encrypted'])
     
     return guest
 
