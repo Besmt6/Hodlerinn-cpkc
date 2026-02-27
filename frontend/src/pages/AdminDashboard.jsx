@@ -864,12 +864,12 @@ export default function AdminDashboard() {
             <>
               {/* Header */}
               <div className="mb-6">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
                     <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Billing Report</h1>
                     <p className="text-vault-text-secondary font-manrope mt-1">View completed stays and billing details</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button 
                       onClick={handleExportBilling}
                       className="vault-btn-primary flex items-center gap-2"
@@ -886,7 +886,52 @@ export default function AdminDashboard() {
                       <Image className="w-4 h-4" />
                       PNG
                     </Button>
+                    <Button 
+                      onClick={handleExportBillingPdf}
+                      className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
+                      data-testid="export-billing-pdf-btn"
+                    >
+                      <FileDown className="w-4 h-4" />
+                      PDF
+                    </Button>
                   </div>
+                </div>
+                
+                {/* Date Filter */}
+                <div className="mt-4 flex flex-wrap items-center gap-3 bg-vault-surface-highlight/50 p-3 rounded-lg border border-vault-border">
+                  <Filter className="w-4 h-4 text-vault-gold" />
+                  <span className="text-vault-text-secondary text-sm font-medium">Filter:</span>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-40 bg-black/50 border-vault-border text-vault-text text-sm h-9"
+                    placeholder="Start Date"
+                  />
+                  <span className="text-vault-text-secondary">to</span>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-40 bg-black/50 border-vault-border text-vault-text text-sm h-9"
+                    placeholder="End Date"
+                  />
+                  <Button
+                    onClick={handleApplyFilter}
+                    className="vault-btn-primary h-9 px-4"
+                  >
+                    Apply
+                  </Button>
+                  {isFiltered && (
+                    <Button
+                      onClick={handleClearFilter}
+                      variant="ghost"
+                      className="h-9 px-3 text-vault-text-secondary hover:text-vault-gold"
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Clear
+                    </Button>
+                  )}
                 </div>
               </div>
 
