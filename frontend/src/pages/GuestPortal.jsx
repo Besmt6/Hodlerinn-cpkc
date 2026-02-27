@@ -260,6 +260,11 @@ function CheckInForm({ setView }) {
   const [loading, setLoading] = useState(false);
   const [verifiedEmployee, setVerifiedEmployee] = useState(null);
   const [verifying, setVerifying] = useState(false);
+  const sigRef = useRef(null);
+
+  const clearSignature = () => {
+    sigRef.current?.clear();
+  };
 
   const handleVerifyEmployee = async () => {
     if (!employeeNumber) {
@@ -302,14 +307,20 @@ function CheckInForm({ setView }) {
       toast.error("Please select check-in time");
       return;
     }
+    if (sigRef.current?.isEmpty()) {
+      toast.error("Please provide your signature");
+      return;
+    }
 
     setLoading(true);
     try {
+      const signature = sigRef.current.toDataURL();
       await axios.post(`${API}/checkin`, {
         employee_number: employeeNumber,
         room_number: roomNumber,
         check_in_date: format(date, "yyyy-MM-dd"),
-        check_in_time: time
+        check_in_time: time,
+        signature
       });
       toast.success("Check-in successful! Welcome to Hodler Inn.");
       setView("menu");
