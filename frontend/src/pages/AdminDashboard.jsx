@@ -100,13 +100,20 @@ export default function AdminDashboard() {
       return;
     }
     fetchData();
+    fetchRooms();
   }, [navigate]);
 
-  const fetchData = async () => {
+  const fetchData = async (filterStart = null, filterEnd = null) => {
     try {
+      let recordsUrl = `${API}/admin/records`;
+      const params = new URLSearchParams();
+      if (filterStart) params.append('start_date', filterStart);
+      if (filterEnd) params.append('end_date', filterEnd);
+      if (params.toString()) recordsUrl += `?${params.toString()}`;
+      
       const [statsRes, recordsRes] = await Promise.all([
         axios.get(`${API}/admin/stats`),
-        axios.get(`${API}/admin/records`)
+        axios.get(recordsUrl)
       ]);
       setStats(statsRes.data);
       setRecords(recordsRes.data);
@@ -115,6 +122,31 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchRooms = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/rooms`);
+      setRooms(response.data);
+    } catch (error) {
+      console.error("Failed to load rooms");
+    }
+  };
+
+  const handleApplyFilter = () => {
+    if (startDate || endDate) {
+      setIsFiltered(true);
+      fetchData(startDate, endDate);
+      toast.success("Filter applied");
+    }
+  };
+
+  const handleClearFilter = () => {
+    setStartDate("");
+    setEndDate("");
+    setIsFiltered(false);
+    fetchData();
+    toast.success("Filter cleared");
   };
 
   const handleExportSignIn = async () => {
