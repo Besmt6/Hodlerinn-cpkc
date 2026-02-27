@@ -46,7 +46,31 @@ const pageVariants = {
 
 export default function GuestPortal() {
   const [view, setView] = useState("menu"); // menu, register, checkin, checkout, signin
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch((err) => {
+        console.log("Fullscreen error:", err);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      });
+    }
+  };
+
+  // Listen for fullscreen changes (e.g., user presses Escape)
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   return (
     <div className="kiosk-container grid-bg min-h-screen relative">
@@ -63,15 +87,29 @@ export default function GuestPortal() {
         </div>
       </div>
 
-      {/* Admin Link */}
-      <button 
-        onClick={() => navigate("/admin")}
-        className="absolute top-6 right-6 flex items-center gap-2 text-vault-text-secondary hover:text-vault-gold transition-colors bg-vault-surface/50 px-3 py-2 rounded-lg border border-vault-border"
-        data-testid="admin-link"
-      >
-        <Settings className="w-4 h-4" />
-        <span className="text-sm font-mono">Admin</span>
-      </button>
+      {/* Top Right Buttons */}
+      <div className="absolute top-6 right-6 flex items-center gap-2">
+        {/* Fullscreen/Kiosk Mode Button */}
+        <button 
+          onClick={toggleFullscreen}
+          className="flex items-center gap-2 text-vault-text-secondary hover:text-vault-gold transition-colors bg-vault-surface/50 px-3 py-2 rounded-lg border border-vault-border"
+          data-testid="fullscreen-btn"
+          title={isFullscreen ? "Exit Kiosk Mode" : "Enter Kiosk Mode"}
+        >
+          {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          <span className="text-sm font-mono hidden sm:inline">{isFullscreen ? "Exit Kiosk" : "Kiosk Mode"}</span>
+        </button>
+        
+        {/* Admin Link */}
+        <button 
+          onClick={() => navigate("/admin")}
+          className="flex items-center gap-2 text-vault-text-secondary hover:text-vault-gold transition-colors bg-vault-surface/50 px-3 py-2 rounded-lg border border-vault-border"
+          data-testid="admin-link"
+        >
+          <Settings className="w-4 h-4" />
+          <span className="text-sm font-mono hidden sm:inline">Admin</span>
+        </button>
+      </div>
 
       <AnimatePresence mode="wait">
         {view === "menu" && (
