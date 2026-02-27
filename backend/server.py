@@ -970,6 +970,8 @@ async def create_room(input: RoomCreate):
     doc['created_at'] = doc['created_at'].isoformat()
     
     await db.rooms.insert_one(doc)
+    # Remove _id before returning (MongoDB adds it during insert)
+    doc.pop('_id', None)
     return {"message": "Room created successfully", "room": doc}
 
 @api_router.put("/admin/rooms/{room_id}")
