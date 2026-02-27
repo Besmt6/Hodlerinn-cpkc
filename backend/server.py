@@ -452,7 +452,8 @@ async def get_all_records(
             
             # Decrypt sensitive data
             decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
-            decrypted_signature = decrypt_data(guest.get('signature_encrypted', guest.get('signature', '')))
+            # Signature is now stored in booking, not guest
+            decrypted_signature = decrypt_data(booking.get('signature_encrypted', ''))
             
             records.append(GuestRecord(
                 id=booking['id'],
