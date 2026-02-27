@@ -28,7 +28,9 @@ import {
   User,
   Hash,
   Settings,
-  ClipboardList
+  ClipboardList,
+  Maximize,
+  Minimize
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
