@@ -5,246 +5,202 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hodler Inn - Guest Portal Instructions</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: Arial, sans-serif;
       max-width: 800px;
       margin: 0 auto;
-      padding: 40px 30px;
+      padding: 15px 25px;
       color: #333;
-      line-height: 1.6;
+      font-size: 11px;
+      line-height: 1.4;
     }
     .header {
       text-align: center;
-      border-bottom: 3px solid #d4a500;
-      padding-bottom: 20px;
-      margin-bottom: 30px;
+      border-bottom: 2px solid #d4a500;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
     }
-    .header h1 {
-      font-size: 32px;
-      color: #1a1a1a;
-      margin-bottom: 5px;
-    }
-    .header p {
-      color: #666;
-      font-size: 14px;
-    }
-    .section {
-      margin-bottom: 35px;
-      page-break-inside: avoid;
-    }
-    .section-title {
-      background: #1a1a1a;
-      color: #d4a500;
-      padding: 12px 20px;
-      font-size: 18px;
-      font-weight: bold;
-      margin-bottom: 15px;
-      border-radius: 5px;
-    }
-    .section-title .step-num {
-      background: #d4a500;
-      color: #1a1a1a;
-      padding: 2px 10px;
-      border-radius: 3px;
-      margin-right: 10px;
-      font-size: 14px;
-    }
-    .steps {
-      padding-left: 25px;
-    }
-    .steps li {
-      margin-bottom: 12px;
-      padding-left: 10px;
-    }
-    .steps li strong {
-      color: #1a1a1a;
-    }
-    .highlight {
-      background: #fff3cd;
-      border-left: 4px solid #d4a500;
-      padding: 12px 15px;
-      margin: 15px 0;
-      font-size: 14px;
-    }
+    .header h1 { font-size: 22px; color: #1a1a1a; margin-bottom: 2px; }
+    .header p { color: #666; font-size: 10px; }
     .button-guide {
       display: flex;
-      justify-content: space-around;
-      margin: 20px 0;
-      flex-wrap: wrap;
-      gap: 15px;
+      justify-content: center;
+      gap: 30px;
+      margin: 10px 0;
     }
-    .button-item {
-      text-align: center;
-      padding: 15px;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-      width: 150px;
-    }
+    .button-item { text-align: center; }
     .button-item .color-box {
-      width: 60px;
-      height: 40px;
-      margin: 0 auto 10px;
-      border-radius: 5px;
+      width: 50px;
+      height: 25px;
+      margin: 0 auto 3px;
+      border-radius: 4px;
+      display: inline-block;
     }
+    .button-item strong { font-size: 10px; }
     .gold { background: linear-gradient(135deg, #d4a500, #fbbf24); }
     .green { background: linear-gradient(135deg, #16a34a, #22c55e); }
     .red { background: linear-gradient(135deg, #dc2626, #ef4444); }
-    .footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 2px solid #eee;
-      text-align: center;
-      font-size: 12px;
-      color: #666;
+    
+    .columns { display: flex; gap: 15px; margin-top: 8px; }
+    .column { flex: 1; }
+    
+    .section { margin-bottom: 8px; }
+    .section-title {
+      background: #1a1a1a;
+      color: #d4a500;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-bottom: 5px;
+      border-radius: 3px;
     }
-    .time-format {
+    .steps { padding-left: 18px; margin: 0; }
+    .steps li { margin-bottom: 3px; }
+    .steps li strong { color: #1a1a1a; }
+    .highlight {
+      background: #fff3cd;
+      border-left: 3px solid #d4a500;
+      padding: 4px 8px;
+      margin: 5px 0;
+      font-size: 9px;
+    }
+    .time-box {
       background: #e8f5e9;
       border: 1px solid #4caf50;
-      padding: 10px 15px;
-      border-radius: 5px;
-      margin: 10px 0;
+      padding: 5px 8px;
+      border-radius: 3px;
+      margin-top: 5px;
+      font-size: 9px;
     }
-    .time-format strong {
-      color: #2e7d32;
+    .time-box strong { color: #2e7d32; }
+    
+    .time-table { width: 100%; margin-top: 8px; }
+    .time-table td {
+      padding: 3px 6px;
+      border: 1px solid #ddd;
+      font-size: 9px;
+      text-align: center;
+    }
+    .time-table tr:nth-child(odd) { background: #f9f9f9; }
+    
+    .footer {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #ddd;
+      text-align: center;
+      font-size: 9px;
+      color: #666;
     }
     @media print {
-      body { padding: 20px; }
-      .section { page-break-inside: avoid; }
+      body { padding: 10px 20px; }
+      @page { margin: 0.3in; }
     }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h1>HODLER INN</h1>
-    <p>Guest Portal Instructions</p>
-    <p style="margin-top: 10px; font-size: 16px;">820 Hwy 59 N Heavener, OK, 74937 | Phone: 918-653-7801</p>
+    <h1>HODLER INN - Guest Portal Instructions</h1>
+    <p>820 Hwy 59 N Heavener, OK, 74937 | Phone: 918-653-7801</p>
   </div>
 
   <div class="button-guide">
     <div class="button-item">
-      <div class="color-box gold"></div>
+      <div class="color-box gold"></div><br>
       <strong>REGISTER</strong>
-      <p style="font-size: 12px;">First-time guests</p>
     </div>
     <div class="button-item">
-      <div class="color-box green"></div>
+      <div class="color-box green"></div><br>
       <strong>CHECK IN</strong>
-      <p style="font-size: 12px;">Arriving guests</p>
     </div>
     <div class="button-item">
-      <div class="color-box red"></div>
+      <div class="color-box red"></div><br>
       <strong>CHECK OUT</strong>
-      <p style="font-size: 12px;">Departing guests</p>
     </div>
   </div>
 
-  <!-- REGISTER SECTION -->
-  <div class="section">
-    <div class="section-title">
-      <span class="step-num">1</span> REGISTER (First-Time Guests Only)
-    </div>
-    <ol class="steps">
-      <li>Tap the <strong>GOLD "Register First Time User"</strong> button</li>
-      <li>Enter your <strong>Employee Number</strong></li>
-      <li>Enter your <strong>Full Name</strong></li>
-      <li>Tap <strong>"Complete Registration"</strong></li>
-    </ol>
-    <div class="highlight">
-      <strong>Note:</strong> You only need to register once. After registering, you can check in anytime using your employee number.
-    </div>
-  </div>
+  <div class="columns">
+    <div class="column">
+      <div class="section">
+        <div class="section-title">1. REGISTER (First-Time Only)</div>
+        <ol class="steps">
+          <li>Tap <strong>GOLD "Register"</strong> button</li>
+          <li>Enter your <strong>Employee Number</strong></li>
+          <li>Enter your <strong>Full Name</strong></li>
+          <li>Tap <strong>"Complete Registration"</strong></li>
+        </ol>
+        <div class="highlight">
+          <strong>Note:</strong> Register once, then check in anytime with your employee number.
+        </div>
+      </div>
 
-  <!-- CHECK IN SECTION -->
-  <div class="section">
-    <div class="section-title">
-      <span class="step-num">2</span> CHECK IN
+      <div class="section">
+        <div class="section-title">2. CHECK IN</div>
+        <ol class="steps">
+          <li>Tap <strong>GREEN "Check In"</strong> button</li>
+          <li>Enter <strong>Employee Number</strong> → Tap <strong>"Verify"</strong></li>
+          <li>Enter your <strong>Room Number</strong></li>
+          <li>Select <strong>Check-In Date</strong> (calendar)</li>
+          <li>Enter <strong>Check-In Time</strong> (24hr format)</li>
+          <li>Sign in the <strong>Signature Box</strong></li>
+          <li>Tap <strong>"Complete Check-In"</strong></li>
+        </ol>
+        <div class="highlight">
+          <strong>Important:</strong> Your signature is used for both check-in and check-out.
+        </div>
+      </div>
     </div>
-    <ol class="steps">
-      <li>Tap the <strong>GREEN "Check In"</strong> button</li>
-      <li>Enter your <strong>Employee Number</strong></li>
-      <li>Tap <strong>"Verify"</strong> to confirm your identity</li>
-      <li>Enter your assigned <strong>Room Number</strong></li>
-      <li>Select your <strong>Check-In Date</strong> using the calendar</li>
-      <li>Enter your <strong>Check-In Time</strong></li>
-      <li>Sign your name in the <strong>Signature Box</strong> using your finger or stylus</li>
-      <li>Tap <strong>"Complete Check-In"</strong></li>
-    </ol>
-    <div class="time-format">
-      <strong>TIME FORMAT:</strong> Use 24-hour military time<br>
-      Examples: 14:00 = 2:00 PM | 08:00 = 8:00 AM | 22:30 = 10:30 PM
-    </div>
-    <div class="highlight">
-      <strong>Important:</strong> Your signature will be used for both check-in and check-out records.
-    </div>
-  </div>
 
-  <!-- CHECK OUT SECTION -->
-  <div class="section">
-    <div class="section-title">
-      <span class="step-num">3</span> CHECK OUT
-    </div>
-    <ol class="steps">
-      <li>Tap the <strong>RED "Check Out"</strong> button</li>
-      <li>Enter your <strong>Room Number</strong></li>
-      <li>Select your <strong>Check-Out Date</strong> using the calendar</li>
-      <li>Enter your <strong>Check-Out Time</strong></li>
-      <li>Tap <strong>"Complete Check-Out"</strong></li>
-    </ol>
-    <div class="time-format">
-      <strong>TIME FORMAT:</strong> Use 24-hour military time<br>
-      Examples: 11:00 = 11:00 AM | 15:30 = 3:30 PM | 18:00 = 6:00 PM
-    </div>
-    <div class="highlight">
-      <strong>Note:</strong> No signature is needed at check-out. Your check-in signature is automatically used.
-    </div>
-  </div>
+    <div class="column">
+      <div class="section">
+        <div class="section-title">3. CHECK OUT</div>
+        <ol class="steps">
+          <li>Tap <strong>RED "Check Out"</strong> button</li>
+          <li>Enter your <strong>Room Number</strong></li>
+          <li>Select <strong>Check-Out Date</strong> (calendar)</li>
+          <li>Enter <strong>Check-Out Time</strong> (24hr format)</li>
+          <li>Tap <strong>"Complete Check-Out"</strong></li>
+        </ol>
+        <div class="highlight">
+          <strong>Note:</strong> No signature needed - your check-in signature is used automatically.
+        </div>
+      </div>
 
-  <!-- VIEW SIGN-IN SHEET -->
-  <div class="section">
-    <div class="section-title">
-      <span class="step-num">4</span> VIEW SIGN-IN SHEET (Optional)
-    </div>
-    <ol class="steps">
-      <li>Tap <strong>"View Sign-In Sheet"</strong> button</li>
-      <li>Enter your <strong>Company Name</strong> or <strong>Employee Number</strong></li>
-      <li>Tap <strong>"View Sign-In Sheet"</strong> to access records</li>
-    </ol>
-  </div>
+      <div class="section">
+        <div class="section-title">4. VIEW SIGN-IN SHEET (Optional)</div>
+        <ol class="steps">
+          <li>Tap <strong>"View Sign-In Sheet"</strong></li>
+          <li>Enter <strong>Company Name</strong> or <strong>Employee Number</strong></li>
+          <li>Tap <strong>"View Sign-In Sheet"</strong></li>
+        </ol>
+      </div>
 
-  <!-- QUICK REFERENCE -->
-  <div class="section">
-    <div class="section-title">
-      QUICK 24-HOUR TIME REFERENCE
+      <div class="section">
+        <div class="section-title">24-HOUR MILITARY TIME</div>
+        <table class="time-table">
+          <tr>
+            <td><strong>6 AM</strong> = 06:00</td>
+            <td><strong>12 PM</strong> = 12:00</td>
+            <td><strong>6 PM</strong> = 18:00</td>
+          </tr>
+          <tr>
+            <td><strong>8 AM</strong> = 08:00</td>
+            <td><strong>2 PM</strong> = 14:00</td>
+            <td><strong>8 PM</strong> = 20:00</td>
+          </tr>
+          <tr>
+            <td><strong>10 AM</strong> = 10:00</td>
+            <td><strong>4 PM</strong> = 16:00</td>
+            <td><strong>10 PM</strong> = 22:00</td>
+          </tr>
+        </table>
+      </div>
     </div>
-    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-      <tr style="background: #f5f5f5;">
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>12:00 AM</strong> = 00:00</td>
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>12:00 PM</strong> = 12:00</td>
-      </tr>
-      <tr>
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>6:00 AM</strong> = 06:00</td>
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>6:00 PM</strong> = 18:00</td>
-      </tr>
-      <tr style="background: #f5f5f5;">
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>8:00 AM</strong> = 08:00</td>
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>8:00 PM</strong> = 20:00</td>
-      </tr>
-      <tr>
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>10:00 AM</strong> = 10:00</td>
-        <td style="padding: 8px; border: 1px solid #ddd;"><strong>10:00 PM</strong> = 22:00</td>
-      </tr>
-    </table>
   </div>
 
   <div class="footer">
-    <p><strong>Need Help?</strong> Please contact front desk staff for assistance.</p>
-    <p style="margin-top: 10px;">HODLER INN | 820 Hwy 59 N Heavener, OK, 74937 | 918-653-7801</p>
+    <strong>Need Help?</strong> Contact front desk for assistance. | HODLER INN | 918-653-7801
   </div>
 
 </body>
