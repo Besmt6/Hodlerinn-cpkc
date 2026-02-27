@@ -26,12 +26,15 @@ Build a two-part application for a hotel named "Hodler Inn":
 - [x] Billing calculation: >24 hours = 2+ nights
 - [x] Excel export for billing reports (Sign-In Sheet + Billing Report)
 - [x] PNG export with embedded signatures
+- [x] PDF export for Sign-In Sheet and Billing Report
 - [x] Telegram notifications (green for check-in, red for check-out)
 - [x] AES encryption for sensitive guest data (name, signature)
 - [x] Monthly auto-reset scheduler (1st of each month)
 - [x] Custom logo integration
 - [x] Color-coded buttons (Gold=Register, Green=Check-In, Red=Check-Out)
 - [x] Password protection for guest Sign-In Sheet view (password: "cpkc" or valid employee ID)
+- [x] Room Management (add/edit/delete rooms with types, floors, status)
+- [x] Date Range Filtering on Sign-In Sheet and Billing Report
 
 ## What's Been Implemented (Feb 2026)
 - Full-stack app with React frontend + FastAPI backend + MongoDB
@@ -39,6 +42,9 @@ Build a two-part application for a hotel named "Hodler Inn":
 - Digital signature canvas using react-signature-canvas
 - Calendar date picker for check-in/out dates
 - Admin dashboard with real-time stats, edit/delete functionality
+- **Room Management** with CRUD operations and status tracking (Available/Occupied/Maintenance)
+- **Date Range Filtering** on both Sign-In Sheet and Billing Report views
+- **PDF Export** using ReportLab for professional report generation
 - Excel export using xlsxwriter (Sign-In Sheet + Billing Report)
 - PNG export with embedded signature images
 - Room occupancy validation
@@ -50,37 +56,51 @@ Build a two-part application for a hotel named "Hodler Inn":
 
 ## Technical Stack
 - Frontend: React 19, Tailwind CSS, Framer Motion, Shadcn/UI
-- Backend: FastAPI, Motor (MongoDB async driver), Cryptography (Fernet)
+- Backend: FastAPI, Motor (MongoDB async driver), Cryptography (Fernet), ReportLab
 - Database: MongoDB
 - Scheduler: APScheduler
-- Dependencies: react-signature-canvas, xlsx, xlsxwriter, pycryptodome, Pillow
+- Dependencies: react-signature-canvas, xlsx, xlsxwriter, pycryptodome, Pillow, reportlab
 
 ## Prioritized Backlog
 ### P0 (Completed)
 - Guest registration, check-in, check-out flows
 - Admin dashboard with billing calculation
-- Excel/PNG exports with signatures
+- Excel/PNG/PDF exports with signatures
 - Password protection for guest sign-in sheet view
 - Telegram notifications
 - Data encryption
+- Room Management (add/edit/delete)
+- Date Range Filtering
 
 ### P1 (Blocked)
 - **Elox Smart Lock Integration**: Send digital keys to guest phones after check-in
   - Status: BLOCKED - waiting for user to provide Elox API documentation
 
 ### P2 (Future)
-- Room management (add/edit rooms)
-- Date range filtering for reports
-- PDF export option
 - Email notifications on check-in/out
 - Multi-admin support with roles
 - Guest history/loyalty tracking
+- Room availability calendar view
 
 ## Access Credentials
 - **Admin Dashboard**: /admin → Password: hodlerinn2024
 - **Guest Sign-In Sheet**: Password: cpkc (or valid employee ID)
 
+## API Endpoints
+### Room Management
+- GET /api/admin/rooms - List all rooms with status
+- POST /api/admin/rooms - Create new room
+- PUT /api/admin/rooms/{room_id} - Update room
+- DELETE /api/admin/rooms/{room_id} - Delete room
+
+### PDF Export
+- GET /api/admin/export-pdf - Sign-In Sheet PDF (supports date filters)
+- GET /api/admin/export-billing-pdf - Billing Report PDF (supports date filters)
+
+### Date Filtering
+- GET /api/admin/records?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+
 ## Next Tasks
 1. Elox Smart Lock Integration (waiting for API docs from user)
-2. Room management feature
-3. Date range filters on dashboard
+2. Email notifications on check-in/out
+3. Room availability calendar view
