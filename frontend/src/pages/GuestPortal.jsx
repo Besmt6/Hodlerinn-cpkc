@@ -603,7 +603,7 @@ function CheckOutForm({ setView }) {
             </Popover>
           </div>
           <div>
-            <label className="vault-label">Check-Out Time</label>
+            <label className="vault-label">Check-Out Time (24hr)</label>
             <div className="relative">
               <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
               <Input
@@ -611,9 +611,11 @@ function CheckOutForm({ setView }) {
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 className="vault-input pl-10"
+                placeholder="HH:MM"
                 data-testid="checkout-time-input"
               />
             </div>
+            <p className="text-vault-text-secondary text-xs mt-1">Use 24-hour format (e.g., 14:00 for 2:00 PM)</p>
           </div>
           <Button
             onClick={handleCheckOut}
