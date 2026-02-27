@@ -1287,6 +1287,118 @@ export default function AdminDashboard() {
         </Dialog>
       )}
 
+      {/* Room Add/Edit Dialog */}
+      {showRoomDialog && (
+        <Dialog open={showRoomDialog} onOpenChange={() => { setShowRoomDialog(false); setEditingRoom(null); }}>
+          <DialogContent className="bg-vault-surface border-vault-border">
+            <DialogHeader>
+              <DialogTitle className="font-outfit text-vault-text">
+                {editingRoom ? 'Edit Room' : 'Add New Room'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Number *</label>
+                <Input
+                  value={roomForm.room_number}
+                  onChange={(e) => setRoomForm({...roomForm, room_number: e.target.value})}
+                  placeholder="e.g., 101, 102A"
+                  className="bg-black/50 border-vault-border text-vault-text"
+                  data-testid="room-number-input"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Type</label>
+                  <Select value={roomForm.room_type} onValueChange={(v) => setRoomForm({...roomForm, room_type: v})}>
+                    <SelectTrigger className="bg-black/50 border-vault-border text-vault-text">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-vault-surface border-vault-border">
+                      <SelectItem value="Standard">Standard</SelectItem>
+                      <SelectItem value="Deluxe">Deluxe</SelectItem>
+                      <SelectItem value="Suite">Suite</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Floor</label>
+                  <Select value={roomForm.floor} onValueChange={(v) => setRoomForm({...roomForm, floor: v})}>
+                    <SelectTrigger className="bg-black/50 border-vault-border text-vault-text">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-vault-surface border-vault-border">
+                      <SelectItem value="1">Floor 1</SelectItem>
+                      <SelectItem value="2">Floor 2</SelectItem>
+                      <SelectItem value="3">Floor 3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {editingRoom && (
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Status</label>
+                  <Select value={roomForm.status || editingRoom.status} onValueChange={(v) => setRoomForm({...roomForm, status: v})}>
+                    <SelectTrigger className="bg-black/50 border-vault-border text-vault-text">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-vault-surface border-vault-border">
+                      <SelectItem value="available">Available</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div>
+                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Notes</label>
+                <Input
+                  value={roomForm.notes}
+                  onChange={(e) => setRoomForm({...roomForm, notes: e.target.value})}
+                  placeholder="Optional notes about the room"
+                  className="bg-black/50 border-vault-border text-vault-text"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => { setShowRoomDialog(false); setEditingRoom(null); }} className="text-vault-text-secondary">
+                Cancel
+              </Button>
+              <Button 
+                onClick={editingRoom ? handleUpdateRoom : handleCreateRoom} 
+                className="vault-btn-primary"
+                data-testid="save-room-btn"
+              >
+                {editingRoom ? 'Save Changes' : 'Add Room'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Room Confirmation Dialog */}
+      {deleteRoomConfirm && (
+        <Dialog open={!!deleteRoomConfirm} onOpenChange={() => setDeleteRoomConfirm(null)}>
+          <DialogContent className="bg-vault-surface border-vault-border">
+            <DialogHeader>
+              <DialogTitle className="font-outfit text-vault-text">
+                Delete Room
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-vault-text-secondary py-4">
+              Are you sure you want to delete <span className="text-vault-gold font-medium">Room {deleteRoomConfirm.room_number}</span>? This action cannot be undone.
+            </p>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setDeleteRoomConfirm(null)} className="text-vault-text-secondary">
+                Cancel
+              </Button>
+              <Button onClick={() => handleDeleteRoom(deleteRoomConfirm.id)} className="bg-red-600 hover:bg-red-700 text-white">
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       <div className="noise-overlay" />
     </div>
   );
