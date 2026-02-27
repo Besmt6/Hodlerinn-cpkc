@@ -57,7 +57,7 @@ export default function GuestPortal() {
         />
         <div>
           <h1 className="font-outfit font-bold text-vault-text text-xl tracking-tight">HODLER INN</h1>
-          <p className="font-mono text-[10px] text-vault-gold uppercase tracking-widest">Immutable Comfort</p>
+          <p className="font-mono text-[10px] text-vault-gold uppercase tracking-widest">Be Responsible to Be Free</p>
         </div>
       </div>
 
