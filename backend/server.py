@@ -409,10 +409,24 @@ async def admin_login(input: AdminLogin):
         return {"success": True, "message": "Login successful"}
     raise HTTPException(status_code=401, detail="Invalid password")
 
-# Admin - Get all records
+# Admin - Get all records (with optional date filtering)
 @api_router.get("/admin/records", response_model=List[GuestRecord])
-async def get_all_records():
-    bookings = await db.bookings.find({}, {"_id": 0}).to_list(1000)
+async def get_all_records(
+    start_date: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)")
+):
+    # Build query with optional date filters
+    query = {}
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date
+        if date_filter:
+            query["check_in_date"] = date_filter
+    
+    bookings = await db.bookings.find(query, {"_id": 0}).to_list(1000)
     
     # Batch fetch all guests to avoid N+1 query
     employee_numbers = [b['employee_number'] for b in bookings]
