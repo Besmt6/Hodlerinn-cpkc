@@ -1065,7 +1065,7 @@ export default function AdminDashboard() {
             <>
               {/* Header */}
               <div className="mb-6">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Room Management</h1>
                     <p className="text-vault-text-secondary font-manrope mt-1">Add, edit, and manage hotel rooms</p>
@@ -1076,7 +1076,7 @@ export default function AdminDashboard() {
                       setRoomForm({ room_number: "", room_type: "Standard", floor: "1", notes: "" });
                       setShowRoomDialog(true);
                     }}
-                    className="vault-btn-primary flex items-center gap-2"
+                    className="vault-btn-primary flex items-center gap-2 shrink-0"
                     data-testid="add-room-btn"
                   >
                     <Plus className="w-4 h-4" />
