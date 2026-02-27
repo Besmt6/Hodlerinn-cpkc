@@ -18,9 +18,9 @@ Build a two-part application for a hotel named "Hodler Inn":
 - **Hotel Staff (Admin)**: Access dashboard to view all records and export billing reports
 
 ## Core Requirements
-- [x] Guest Registration with digital signature
-- [x] Guest Check-In with date/time and room selection
-- [x] Guest Check-Out with date/time
+- [x] Guest Registration with employee details (no signature - captured at check-in)
+- [x] Guest Check-In with date/time, room, and **signature** (captured at check-in)
+- [x] Guest Check-Out with date/time (reuses check-in signature, no new signature needed)
 - [x] Admin login with password protection (password: hodlerinn2024)
 - [x] Dashboard with stats and detailed records table
 - [x] Billing calculation: >24 hours = 2+ nights
