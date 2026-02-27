@@ -768,7 +768,8 @@ async def export_signin_png():
         guest = guests_dict.get(booking['employee_number'])
         if guest:
             decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
-            decrypted_sig = decrypt_data(guest.get('signature_encrypted', guest.get('signature', '')))
+            # Signature is now in booking
+            decrypted_sig = decrypt_data(booking.get('signature_encrypted', ''))
             has_sig = bool(decrypted_sig)
             is_checked_out = booking.get('is_checked_out', False)
             
