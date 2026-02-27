@@ -162,31 +162,20 @@ function RegisterForm({ setView }) {
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const sigRef = useRef(null);
-
-  const clearSignature = () => {
-    sigRef.current?.clear();
-  };
 
   const handleRegister = async () => {
     if (!employeeNumber || !name) {
       toast.error("Please fill in all fields");
       return;
     }
-    if (sigRef.current?.isEmpty()) {
-      toast.error("Please provide your signature");
-      return;
-    }
 
     setLoading(true);
     try {
-      const signature = sigRef.current.toDataURL();
       await axios.post(`${API}/guests/register`, {
         employee_number: employeeNumber,
-        name,
-        signature
+        name
       });
-      toast.success("Registration successful!");
+      toast.success("Registration successful! You can now check in.");
       setView("menu");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Registration failed");
@@ -218,6 +207,9 @@ function RegisterForm({ setView }) {
             <UserPlus className="w-6 h-6 text-vault-gold" />
             Guest Registration
           </CardTitle>
+          <p className="text-vault-text-secondary text-sm mt-2">
+            Register with your employee details. Signature will be captured at check-in.
+          </p>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
@@ -243,31 +235,6 @@ function RegisterForm({ setView }) {
                 placeholder="Enter your full name"
                 className="vault-input pl-10"
                 data-testid="name-input"
-              />
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="vault-label mb-0">Signature</label>
-              <button 
-                onClick={clearSignature}
-                className="text-vault-text-secondary hover:text-vault-gold text-xs flex items-center gap-1 transition-colors"
-                data-testid="clear-signature-btn"
-              >
-                <Eraser className="w-3 h-3" />
-                Clear
-              </button>
-            </div>
-            <div className="signature-wrapper">
-              <SignatureCanvas
-                ref={sigRef}
-                canvasProps={{
-                  className: "signature-canvas w-full h-40 bg-transparent",
-                  style: { width: "100%", height: "160px" }
-                }}
-                penColor="#fbbf24"
-                backgroundColor="transparent"
-                data-testid="signature-canvas"
               />
             </div>
           </div>
