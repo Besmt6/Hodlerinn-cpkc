@@ -151,6 +151,9 @@ function MainMenu({ setView }) {
           <CardTitle className="font-outfit text-3xl font-bold text-vault-text tracking-tight">
             Welcome to Hodler Inn
           </CardTitle>
+          <p className="text-red-500 font-bold text-lg mt-3">
+            Railroad Crew Check In Here
+          </p>
           <p className="text-vault-text-secondary font-manrope mt-2">
             Select an option below to continue
           </p>
