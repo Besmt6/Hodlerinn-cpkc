@@ -197,7 +197,7 @@ function MainMenu({ setView }) {
             </Button>
             <Button
               onClick={() => setView("help")}
-              className="w-full h-12 flex items-center justify-center gap-3 bg-vault-surface border border-vault-border text-vault-text hover:border-vault-gold hover:text-vault-gold transition-colors"
+              className="w-full h-12 flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-wide"
               data-testid="help-btn"
             >
               <HelpCircle className="w-5 h-5" />
