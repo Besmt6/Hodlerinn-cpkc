@@ -879,3 +879,114 @@ function SignInSheetView({ setView }) {
     </motion.div>
   );
 }
+
+function HelpView({ setView }) {
+  return (
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="w-full max-w-2xl"
+    >
+      <Card className="glass-card p-6 md:p-8" data-testid="help-view-card">
+        <CardHeader className="pb-4">
+          <button 
+            onClick={() => setView("menu")} 
+            className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
+            data-testid="back-btn"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Menu
+          </button>
+          <CardTitle className="font-outfit text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
+            <HelpCircle className="w-6 h-6 text-vault-gold" />
+            How to Use Guest Portal
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Step 1: Register */}
+          <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-4">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+                <span className="text-black font-bold text-lg">1</span>
+              </div>
+              <div>
+                <h3 className="font-outfit text-lg font-bold text-vault-gold mb-1">REGISTER (First-Time Only)</h3>
+                <ul className="text-vault-text-secondary text-sm space-y-1">
+                  <li>• Tap the <span className="text-amber-400 font-medium">GOLD "Register"</span> button</li>
+                  <li>• Enter your <span className="text-vault-text">Employee Number</span></li>
+                  <li>• Enter your <span className="text-vault-text">Full Name</span></li>
+                  <li>• Tap "Complete Registration"</li>
+                </ul>
+                <p className="text-vault-gold text-xs mt-2 italic">You only need to register once!</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 2: Check In */}
+          <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-4">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                <span className="text-black font-bold text-lg">2</span>
+              </div>
+              <div>
+                <h3 className="font-outfit text-lg font-bold text-emerald-400 mb-1">CHECK IN</h3>
+                <ul className="text-vault-text-secondary text-sm space-y-1">
+                  <li>• Tap the <span className="text-emerald-400 font-medium">GREEN "Check In"</span> button</li>
+                  <li>• Enter your <span className="text-vault-text">Employee Number</span> → Tap "Verify"</li>
+                  <li>• Enter your assigned <span className="text-vault-text">Room Number</span></li>
+                  <li>• Select <span className="text-vault-text">Check-In Date</span> from calendar</li>
+                  <li>• Enter <span className="text-vault-text">Check-In Time</span> (24hr format: 14:00 = 2PM)</li>
+                  <li>• Sign your name in the <span className="text-vault-text">Signature Box</span></li>
+                  <li>• Tap "Complete Check-In"</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 3: Check Out */}
+          <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-4">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-lg">3</span>
+              </div>
+              <div>
+                <h3 className="font-outfit text-lg font-bold text-red-400 mb-1">CHECK OUT</h3>
+                <ul className="text-vault-text-secondary text-sm space-y-1">
+                  <li>• Tap the <span className="text-red-400 font-medium">RED "Check Out"</span> button</li>
+                  <li>• Enter your <span className="text-vault-text">Room Number</span></li>
+                  <li>• Select <span className="text-vault-text">Check-Out Date</span></li>
+                  <li>• Enter <span className="text-vault-text">Check-Out Time</span> (24hr format)</li>
+                  <li>• Tap "Complete Check-Out"</li>
+                </ul>
+                <p className="text-vault-gold text-xs mt-2 italic">No signature needed - your check-in signature is used automatically.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Time Reference */}
+          <div className="bg-black/50 border border-vault-gold/30 rounded-lg p-4">
+            <h3 className="font-outfit text-sm font-bold text-vault-gold mb-3 text-center">24-HOUR TIME REFERENCE</h3>
+            <div className="grid grid-cols-3 gap-2 text-center text-sm">
+              <div className="text-vault-text-secondary">6 AM = <span className="text-vault-text">06:00</span></div>
+              <div className="text-vault-text-secondary">12 PM = <span className="text-vault-text">12:00</span></div>
+              <div className="text-vault-text-secondary">6 PM = <span className="text-vault-text">18:00</span></div>
+              <div className="text-vault-text-secondary">8 AM = <span className="text-vault-text">08:00</span></div>
+              <div className="text-vault-text-secondary">2 PM = <span className="text-vault-text">14:00</span></div>
+              <div className="text-vault-text-secondary">10 PM = <span className="text-vault-text">22:00</span></div>
+            </div>
+          </div>
+
+          {/* Help Footer */}
+          <div className="text-center pt-2">
+            <p className="text-vault-text-secondary text-sm">
+              Need assistance? Please contact front desk staff.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
