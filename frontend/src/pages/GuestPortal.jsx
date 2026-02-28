@@ -100,16 +100,6 @@ export default function GuestPortal() {
           {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           <span className="text-sm font-mono hidden sm:inline">{isFullscreen ? "Exit Kiosk" : "Kiosk Mode"}</span>
         </button>
-        
-        {/* Admin Link */}
-        <button 
-          onClick={() => navigate("/admin")}
-          className="flex items-center gap-2 text-vault-text-secondary hover:text-vault-gold transition-colors bg-vault-surface/50 px-3 py-2 rounded-lg border border-vault-border"
-          data-testid="admin-link"
-        >
-          <Settings className="w-4 h-4" />
-          <span className="text-sm font-mono hidden sm:inline">Admin</span>
-        </button>
       </div>
 
       <AnimatePresence mode="wait">
