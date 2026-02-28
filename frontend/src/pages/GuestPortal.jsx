@@ -73,6 +73,56 @@ export default function GuestPortal() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Auto-refresh every 5 minutes to keep screen active and reset to menu
+  React.useEffect(() => {
+    let idleTimer;
+    let refreshInterval;
+    
+    const resetToMenu = () => {
+      if (view !== "menu") {
+        setView("menu");
+      }
+    };
+
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer);
+      // Reset to menu after 2 minutes of inactivity
+      idleTimer = setTimeout(resetToMenu, 2 * 60 * 1000);
+    };
+
+    // Auto-refresh page every 10 minutes to prevent any caching issues
+    refreshInterval = setInterval(() => {
+      if (view === "menu") {
+        window.location.reload();
+      }
+    }, 10 * 60 * 1000);
+
+    // Keep screen awake using Wake Lock API if available
+    let wakeLock = null;
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.log('Wake Lock not supported');
+      }
+    };
+    requestWakeLock();
+
+    // Listen for user activity
+    const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(event => document.addEventListener(event, resetIdleTimer));
+    resetIdleTimer();
+
+    return () => {
+      clearTimeout(idleTimer);
+      clearInterval(refreshInterval);
+      events.forEach(event => document.removeEventListener(event, resetIdleTimer));
+      if (wakeLock) wakeLock.release();
+    };
+  }, [view]);
+
   return (
     <div className="kiosk-container grid-bg min-h-screen relative">
       {/* Logo Header */}
