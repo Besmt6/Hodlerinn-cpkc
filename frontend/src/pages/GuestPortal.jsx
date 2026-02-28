@@ -186,7 +186,7 @@ function MainMenu({ setView }) {
             <LogOut className="w-5 h-5" />
             Check Out
           </Button>
-          <div className="pt-4 border-t border-vault-border">
+          <div className="pt-4 border-t border-vault-border space-y-3">
             <Button
               onClick={() => setView("signin")}
               className="w-full vault-btn-secondary h-12 flex items-center justify-center gap-3"
@@ -194,6 +194,14 @@ function MainMenu({ setView }) {
             >
               <ClipboardList className="w-5 h-5" />
               View Sign-In Sheet
+            </Button>
+            <Button
+              onClick={() => setView("help")}
+              className="w-full h-12 flex items-center justify-center gap-3 bg-vault-surface border border-vault-border text-vault-text hover:border-vault-gold hover:text-vault-gold transition-colors"
+              data-testid="help-btn"
+            >
+              <HelpCircle className="w-5 h-5" />
+              How to Use / Help
             </Button>
           </div>
         </CardContent>
