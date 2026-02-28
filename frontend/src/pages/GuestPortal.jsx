@@ -128,6 +128,9 @@ export default function GuestPortal() {
         {view === "signin" && (
           <SignInSheetView key="signin" setView={setView} />
         )}
+        {view === "help" && (
+          <HelpView key="help" setView={setView} />
+        )}
       </AnimatePresence>
     </div>
   );
