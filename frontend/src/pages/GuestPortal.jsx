@@ -323,7 +323,10 @@ function MainMenu({ setView }) {
             </p>
           </div>
           <Button
-            onClick={() => setView("register")}
+            onClick={() => {
+              playVoiceMessage("register_welcome");
+              setView("register");
+            }}
             className="w-full h-14 text-lg flex items-center justify-center gap-3 vault-btn-primary uppercase tracking-wide"
             data-testid="register-btn"
           >
@@ -331,7 +334,11 @@ function MainMenu({ setView }) {
             Register (First Time Only)
           </Button>
           <Button
-            onClick={() => setView("checkin")}
+            onClick={() => {
+              const timePeriod = getTimePeriod();
+              playVoiceMessage(`checkin_welcome_${timePeriod}`);
+              setView("checkin");
+            }}
             className="w-full h-14 text-lg flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase tracking-wide"
             data-testid="checkin-btn"
           >
