@@ -1097,6 +1097,7 @@ export default function AdminDashboard() {
                           <TableHead className="text-vault-gold">Total Hours</TableHead>
                           <TableHead className="text-vault-gold">Nights Billed</TableHead>
                           <TableHead className="text-vault-gold">Signed</TableHead>
+                          <TableHead className="text-vault-gold">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
