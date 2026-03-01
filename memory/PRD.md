@@ -106,9 +106,37 @@ Build a two-part application for a hotel named "Hodler Inn":
   - Multi-language support
   - Provider options: Vapi.ai (recommended), Retell AI, Twilio + OpenAI
 
+## AI Verification Agent (March 2026)
+**Status:** FUNCTIONAL - Login working, navigation needs calibration to portal UI
+
+### Features Implemented:
+- Portal Settings page in Admin Dashboard to store API Global credentials
+- Encrypted credential storage (username + password)
+- **Test Connection** - Successfully logs into the third-party railroad portal
+- **Run Sync Now** - Background task automation with Playwright browser
+- Sync Status tracking with results history
+- Name matching algorithm (fuzzy matching with SequenceMatcher)
+
+### Technical Details:
+- Uses Playwright for headless browser automation
+- Chromium browser installed for ARM64 architecture
+- Async background task execution
+- Login URL: https://providerrail.apps-apiglobalsolutions.com/ACESSUPPLIER/faces/login.xhtml
+
+### Known Limitations:
+- Navigation selectors need calibration based on actual portal UI structure
+- The third-party website UI may change, requiring selector updates
+- Currently, the "Sign In Sheets" menu navigation fails due to different menu structure
+
+### Next Steps for Full Automation:
+1. User should capture screenshots of the portal's navigation flow after login
+2. Update selectors in `/app/backend/sync_agent.py` to match actual UI elements
+3. Test with real booking data matching the portal's date
+
 ## Access Credentials
 - **Admin Dashboard**: /admin → Password: hodlerinn2024
 - **Guest Sign-In Sheet**: Password: cpkc (or valid employee ID)
+- **API Global Portal**: Credentials entered in Portal Settings (encrypted)
 
 ## API Endpoints
 ### Room Management
@@ -121,12 +149,21 @@ Build a two-part application for a hotel named "Hodler Inn":
 - GET /api/admin/export-pdf - Sign-In Sheet PDF (supports date filters)
 - GET /api/admin/export-billing-pdf - Billing Report PDF (supports date filters)
 
+### Portal Sync (AI Verification Agent)
+- GET /api/admin/settings - Get portal settings
+- POST /api/admin/settings - Update portal settings
+- POST /api/admin/settings/test-connection - Test portal login
+- POST /api/admin/sync/run - Start sync process
+- GET /api/admin/sync/status - Get sync status
+- GET /api/admin/sync/history - Get sync history
+
 ### Date Filtering
 - GET /api/admin/records?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
 
 ## Next Tasks
-1. UnlockOS Smart Lock Integration (saved for later)
-2. Email notifications on check-in/out
-3. Room availability calendar view
-4. Blockchain integration (saved for later)
-5. AI Phone Bot (saved for later)
+1. **Calibrate AI Sync Agent selectors** - User needs to provide portal UI screenshots after login
+2. UnlockOS Smart Lock Integration (saved for later)
+3. Email notifications on check-in/out
+4. Room availability calendar view
+5. Blockchain integration (saved for later)
+6. AI Phone Bot (saved for later)
