@@ -1,6 +1,7 @@
 """
 API Global Portal Sync Agent
 Automates verification of railroad crew sign-in sheets
+Portal: providerrail.apps-apiglobalsolutions.com
 """
 
 import asyncio
@@ -18,7 +19,8 @@ def normalize_name(name: str) -> str:
     """Normalize name for matching - remove suffixes, lowercase, etc."""
     if not name:
         return ""
-    # Remove common suffixes like BMR, HBW, MBW, etc.
+    # Remove common suffixes like BMR, HBW, MBW, HUB R E, etc.
+    name = re.sub(r'[/*][A-Z\s]{2,10}\s*$', '', name.strip())
     name = re.sub(r'/[A-Z]{2,4}\s*$', '', name.strip())
     # Convert LASTNAME/FIRSTNAME format to "firstname lastname"
     parts = name.split('/')
@@ -26,14 +28,19 @@ def normalize_name(name: str) -> str:
         # Format: LASTNAME/FIRSTNAME or LASTNAME/FIRSTNAME/SUFFIX
         lastname = parts[0].strip()
         firstname = parts[1].strip()
+        # Remove any remaining suffix from firstname
+        firstname = re.sub(r'[/*].*$', '', firstname).strip()
         return f"{firstname} {lastname}".lower()
     return name.lower().strip()
 
 
-def match_names(api_name: str, hodler_name: str, threshold: float = 0.7) -> bool:
+def match_names(api_name: str, hodler_name: str, threshold: float = 0.6) -> bool:
     """Check if two names match using fuzzy matching."""
     norm_api = normalize_name(api_name)
     norm_hodler = normalize_name(hodler_name)
+    
+    if not norm_api or not norm_hodler:
+        return False
     
     # Exact match
     if norm_api == norm_hodler:
@@ -42,6 +49,20 @@ def match_names(api_name: str, hodler_name: str, threshold: float = 0.7) -> bool
     # Check if one contains the other
     if norm_api in norm_hodler or norm_hodler in norm_api:
         return True
+    
+    # Check individual name parts
+    api_parts = set(norm_api.split())
+    hodler_parts = set(norm_hodler.split())
+    if api_parts and hodler_parts:
+        # If both first and last name match (in any order)
+        if len(api_parts & hodler_parts) >= 2:
+            return True
+        # If at least one significant name part matches
+        if len(api_parts & hodler_parts) >= 1:
+            # Use fuzzy match for additional confirmation
+            ratio = SequenceMatcher(None, norm_api, norm_hodler).ratio()
+            if ratio >= 0.5:
+                return True
     
     # Fuzzy match using sequence matcher
     ratio = SequenceMatcher(None, norm_api, norm_hodler).ratio()
@@ -54,7 +75,9 @@ class APIGlobalSyncAgent:
         self.password = password
         self.portal_url = "https://providerrail.apps-apiglobalsolutions.com/ACESSUPPLIER/faces/login.xhtml"
         self.browser = None
+        self.context = None
         self.page = None
+        self.playwright = None
         self.results = {
             "verified": [],
             "no_bill": [],
@@ -64,16 +87,31 @@ class APIGlobalSyncAgent:
     
     async def start(self):
         """Initialize browser."""
-        playwright = await async_playwright().start()
-        self.browser = await playwright.chromium.launch(headless=True)
-        self.page = await self.browser.new_page()
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-setuid-sandbox']
+        )
+        self.context = await self.browser.new_context(
+            viewport={'width': 1920, 'height': 1080}
+        )
+        self.page = await self.context.new_page()
         logger.info("Browser started")
     
     async def stop(self):
         """Close browser."""
-        if self.browser:
-            await self.browser.close()
+        try:
+            if self.page:
+                await self.page.close()
+            if self.context:
+                await self.context.close()
+            if self.browser:
+                await self.browser.close()
+            if self.playwright:
+                await self.playwright.stop()
             logger.info("Browser closed")
+        except Exception as e:
+            logger.error(f"Error closing browser: {e}")
     
     async def login(self) -> bool:
         """Login to API Global portal."""
@@ -81,27 +119,39 @@ class APIGlobalSyncAgent:
             logger.info(f"Navigating to {self.portal_url}")
             await self.page.goto(self.portal_url, wait_until="networkidle", timeout=30000)
             
-            # Wait for login form
-            await self.page.wait_for_selector('input[id*="username"]', timeout=10000)
+            # Wait for login form - look for username input
+            await self.page.wait_for_selector('input[type="text"]', timeout=10000)
             
-            # Fill credentials
-            await self.page.fill('input[id*="username"]', self.username)
-            await self.page.fill('input[id*="password"]', self.password)
+            # Fill credentials - the form has simple text/password inputs
+            username_input = self.page.locator('input[type="text"]').first
+            password_input = self.page.locator('input[type="password"]').first
             
-            # Click login button
-            await self.page.click('input[type="submit"], button[type="submit"]')
+            await username_input.fill(self.username)
+            await password_input.fill(self.password)
             
-            # Wait for navigation
+            # Click Login button
+            login_button = self.page.locator('input[type="submit"][value="Login"], button:has-text("Login")').first
+            await login_button.click()
+            
+            # Wait for navigation to complete
             await self.page.wait_for_load_state("networkidle", timeout=15000)
+            await self.page.wait_for_timeout(2000)
             
-            # Check if login successful by looking for menu or dashboard elements
+            # Check if login successful by looking for the welcome message or menu
             try:
-                await self.page.wait_for_selector('[id*="menu"], [class*="menu"], [id*="dashboard"]', timeout=5000)
+                # After login, we should see "Welcome" text or the sidebar menu
+                await self.page.wait_for_selector('text=Welcome, text=Sign-in Sheets, text=Home', timeout=8000)
                 logger.info("Login successful")
                 return True
             except:
-                logger.error("Login failed - could not find dashboard elements")
-                return False
+                # Check if we're still on login page (login failed)
+                current_url = self.page.url
+                if "login" in current_url.lower():
+                    logger.error("Login failed - still on login page")
+                    return False
+                # Might have succeeded anyway
+                logger.info("Login appears successful (navigated away from login)")
+                return True
                 
         except Exception as e:
             logger.error(f"Login error: {str(e)}")
@@ -109,95 +159,170 @@ class APIGlobalSyncAgent:
             return False
     
     async def navigate_to_signin_sheets(self) -> bool:
-        """Navigate to Online Sign-In Sheets."""
+        """Navigate to Online Sign-In Sheets page."""
         try:
-            # Click on Sign In Sheets menu
-            await self.page.click('text=Sign In Sheets', timeout=10000)
+            logger.info("Navigating to Sign-in Sheets...")
+            
+            # Wait for page to be ready
             await self.page.wait_for_timeout(1000)
             
-            # Click on Online Sign In Sheets
-            await self.page.click('text=Online Sign In Sheets', timeout=10000)
-            await self.page.wait_for_load_state("networkidle", timeout=15000)
+            # Click on "Sign-in Sheets" in the left sidebar menu (it's expandable)
+            signin_menu = self.page.locator('text=Sign-in Sheets').first
+            await signin_menu.click()
+            await self.page.wait_for_timeout(1500)
             
-            logger.info("Navigated to Online Sign In Sheets")
-            return True
+            logger.info("Clicked Sign-in Sheets menu")
+            
+            # Now click on "Online Sign-in Sheets" submenu
+            online_signin = self.page.locator('text=Online Sign-in Sheets').first
+            await online_signin.click()
+            
+            # Wait for the page to load
+            await self.page.wait_for_load_state("networkidle", timeout=15000)
+            await self.page.wait_for_timeout(2000)
+            
+            # Verify we're on the right page by checking for "Enter Online Sign-In Sheets" header
+            try:
+                await self.page.wait_for_selector('text=Enter Online Sign-In Sheets', timeout=5000)
+                logger.info("Navigated to Online Sign-In Sheets page")
+                return True
+            except:
+                logger.info("Navigation completed (page loaded)")
+                return True
             
         except Exception as e:
             logger.error(f"Navigation error: {str(e)}")
             self.results["errors"].append(f"Navigation failed: {str(e)}")
             return False
     
-    async def select_date_and_load(self, target_date: datetime = None) -> bool:
-        """Select the target date and load sign-in sheets."""
+    async def load_signin_sheet(self) -> bool:
+        """Click Load button to load the sign-in sheet data."""
         try:
-            if target_date is None:
-                # Auto-select date based on current time
-                now = datetime.now()
-                if now.hour >= 18:  # After 6 PM
-                    target_date = now - timedelta(days=1)
-                elif now.hour < 15:  # Before 3 PM
-                    target_date = now
-                else:
-                    target_date = now
+            logger.info("Loading sign-in sheet data...")
             
-            date_str = target_date.strftime("%m/%d/%Y")
-            logger.info(f"Selecting date: {date_str}")
+            # The page should show:
+            # - Select Client: Canadian Pacific (dropdown)
+            # - City: HEAVENER-OK
+            # - Supplier: Hodler Inn - Heavener
+            # - Reservation Date: [date] (auto-set to previous day)
+            # - Load button
             
-            # Find and fill date input
-            date_input = await self.page.query_selector('input[id*="date"], input[type="date"]')
-            if date_input:
-                await date_input.fill(date_str)
+            # Just click the Load button - date should already be correct (previous day before 3pm)
+            load_button = self.page.locator('input[type="submit"][value="Load"], button:has-text("Load")').first
+            await load_button.click()
             
-            # Click Load button
-            await self.page.click('text=Load', timeout=10000)
-            await self.page.wait_for_load_state("networkidle", timeout=15000)
-            await self.page.wait_for_timeout(2000)  # Extra wait for data to load
+            # Wait for data to load
+            await self.page.wait_for_load_state("networkidle", timeout=20000)
+            await self.page.wait_for_timeout(3000)
             
-            logger.info("Sign-in sheets loaded")
-            return True
+            # Check if "Scheduled Arrivals" section appeared
+            try:
+                await self.page.wait_for_selector('text=Scheduled Arrivals', timeout=10000)
+                logger.info("Sign-in sheet data loaded successfully")
+                return True
+            except:
+                logger.warning("Could not find Scheduled Arrivals - page may be empty or different structure")
+                return True
             
         except Exception as e:
-            logger.error(f"Date selection error: {str(e)}")
-            self.results["errors"].append(f"Failed to load sign-in sheets: {str(e)}")
+            logger.error(f"Load error: {str(e)}")
+            self.results["errors"].append(f"Failed to load sign-in sheet: {str(e)}")
             return False
     
     async def get_signin_sheet_entries(self) -> list:
-        """Extract all sign-in sheet entries from the page."""
+        """Extract all sign-in sheet entries from the Scheduled Arrivals section."""
         entries = []
         try:
-            # Find all rows in the sign-in sheet table
-            rows = await self.page.query_selector_all('tr[id*="row"], tr[class*="row"], tbody tr')
+            logger.info("Extracting sign-in sheet entries...")
             
-            for row in rows:
-                try:
-                    # Get name cell
-                    name_cell = await row.query_selector('td:nth-child(4), [id*="name"]')
-                    if name_cell:
-                        name = await name_cell.inner_text()
+            # The page structure shows multiple arrival blocks, each with a data table
+            # Each block has: Name, Employee ID input, No Show/No Bill checkboxes, Room Number input
+            
+            # Find all table rows that contain employee data
+            # Looking for rows with Name column and Employee ID input
+            
+            # Get all tables in the Scheduled Arrivals section
+            tables = await self.page.query_selector_all('table')
+            
+            for table in tables:
+                rows = await table.query_selector_all('tr')
+                for row in rows:
+                    try:
+                        # Look for rows that have a Name cell and Employee ID input
+                        cells = await row.query_selector_all('td')
+                        if len(cells) < 4:
+                            continue
                         
-                        # Get employee ID input
-                        emp_input = await row.query_selector('input[id*="employee"], input[id*="empId"]')
+                        # Try to find the name - it's usually in format LASTNAME/FIRSTNAME/SUFFIX
+                        name_text = None
+                        emp_input = None
+                        room_input = None
+                        no_bill_checkbox = None
                         
-                        # Get room number input
-                        room_input = await row.query_selector('input[id*="room"]')
+                        for cell in cells:
+                            cell_text = await cell.inner_text()
+                            cell_text = cell_text.strip()
+                            
+                            # Check if this looks like a name (contains /)
+                            if '/' in cell_text and len(cell_text) > 3:
+                                # This is likely the name column
+                                name_text = cell_text
                         
-                        # Get no bill checkbox
-                        no_bill_checkbox = await row.query_selector('input[type="checkbox"][id*="noBill"]')
+                        # Find Employee ID input in this row
+                        emp_input = await row.query_selector('input[id*="employeeId"], input[id*="empId"], input[name*="employee"]')
+                        if not emp_input:
+                            # Try finding any text input that might be for employee ID
+                            inputs = await row.query_selector_all('input[type="text"]')
+                            for inp in inputs:
+                                placeholder = await inp.get_attribute('placeholder') or ''
+                                value = await inp.get_attribute('value') or ''
+                                inp_id = await inp.get_attribute('id') or ''
+                                if 'employee' in inp_id.lower() or 'emp' in inp_id.lower() or value == 'NO ID':
+                                    emp_input = inp
+                                    break
                         
-                        # Get status element
-                        status = await row.query_selector('[class*="status"], [id*="status"]')
-                        status_text = await status.inner_text() if status else ""
+                        # Find Room Number input
+                        room_input = await row.query_selector('input[id*="room"], input[name*="room"]')
+                        if not room_input:
+                            inputs = await row.query_selector_all('input[type="text"]')
+                            for inp in inputs:
+                                inp_id = await inp.get_attribute('id') or ''
+                                inp_name = await inp.get_attribute('name') or ''
+                                if 'room' in inp_id.lower() or 'room' in inp_name.lower():
+                                    room_input = inp
+                                    break
                         
-                        entries.append({
-                            "name": name.strip(),
-                            "emp_input": emp_input,
-                            "room_input": room_input,
-                            "no_bill_checkbox": no_bill_checkbox,
-                            "row": row,
-                            "verified": "check" in status_text.lower() or "blue" in status_text.lower()
-                        })
-                except Exception as e:
-                    continue
+                        # Find No Bill checkbox
+                        no_bill_checkbox = await row.query_selector('input[type="checkbox"][id*="noBill"], input[type="checkbox"][name*="noBill"]')
+                        if not no_bill_checkbox:
+                            checkboxes = await row.query_selector_all('input[type="checkbox"]')
+                            for cb in checkboxes:
+                                cb_id = await cb.get_attribute('id') or ''
+                                if 'nobill' in cb_id.lower() or 'no_bill' in cb_id.lower():
+                                    no_bill_checkbox = cb
+                                    break
+                        
+                        if name_text:
+                            # Check if already verified (has employee ID filled in)
+                            emp_value = ""
+                            if emp_input:
+                                emp_value = await emp_input.get_attribute('value') or ''
+                            
+                            is_verified = emp_value and emp_value != 'NO ID' and len(emp_value) > 2
+                            
+                            entries.append({
+                                "name": name_text,
+                                "emp_input": emp_input,
+                                "room_input": room_input,
+                                "no_bill_checkbox": no_bill_checkbox,
+                                "row": row,
+                                "verified": is_verified,
+                                "current_emp_value": emp_value
+                            })
+                            logger.info(f"Found entry: {name_text} (verified: {is_verified})")
+                    
+                    except Exception as e:
+                        continue
             
             logger.info(f"Found {len(entries)} sign-in sheet entries")
             return entries
@@ -211,12 +336,16 @@ class APIGlobalSyncAgent:
         """Fill in employee ID and room number for an entry."""
         try:
             if entry["emp_input"]:
-                await entry["emp_input"].fill(employee_id)
+                await entry["emp_input"].clear()
+                await entry["emp_input"].fill(str(employee_id))
+                await self.page.wait_for_timeout(300)
             
             if entry["room_input"]:
-                await entry["room_input"].fill(room_number)
+                await entry["room_input"].clear()
+                await entry["room_input"].fill(str(room_number))
+                await self.page.wait_for_timeout(300)
             
-            # Tab out to trigger validation
+            # Tab out to trigger any validation
             await self.page.keyboard.press("Tab")
             await self.page.wait_for_timeout(500)
             
@@ -224,21 +353,26 @@ class APIGlobalSyncAgent:
             return True
             
         except Exception as e:
-            logger.error(f"Error verifying entry: {str(e)}")
+            logger.error(f"Error verifying entry {entry['name']}: {str(e)}")
             return False
     
     async def mark_no_bill(self, entry: dict) -> bool:
-        """Mark an entry as No Bill."""
+        """Mark an entry as No Bill (guest didn't stay)."""
         try:
             if entry["no_bill_checkbox"]:
-                await entry["no_bill_checkbox"].check()
-                await self.page.wait_for_timeout(500)
+                # Check if already checked
+                is_checked = await entry["no_bill_checkbox"].is_checked()
+                if not is_checked:
+                    await entry["no_bill_checkbox"].check()
+                    await self.page.wait_for_timeout(500)
                 logger.info(f"Marked No Bill: {entry['name']}")
                 return True
-            return False
+            else:
+                logger.warning(f"No Bill checkbox not found for: {entry['name']}")
+                return False
             
         except Exception as e:
-            logger.error(f"Error marking no bill: {str(e)}")
+            logger.error(f"Error marking no bill for {entry['name']}: {str(e)}")
             return False
     
     async def run_sync(self, hodler_records: list) -> dict:
@@ -254,28 +388,41 @@ class APIGlobalSyncAgent:
         try:
             await self.start()
             
+            # Step 1: Login
             if not await self.login():
                 return self.results
             
+            # Step 2: Navigate to Sign-in Sheets > Online Sign-in Sheets
             if not await self.navigate_to_signin_sheets():
                 return self.results
             
-            if not await self.select_date_and_load():
+            # Step 3: Click Load to get the data
+            if not await self.load_signin_sheet():
                 return self.results
             
+            # Step 4: Get all entries from the table
             entries = await self.get_signin_sheet_entries()
             
+            if not entries:
+                logger.info("No entries found to process")
+                self.results["errors"].append("No entries found on the sign-in sheet")
+                return self.results
+            
+            # Step 5: Process each entry
             for entry in entries:
                 if entry["verified"]:
-                    continue  # Skip already verified entries
+                    logger.info(f"Skipping already verified: {entry['name']}")
+                    continue
                 
                 api_name = entry["name"]
                 matched = False
                 
                 # Try to match with Hodler Inn records
                 for record in hodler_records:
-                    if match_names(api_name, record.get("employee_name", "")):
+                    hodler_name = record.get("employee_name", "")
+                    if match_names(api_name, hodler_name):
                         # Found a match - fill in the details
+                        logger.info(f"Match found: {api_name} <-> {hodler_name}")
                         success = await self.verify_entry(
                             entry,
                             record.get("employee_number", ""),
@@ -284,7 +431,7 @@ class APIGlobalSyncAgent:
                         if success:
                             self.results["verified"].append({
                                 "api_name": api_name,
-                                "hodler_name": record.get("employee_name"),
+                                "hodler_name": hodler_name,
                                 "employee_id": record.get("employee_number"),
                                 "room": record.get("room_number")
                             })
@@ -292,24 +439,26 @@ class APIGlobalSyncAgent:
                         break
                 
                 if not matched:
-                    # No match found - mark as No Bill
+                    # No match found in Hodler Inn records - mark as No Bill
+                    logger.info(f"No match for {api_name} - marking No Bill")
                     if await self.mark_no_bill(entry):
                         self.results["no_bill"].append({"name": api_name})
                     else:
                         self.results["missing_in_hodler"].append({"name": api_name})
             
-            # Check for Hodler records not in API Global
-            api_names = [normalize_name(e["name"]) for e in entries]
+            # Check for Hodler records not found in API Global (guests who stayed but not in system)
             for record in hodler_records:
-                hodler_norm = normalize_name(record.get("employee_name", ""))
-                found = any(match_names(api_name, record.get("employee_name", "")) 
-                           for api_name in [e["name"] for e in entries])
+                hodler_name = record.get("employee_name", "")
+                found = any(match_names(e["name"], hodler_name) for e in entries)
                 if not found:
                     self.results["missing_in_hodler"].append({
-                        "name": record.get("employee_name"),
-                        "note": "In Hodler Inn but not in API Global - needs to be added"
+                        "name": hodler_name,
+                        "employee_id": record.get("employee_number"),
+                        "room": record.get("room_number"),
+                        "note": "Guest checked in at Hodler Inn but not listed in API Global portal"
                     })
             
+            logger.info(f"Sync completed. Verified: {len(self.results['verified'])}, No Bill: {len(self.results['no_bill'])}")
             return self.results
             
         except Exception as e:
