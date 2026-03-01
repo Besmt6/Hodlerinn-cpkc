@@ -164,7 +164,9 @@ export default function AdminDashboard() {
         api_global_password: "",
         alert_email: settingsRes.data.alert_email || "",
         auto_sync_enabled: settingsRes.data.auto_sync_enabled || false,
-        api_global_password_set: settingsRes.data.api_global_password_set || false
+        api_global_password_set: settingsRes.data.api_global_password_set || false,
+        voice_enabled: settingsRes.data.voice_enabled !== false,
+        voice_volume: settingsRes.data.voice_volume || 1.0
       });
       setSyncStatus(syncStatusRes.data);
     } catch (error) {
