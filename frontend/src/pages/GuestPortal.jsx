@@ -132,20 +132,6 @@ const speakMessage = (message, rate = 0.9) => {
     window.speechSynthesis.speak(utterance);
   }
 };
-    
-    // Try to use a natural sounding voice
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => 
-      v.lang.startsWith('en') && (v.name.includes('Female') || v.name.includes('Samantha') || v.name.includes('Google'))
-    ) || voices.find(v => v.lang.startsWith('en'));
-    
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    }
-    
-    window.speechSynthesis.speak(utterance);
-  }
-};
 
 // Get greeting based on time of day
 const getTimeBasedGreeting = () => {
