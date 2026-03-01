@@ -887,21 +887,8 @@ function CheckOutForm({ setView, setSuccessMessage }) {
                     data-testid="checkout-room-input"
                   />
                 </div>
-              </div>
-              <div>
-                <label className="vault-label">Employee Number</label>
-                <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
-                  <Input
-                    value={employeeNumber}
-                    onChange={(e) => setEmployeeNumber(e.target.value)}
-                    placeholder="Enter your employee number"
-                    className="vault-input pl-10"
-                    data-testid="checkout-employee-input"
-                  />
-                </div>
                 <p className="text-vault-text-secondary text-xs mt-1">
-                  Enter the same employee number you used at check-in
+                  Enter your room number to find your booking
                 </p>
               </div>
               <Button
@@ -910,22 +897,22 @@ function CheckOutForm({ setView, setSuccessMessage }) {
                 className="w-full vault-btn-primary h-12"
                 data-testid="verify-checkout-btn"
               >
-                {verifying ? "Verifying..." : "Verify & Continue"}
+                {verifying ? "Finding booking..." : "Find My Booking"}
               </Button>
             </>
           ) : (
             <>
               <div className="bg-emerald-900/30 border border-emerald-600/50 rounded-lg p-4">
-                <p className="text-emerald-400 text-xs uppercase tracking-wide mb-1">Verified Guest</p>
+                <p className="text-emerald-400 text-xs uppercase tracking-wide mb-1">Booking Found</p>
                 <p className="text-vault-text font-bold text-lg">{verifiedBooking.employee_name}</p>
-                <p className="text-vault-text-secondary text-sm">ID: {verifiedBooking.employee_number}</p>
+                <p className="text-vault-text-secondary text-sm">Employee ID: {verifiedBooking.employee_number}</p>
                 <p className="text-vault-text-secondary text-sm">Room: {verifiedBooking.room_number}</p>
                 <p className="text-vault-text-secondary text-sm">Checked in: {verifiedBooking.check_in_date} at {verifiedBooking.check_in_time}</p>
                 <button
                   onClick={handleClearVerification}
                   className="text-vault-text-secondary hover:text-vault-gold text-xs underline mt-2"
                 >
-                  Not you? Change
+                  Not your booking? Try again
                 </button>
               </div>
               <div>
