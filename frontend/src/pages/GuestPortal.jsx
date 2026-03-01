@@ -39,8 +39,33 @@ import { useNavigate } from "react-router-dom";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Voice settings cache
+let voiceSettings = { enabled: true, volume: 1.0 };
+
+// Fetch voice settings from server
+const fetchVoiceSettings = async () => {
+  try {
+    const response = await axios.get(`${API}/voice-settings`);
+    voiceSettings = {
+      enabled: response.data.voice_enabled,
+      volume: response.data.voice_volume
+    };
+  } catch (error) {
+    console.error("Failed to fetch voice settings:", error);
+  }
+};
+
+// Initialize voice settings on load
+fetchVoiceSettings();
+
 // Voice message helper using Web Speech API
 const speakMessage = (message, rate = 0.9) => {
+  // Check if voice is enabled
+  if (!voiceSettings.enabled) {
+    console.log("Voice is disabled");
+    return;
+  }
+  
   if ('speechSynthesis' in window) {
     // Cancel any ongoing speech
     window.speechSynthesis.cancel();
@@ -48,7 +73,7 @@ const speakMessage = (message, rate = 0.9) => {
     const utterance = new SpeechSynthesisUtterance(message);
     utterance.rate = rate;
     utterance.pitch = 1;
-    utterance.volume = 1;
+    utterance.volume = voiceSettings.volume;
     
     // Try to use a natural sounding voice
     const voices = window.speechSynthesis.getVoices();
