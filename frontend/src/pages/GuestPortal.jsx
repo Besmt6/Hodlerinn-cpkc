@@ -476,9 +476,11 @@ function CheckInForm({ setView, setSuccessMessage }) {
   const [availableRooms, setAvailableRooms] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [signatureReminderSpoken, setSignatureReminderSpoken] = useState(false);
+  const [roomReminderSpoken, setRoomReminderSpoken] = useState(false);
   const sigRef = useRef(null);
   const roomInputRef = useRef(null);
   const timeInputRef = useRef(null);
+  const signatureContainerRef = useRef(null);
 
   // Fetch available rooms on component mount
   useEffect(() => {
