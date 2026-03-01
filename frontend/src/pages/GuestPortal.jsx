@@ -133,8 +133,8 @@ export default function GuestPortal() {
           className="w-12 h-12 rounded-lg object-cover"
         />
         <div>
-          <h1 className="font-outfit font-bold text-gray-800 text-xl tracking-tight">HODLER INN</h1>
-          <p className="font-mono text-[10px] text-amber-600 uppercase tracking-widest">Be Responsible to Be Free</p>
+          <h1 className="font-outfit font-bold text-vault-text text-xl tracking-tight">HODLER INN</h1>
+          <p className="font-mono text-[10px] text-vault-gold uppercase tracking-widest">Be Responsible to Be Free</p>
         </div>
       </div>
 
@@ -143,7 +143,7 @@ export default function GuestPortal() {
         {/* Fullscreen/Kiosk Mode Button */}
         <button 
           onClick={toggleFullscreen}
-          className="flex items-center gap-2 text-gray-600 hover:text-amber-600 transition-colors bg-white px-3 py-2 rounded-lg border border-gray-300 shadow-sm"
+          className="flex items-center gap-2 text-vault-text-secondary hover:text-vault-gold transition-colors bg-vault-surface px-3 py-2 rounded-lg border border-gray-300 shadow-sm"
           data-testid="fullscreen-btn"
           title={isFullscreen ? "Exit Kiosk Mode" : "Enter Kiosk Mode"}
         >
@@ -186,28 +186,28 @@ function MainMenu({ setView }) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="w-full max-w-md"
     >
-      <Card className="bg-white border border-gray-200 shadow-xl p-8 rounded-2xl" data-testid="main-menu-card">
+      <Card className="bg-vault-surface border border-vault-border shadow-xl p-8 rounded-2xl" data-testid="main-menu-card">
         <CardHeader className="text-center pb-8">
-          <CardTitle className="font-outfit text-3xl font-bold text-gray-800 tracking-tight">
+          <CardTitle className="font-outfit text-3xl font-bold text-vault-text tracking-tight">
             Welcome to Hodler Inn
           </CardTitle>
           <p className="text-red-600 font-bold text-lg mt-3">
             Railroad Crew Check In Here
           </p>
-          <p className="text-gray-600 font-manrope mt-2">
+          <p className="text-vault-text-secondary font-manrope mt-2">
             Select an option below to continue
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
-            <p className="text-gray-600 text-sm text-center">
-              <span className="text-amber-600 font-medium">Note:</span> Register only if this is your <span className="text-amber-600 font-medium">first time</span>. 
-              Already registered? Go directly to <span className="text-amber-600 font-medium">Check In</span>.
+            <p className="text-vault-text-secondary text-sm text-center">
+              <span className="text-vault-gold font-medium">Note:</span> Register only if this is your <span className="text-vault-gold font-medium">first time</span>. 
+              Already registered? Go directly to <span className="text-vault-gold font-medium">Check In</span>.
             </p>
           </div>
           <Button
             onClick={() => setView("register")}
-            className="w-full h-14 text-lg flex items-center justify-center gap-3 bg-amber-500 hover:bg-amber-600 text-black font-bold uppercase tracking-wide"
+            className="w-full h-14 text-lg flex items-center justify-center gap-3 vault-btn-primary uppercase tracking-wide"
             data-testid="register-btn"
           >
             <UserPlus className="w-5 h-5" />
@@ -229,7 +229,7 @@ function MainMenu({ setView }) {
             <LogOut className="w-5 h-5" />
             Check Out
           </Button>
-          <div className="pt-4 border-t border-gray-200 space-y-3">
+          <div className="pt-4 border-t border-vault-border space-y-3">
             <Button
               onClick={() => setView("signin")}
               className="w-full h-12 flex items-center justify-center gap-3 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
@@ -288,47 +288,47 @@ function RegisterForm({ setView }) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="w-full max-w-md"
     >
-      <Card className="bg-white border border-gray-200 shadow-xl p-8 rounded-2xl" data-testid="register-form-card">
+      <Card className="bg-vault-surface border border-vault-border shadow-xl p-8 rounded-2xl" data-testid="register-form-card">
         <CardHeader className="pb-6">
           <button 
             onClick={() => setView("menu")} 
-            className="text-gray-500 hover:text-amber-600 transition-colors mb-4 flex items-center gap-2"
+            className="text-gray-500 hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
             data-testid="back-btn"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          <CardTitle className="font-outfit text-2xl font-bold text-gray-800 tracking-tight flex items-center gap-3">
+          <CardTitle className="font-outfit text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
             <UserPlus className="w-6 h-6 text-amber-500" />
             Guest Registration
           </CardTitle>
-          <p className="text-gray-600 text-sm mt-2">
+          <p className="text-vault-text-secondary text-sm mt-2">
             Register with your employee details. Signature will be captured at check-in.
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Employee Number</label>
+            <label className="vault-label">Employee Number</label>
             <div className="relative">
               <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 value={employeeNumber}
                 onChange={(e) => setEmployeeNumber(e.target.value)}
                 placeholder="Enter employee number"
-                className="pl-10 bg-gray-50 border-gray-300 text-gray-800 focus:border-amber-500"
+                className="pl-10 vault-input focus:border-amber-500"
                 data-testid="employee-number-input"
               />
             </div>
           </div>
           <div>
-            <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Full Name</label>
+            <label className="vault-label">Full Name</label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter your full name"
-                className="pl-10 bg-gray-50 border-gray-300 text-gray-800 focus:border-amber-500"
+                className="pl-10 vault-input focus:border-amber-500"
                 data-testid="name-input"
               />
             </div>
@@ -336,7 +336,7 @@ function RegisterForm({ setView }) {
           <Button
             onClick={handleRegister}
             disabled={loading}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold h-12"
+            className="w-full vault-btn-primary h-12"
             data-testid="submit-register-btn"
           >
             {loading ? "Registering..." : "Complete Registration"}
@@ -435,18 +435,18 @@ function CheckInForm({ setView }) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="w-full max-w-md"
     >
-      <Card className="bg-white border border-gray-200 shadow-xl rounded-2xl p-8" data-testid="checkin-form-card">
+      <Card className="glass-card p-8" data-testid="checkin-form-card">
         <CardHeader className="pb-6">
           <button 
             onClick={() => setView("menu")} 
-            className="text-gray-600 hover:text-amber-600 transition-colors mb-4 flex items-center gap-2"
+            className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
             data-testid="back-btn"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          <CardTitle className="font-outfit text-2xl font-bold text-gray-800 tracking-tight flex items-center gap-3">
-            <LogIn className="w-6 h-6 text-amber-600" />
+          <CardTitle className="font-outfit text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
+            <LogIn className="w-6 h-6 text-vault-gold" />
             Guest Check-In
           </CardTitle>
         </CardHeader>
@@ -455,14 +455,14 @@ function CheckInForm({ setView }) {
           {!verifiedEmployee ? (
             <div className="space-y-4">
               <div>
-                <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Employee Number</label>
+                <label className="vault-label">Employee Number</label>
                 <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
                   <Input
                     value={employeeNumber}
                     onChange={(e) => setEmployeeNumber(e.target.value)}
                     placeholder="Enter employee number"
-                    className="bg-gray-50 border-gray-300 text-gray-800 pl-10"
+                    className="vault-input pl-10"
                     data-testid="checkin-employee-input"
                   />
                 </div>
@@ -470,7 +470,7 @@ function CheckInForm({ setView }) {
               <Button
                 onClick={handleVerifyEmployee}
                 disabled={verifying}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold h-12"
+                className="w-full vault-btn-primary h-12"
                 data-testid="verify-employee-btn"
               >
                 {verifying ? "Verifying..." : "Verify Employee"}
@@ -483,12 +483,12 @@ function CheckInForm({ setView }) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-vault-success text-xs uppercase tracking-wider mb-1">Verified Employee</p>
-                    <p className="text-gray-800 font-bold text-lg">{verifiedEmployee.name}</p>
-                    <p className="text-gray-600 font-mono text-sm">ID: {verifiedEmployee.employee_number}</p>
+                    <p className="text-vault-text font-bold text-lg">{verifiedEmployee.name}</p>
+                    <p className="text-vault-text-secondary font-mono text-sm">ID: {verifiedEmployee.employee_number}</p>
                   </div>
                   <button 
                     onClick={handleClearVerification}
-                    className="text-gray-600 hover:text-amber-600 text-xs underline"
+                    className="text-vault-text-secondary hover:text-vault-gold text-xs underline"
                   >
                     Change
                   </button>
@@ -496,74 +496,74 @@ function CheckInForm({ setView }) {
               </div>
 
               <div>
-                <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Room Number</label>
+                <label className="vault-label">Room Number</label>
                 <div className="relative">
-                  <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
                   <Input
                     value={roomNumber}
                     onChange={(e) => setRoomNumber(e.target.value)}
                     placeholder="Enter room number"
-                    className="bg-gray-50 border-gray-300 text-gray-800 pl-10"
+                    className="vault-input pl-10"
                     data-testid="checkin-room-input"
                   />
                 </div>
               </div>
               <div>
-                <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Check-In Date</label>
+                <label className="vault-label">Check-In Date</label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
-                        "w-full bg-gray-50 border-gray-300 text-gray-800 justify-start text-left font-normal",
+                        "w-full vault-input justify-start text-left font-normal",
                         !date && "text-muted-foreground"
                       )}
                       data-testid="checkin-date-btn"
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-600" />
+                      <CalendarIcon className="mr-2 h-4 w-4 text-vault-text-secondary" />
                       {date ? format(date, "dd MMM yyyy") : "Select date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-white border-gray-200" align="start">
+                  <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
                     <Calendar
                       mode="single"
                       selected={date}
                       onSelect={setDate}
                       initialFocus
-                      className="bg-white text-gray-800"
+                      className="bg-vault-surface text-vault-text"
                       data-testid="checkin-calendar"
                     />
                   </PopoverContent>
                 </Popover>
               </div>
               <div>
-                <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Check-In Time (24hr)</label>
+                <label className="vault-label">Check-In Time (24hr)</label>
                 <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
                   <Input
                     type="time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
-                    className="bg-gray-50 border-gray-300 text-gray-800 pl-10"
+                    className="vault-input pl-10"
                     placeholder="HH:MM"
                     data-testid="checkin-time-input"
                   />
                 </div>
-                <p className="text-gray-600 text-xs mt-1">Use 24-hour format (e.g., 14:00 for 2:00 PM)</p>
+                <p className="text-vault-text-secondary text-xs mt-1">Use 24-hour format (e.g., 14:00 for 2:00 PM)</p>
               </div>
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium mb-0">Signature</label>
+                  <label className="vault-label mb-0">Signature</label>
                   <button 
                     onClick={clearSignature}
-                    className="text-gray-600 hover:text-amber-600 text-xs flex items-center gap-1 transition-colors"
+                    className="text-vault-text-secondary hover:text-vault-gold text-xs flex items-center gap-1 transition-colors"
                     data-testid="clear-checkin-signature-btn"
                   >
                     <Eraser className="w-3 h-3" />
                     Clear
                   </button>
                 </div>
-                <div className="bg-white border border-gray-300 rounded-lg">
+                <div className="bg-vault-surface border border-gray-300 rounded-lg">
                   <SignatureCanvas
                     ref={sigRef}
                     canvasProps={{
@@ -575,14 +575,14 @@ function CheckInForm({ setView }) {
                     data-testid="checkin-signature-canvas"
                   />
                 </div>
-                <p className="text-gray-600 text-xs mt-1">
+                <p className="text-vault-text-secondary text-xs mt-1">
                   This signature will be used for both check-in and check-out.
                 </p>
               </div>
               <Button
                 onClick={handleCheckIn}
                 disabled={loading}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold h-12"
+                className="w-full vault-btn-primary h-12"
                 data-testid="submit-checkin-btn"
               >
                 {loading ? "Processing..." : "Complete Check-In"}
@@ -640,82 +640,82 @@ function CheckOutForm({ setView }) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="w-full max-w-md"
     >
-      <Card className="bg-white border border-gray-200 shadow-xl rounded-2xl p-8" data-testid="checkout-form-card">
+      <Card className="glass-card p-8" data-testid="checkout-form-card">
         <CardHeader className="pb-6">
           <button 
             onClick={() => setView("menu")} 
-            className="text-gray-600 hover:text-amber-600 transition-colors mb-4 flex items-center gap-2"
+            className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
             data-testid="back-btn"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          <CardTitle className="font-outfit text-2xl font-bold text-gray-800 tracking-tight flex items-center gap-3">
-            <LogOut className="w-6 h-6 text-amber-600" />
+          <CardTitle className="font-outfit text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
+            <LogOut className="w-6 h-6 text-vault-gold" />
             Guest Check-Out
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Room Number</label>
+            <label className="vault-label">Room Number</label>
             <div className="relative">
-              <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+              <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
               <Input
                 value={roomNumber}
                 onChange={(e) => setRoomNumber(e.target.value)}
                 placeholder="Enter room number"
-                className="bg-gray-50 border-gray-300 text-gray-800 pl-10"
+                className="vault-input pl-10"
                 data-testid="checkout-room-input"
               />
             </div>
           </div>
           <div>
-            <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Check-Out Date</label>
+            <label className="vault-label">Check-Out Date</label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full bg-gray-50 border-gray-300 text-gray-800 justify-start text-left font-normal",
+                    "w-full vault-input justify-start text-left font-normal",
                     !date && "text-muted-foreground"
                   )}
                   data-testid="checkout-date-btn"
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4 text-gray-600" />
+                  <CalendarIcon className="mr-2 h-4 w-4 text-vault-text-secondary" />
                   {date ? format(date, "dd MMM yyyy") : "Select date"}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-white border-gray-200" align="start">
+              <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
                 <Calendar
                   mode="single"
                   selected={date}
                   onSelect={setDate}
                   initialFocus
-                  className="bg-white text-gray-800"
+                  className="bg-vault-surface text-vault-text"
                   data-testid="checkout-calendar"
                 />
               </PopoverContent>
             </Popover>
           </div>
           <div>
-            <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Check-Out Time (24hr)</label>
+            <label className="vault-label">Check-Out Time (24hr)</label>
             <div className="relative">
-              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
               <Input
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="bg-gray-50 border-gray-300 text-gray-800 pl-10"
+                className="vault-input pl-10"
                 placeholder="HH:MM"
                 data-testid="checkout-time-input"
               />
             </div>
-            <p className="text-gray-600 text-xs mt-1">Use 24-hour format (e.g., 14:00 for 2:00 PM)</p>
+            <p className="text-vault-text-secondary text-xs mt-1">Use 24-hour format (e.g., 14:00 for 2:00 PM)</p>
           </div>
           <Button
             onClick={handleCheckOut}
             disabled={loading}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold h-12"
+            className="w-full vault-btn-primary h-12"
             data-testid="submit-checkout-btn"
           >
             {loading ? "Processing..." : "Complete Check-Out"}
@@ -787,34 +787,34 @@ function SignInSheetView({ setView }) {
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-md"
       >
-        <Card className="bg-white border border-gray-200 shadow-xl rounded-2xl p-8" data-testid="signin-access-card">
+        <Card className="glass-card p-8" data-testid="signin-access-card">
           <CardHeader className="pb-6">
             <button 
               onClick={() => setView("menu")} 
-              className="text-gray-600 hover:text-amber-600 transition-colors mb-4 flex items-center gap-2"
+              className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
               data-testid="back-btn"
             >
               <ArrowLeft className="w-4 h-4" />
               Back
             </button>
-            <CardTitle className="font-outfit text-2xl font-bold text-gray-800 tracking-tight flex items-center gap-3">
-              <ClipboardList className="w-6 h-6 text-amber-600" />
+            <CardTitle className="font-outfit text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
+              <ClipboardList className="w-6 h-6 text-vault-gold" />
               View Sign-In Sheet
             </CardTitle>
-            <p className="text-gray-600 font-manrope mt-2 text-sm">
+            <p className="text-vault-text-secondary font-manrope mt-2 text-sm">
               Enter your company name or employee ID to view records
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Company Name or Employee ID</label>
+              <label className="vault-label">Company Name or Employee ID</label>
               <div className="relative">
-                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
                 <Input
                   value={accessCode}
                   onChange={(e) => setAccessCode(e.target.value)}
                   placeholder="Enter company name or employee ID"
-                  className="bg-gray-50 border-gray-300 text-gray-800 pl-10"
+                  className="vault-input pl-10"
                   data-testid="access-code-input"
                   onKeyDown={(e) => e.key === 'Enter' && handleVerifyAccess()}
                 />
@@ -823,7 +823,7 @@ function SignInSheetView({ setView }) {
             <Button
               onClick={handleVerifyAccess}
               disabled={verifying}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold h-12"
+              className="w-full vault-btn-primary h-12"
               data-testid="verify-access-btn"
             >
               {verifying ? "Verifying..." : "View Sign-In Sheet"}
@@ -843,70 +843,70 @@ function SignInSheetView({ setView }) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="w-full max-w-6xl px-4"
     >
-      <Card className="bg-white border border-gray-200 shadow-xl rounded-2xl" data-testid="signin-sheet-view-card">
+      <Card className="glass-card" data-testid="signin-sheet-view-card">
         <CardHeader className="pb-4">
           <button 
             onClick={() => setView("menu")} 
-            className="text-gray-600 hover:text-amber-600 transition-colors mb-4 flex items-center gap-2"
+            className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
             data-testid="back-btn"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Menu
           </button>
           <div className="text-center">
-            <CardTitle className="font-outfit text-2xl font-bold text-amber-600 tracking-tight">
+            <CardTitle className="font-outfit text-2xl font-bold text-vault-gold tracking-tight">
               Hodler Inn
             </CardTitle>
-            <p className="text-gray-600 text-sm mt-1">820 Hwy 59 N Heavener, OK, 74937</p>
-            <p className="text-gray-600 text-sm">Phone: 918-653-7801</p>
+            <p className="text-vault-text-secondary text-sm mt-1">820 Hwy 59 N Heavener, OK, 74937</p>
+            <p className="text-vault-text-secondary text-sm">Phone: 918-653-7801</p>
           </div>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
-            <div className="text-center py-8 text-gray-600">Loading...</div>
+            <div className="text-center py-8 text-vault-text-secondary">Loading...</div>
           ) : (
             <div className="min-w-[1000px]">
               <Table>
                 <TableHeader>
-                  <TableRow className="table-header border-gray-200 hover:bg-transparent">
-                    <TableHead className="text-amber-600 w-12">#</TableHead>
-                    <TableHead className="text-amber-600">Stay Type</TableHead>
-                    <TableHead className="text-amber-600">Name</TableHead>
-                    <TableHead className="text-amber-600">Employee ID</TableHead>
-                    <TableHead className="text-amber-600">Signature In</TableHead>
-                    <TableHead className="text-amber-600">Signature Out</TableHead>
-                    <TableHead className="text-amber-600">Date In</TableHead>
-                    <TableHead className="text-amber-600">Time In</TableHead>
-                    <TableHead className="text-amber-600">Date Out</TableHead>
-                    <TableHead className="text-amber-600">Time Out</TableHead>
-                    <TableHead className="text-amber-600">Room #</TableHead>
+                  <TableRow className="table-header border-vault-border hover:bg-transparent">
+                    <TableHead className="text-vault-gold w-12">#</TableHead>
+                    <TableHead className="text-vault-gold">Stay Type</TableHead>
+                    <TableHead className="text-vault-gold">Name</TableHead>
+                    <TableHead className="text-vault-gold">Employee ID</TableHead>
+                    <TableHead className="text-vault-gold">Signature In</TableHead>
+                    <TableHead className="text-vault-gold">Signature Out</TableHead>
+                    <TableHead className="text-vault-gold">Date In</TableHead>
+                    <TableHead className="text-vault-gold">Time In</TableHead>
+                    <TableHead className="text-vault-gold">Date Out</TableHead>
+                    <TableHead className="text-vault-gold">Time Out</TableHead>
+                    <TableHead className="text-vault-gold">Room #</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {records.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center text-gray-600 py-8">
+                      <TableCell colSpan={11} className="text-center text-vault-text-secondary py-8">
                         No records found
                       </TableCell>
                     </TableRow>
                   ) : (
                     records.map((record, index) => (
-                      <TableRow key={record.id} className="table-row border-gray-200">
-                        <TableCell className="font-mono text-gray-800">{index + 1}</TableCell>
-                        <TableCell className="text-gray-800">Single Stay</TableCell>
-                        <TableCell className="text-gray-800 font-medium">{record.employee_name}</TableCell>
-                        <TableCell className="font-mono text-gray-800">{record.employee_number}</TableCell>
+                      <TableRow key={record.id} className="table-row border-vault-border">
+                        <TableCell className="font-mono text-vault-text">{index + 1}</TableCell>
+                        <TableCell className="text-vault-text">Single Stay</TableCell>
+                        <TableCell className="text-vault-text font-medium">{record.employee_name}</TableCell>
+                        <TableCell className="font-mono text-vault-text">{record.employee_number}</TableCell>
                         <TableCell className="text-vault-success font-medium">
                           {record.signature ? "Signed" : "—"}
                         </TableCell>
                         <TableCell className="text-vault-success font-medium">
                           {record.is_checked_out && record.signature ? "Signed" : "—"}
                         </TableCell>
-                        <TableCell className="text-gray-800">{record.check_in_date}</TableCell>
-                        <TableCell className="font-mono text-gray-800">{record.check_in_time}</TableCell>
-                        <TableCell className="text-gray-800">{record.check_out_date || "—"}</TableCell>
-                        <TableCell className="font-mono text-gray-800">{record.check_out_time || "—"}</TableCell>
-                        <TableCell className="font-mono text-amber-600 font-bold">{record.room_number}</TableCell>
+                        <TableCell className="text-vault-text">{record.check_in_date}</TableCell>
+                        <TableCell className="font-mono text-vault-text">{record.check_in_time}</TableCell>
+                        <TableCell className="text-vault-text">{record.check_out_date || "—"}</TableCell>
+                        <TableCell className="font-mono text-vault-text">{record.check_out_time || "—"}</TableCell>
+                        <TableCell className="font-mono text-vault-gold font-bold">{record.room_number}</TableCell>
                       </TableRow>
                     ))
                   )}
@@ -914,7 +914,7 @@ function SignInSheetView({ setView }) {
               </Table>
             </div>
           )}
-          <p className="text-gray-600 text-xs text-center py-4 md:hidden">
+          <p className="text-vault-text-secondary text-xs text-center py-4 md:hidden">
             ← Swipe table horizontally to see all columns →
           </p>
         </CardContent>
@@ -933,56 +933,56 @@ function HelpView({ setView }) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="w-full max-w-2xl"
     >
-      <Card className="bg-white border border-gray-200 shadow-xl rounded-2xl p-6 md:p-8" data-testid="help-view-card">
+      <Card className="glass-card p-6 md:p-8" data-testid="help-view-card">
         <CardHeader className="pb-4">
           <button 
             onClick={() => setView("menu")} 
-            className="text-gray-600 hover:text-amber-600 transition-colors mb-4 flex items-center gap-2"
+            className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
             data-testid="back-btn"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Menu
           </button>
-          <CardTitle className="font-outfit text-2xl font-bold text-gray-800 tracking-tight flex items-center gap-3">
-            <HelpCircle className="w-6 h-6 text-amber-600" />
+          <CardTitle className="font-outfit text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
+            <HelpCircle className="w-6 h-6 text-vault-gold" />
             How to Use Guest Portal
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Step 1: Register */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-4">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
                 <span className="text-black font-bold text-lg">1</span>
               </div>
               <div>
-                <h3 className="font-outfit text-lg font-bold text-amber-600 mb-1">REGISTER (First-Time Only)</h3>
-                <ul className="text-gray-600 text-sm space-y-1">
+                <h3 className="font-outfit text-lg font-bold text-vault-gold mb-1">REGISTER (First-Time Only)</h3>
+                <ul className="text-vault-text-secondary text-sm space-y-1">
                   <li>• Tap the <span className="text-amber-400 font-medium">GOLD "Register"</span> button</li>
-                  <li>• Enter your <span className="text-gray-800">Employee Number</span></li>
-                  <li>• Enter your <span className="text-gray-800">Full Name</span></li>
+                  <li>• Enter your <span className="text-vault-text">Employee Number</span></li>
+                  <li>• Enter your <span className="text-vault-text">Full Name</span></li>
                   <li>• Tap "Complete Registration"</li>
                 </ul>
-                <p className="text-amber-600 text-xs mt-2 italic">You only need to register once!</p>
+                <p className="text-vault-gold text-xs mt-2 italic">You only need to register once!</p>
               </div>
             </div>
           </div>
 
           {/* Step 2: Check In */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-4">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
                 <span className="text-black font-bold text-lg">2</span>
               </div>
               <div>
                 <h3 className="font-outfit text-lg font-bold text-emerald-400 mb-1">CHECK IN</h3>
-                <ul className="text-gray-600 text-sm space-y-1">
+                <ul className="text-vault-text-secondary text-sm space-y-1">
                   <li>• Tap the <span className="text-emerald-400 font-medium">GREEN "Check In"</span> button</li>
-                  <li>• Enter your <span className="text-gray-800">Employee Number</span> → Tap "Verify"</li>
-                  <li>• Enter your assigned <span className="text-gray-800">Room Number</span></li>
-                  <li>• Select <span className="text-gray-800">Check-In Date</span> from calendar</li>
-                  <li>• Enter <span className="text-gray-800">Check-In Time</span> (24hr format: 14:00 = 2PM)</li>
-                  <li>• Sign your name in the <span className="text-gray-800">Signature Box</span></li>
+                  <li>• Enter your <span className="text-vault-text">Employee Number</span> → Tap "Verify"</li>
+                  <li>• Enter your assigned <span className="text-vault-text">Room Number</span></li>
+                  <li>• Select <span className="text-vault-text">Check-In Date</span> from calendar</li>
+                  <li>• Enter <span className="text-vault-text">Check-In Time</span> (24hr format: 14:00 = 2PM)</li>
+                  <li>• Sign your name in the <span className="text-vault-text">Signature Box</span></li>
                   <li>• Tap "Complete Check-In"</li>
                 </ul>
               </div>
@@ -990,41 +990,41 @@ function HelpView({ setView }) {
           </div>
 
           {/* Step 3: Check Out */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-4">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
                 <span className="text-white font-bold text-lg">3</span>
               </div>
               <div>
                 <h3 className="font-outfit text-lg font-bold text-red-400 mb-1">CHECK OUT</h3>
-                <ul className="text-gray-600 text-sm space-y-1">
+                <ul className="text-vault-text-secondary text-sm space-y-1">
                   <li>• Tap the <span className="text-red-400 font-medium">RED "Check Out"</span> button</li>
-                  <li>• Enter your <span className="text-gray-800">Room Number</span></li>
-                  <li>• Select <span className="text-gray-800">Check-Out Date</span></li>
-                  <li>• Enter <span className="text-gray-800">Check-Out Time</span> (24hr format)</li>
+                  <li>• Enter your <span className="text-vault-text">Room Number</span></li>
+                  <li>• Select <span className="text-vault-text">Check-Out Date</span></li>
+                  <li>• Enter <span className="text-vault-text">Check-Out Time</span> (24hr format)</li>
                   <li>• Tap "Complete Check-Out"</li>
                 </ul>
-                <p className="text-amber-600 text-xs mt-2 italic">No signature needed - your check-in signature is used automatically.</p>
+                <p className="text-vault-gold text-xs mt-2 italic">No signature needed - your check-in signature is used automatically.</p>
               </div>
             </div>
           </div>
 
           {/* Time Reference */}
           <div className="bg-black/50 border border-vault-gold/30 rounded-lg p-4">
-            <h3 className="font-outfit text-sm font-bold text-amber-600 mb-3 text-center">24-HOUR TIME REFERENCE</h3>
+            <h3 className="font-outfit text-sm font-bold text-vault-gold mb-3 text-center">24-HOUR TIME REFERENCE</h3>
             <div className="grid grid-cols-3 gap-2 text-center text-sm">
-              <div className="text-gray-600">6 AM = <span className="text-gray-800">06:00</span></div>
-              <div className="text-gray-600">12 PM = <span className="text-gray-800">12:00</span></div>
-              <div className="text-gray-600">6 PM = <span className="text-gray-800">18:00</span></div>
-              <div className="text-gray-600">8 AM = <span className="text-gray-800">08:00</span></div>
-              <div className="text-gray-600">2 PM = <span className="text-gray-800">14:00</span></div>
-              <div className="text-gray-600">10 PM = <span className="text-gray-800">22:00</span></div>
+              <div className="text-vault-text-secondary">6 AM = <span className="text-vault-text">06:00</span></div>
+              <div className="text-vault-text-secondary">12 PM = <span className="text-vault-text">12:00</span></div>
+              <div className="text-vault-text-secondary">6 PM = <span className="text-vault-text">18:00</span></div>
+              <div className="text-vault-text-secondary">8 AM = <span className="text-vault-text">08:00</span></div>
+              <div className="text-vault-text-secondary">2 PM = <span className="text-vault-text">14:00</span></div>
+              <div className="text-vault-text-secondary">10 PM = <span className="text-vault-text">22:00</span></div>
             </div>
           </div>
 
           {/* Help Footer */}
           <div className="text-center pt-2">
-            <p className="text-gray-600 text-sm">
+            <p className="text-vault-text-secondary text-sm">
               Need assistance? Please contact front desk staff.
             </p>
           </div>
