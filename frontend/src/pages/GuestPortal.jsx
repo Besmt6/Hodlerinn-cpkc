@@ -506,7 +506,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
     // Validate room number exists in available rooms
     const validRoom = availableRooms.find(r => r.room_number === roomNumber.trim());
     if (!validRoom) {
-      toast.error(`Room ${roomNumber} does not exist. Available rooms: ${availableRooms.map(r => r.room_number).join(", ")}`);
+      toast.error(`Room ${roomNumber} is not valid. Please check the room number on your key.`);
       return;
     }
     if (!date) {
@@ -782,7 +782,7 @@ function CheckOutForm({ setView, setSuccessMessage }) {
     // Validate room number exists
     const validRoom = availableRooms.find(r => r.room_number === roomNumber.trim());
     if (!validRoom) {
-      toast.error(`Room ${roomNumber} does not exist. Available rooms: ${availableRooms.map(r => r.room_number).join(", ")}`);
+      toast.error(`Room ${roomNumber} is not valid. Please check the room number on your key.`);
       return;
     }
 
