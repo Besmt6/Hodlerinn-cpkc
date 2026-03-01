@@ -187,7 +187,7 @@ async def auto_sync_task():
             f"━━━━━━━━━━━━━━━"
         )
 
-def update_auto_sync_schedule(enabled: bool):
+def update_auto_sync_schedule(enabled: bool, start_date: str = None):
     """Add or remove the auto-sync scheduled job"""
     try:
         # Remove existing job if present
@@ -196,14 +196,22 @@ def update_auto_sync_schedule(enabled: bool):
             logging.info("Removed existing auto-sync job")
         
         if enabled:
-            # Schedule for 3 PM (15:00) every day
+            # Parse start date if provided
+            trigger_start = None
+            if start_date:
+                trigger_start = datetime.strptime(start_date, "%Y-%m-%d").replace(hour=15, minute=0)
+            
+            # Schedule for 3 PM (15:00) every day, starting from start_date
             scheduler.add_job(
                 lambda: asyncio.create_task(auto_sync_task()),
-                CronTrigger(hour=15, minute=0),
+                CronTrigger(hour=15, minute=0, start_date=trigger_start),
                 id=AUTO_SYNC_JOB_ID,
                 replace_existing=True
             )
-            logging.info("Auto-sync scheduled for 3 PM daily")
+            if start_date:
+                logging.info(f"Auto-sync scheduled for 3 PM daily, starting from {start_date}")
+            else:
+                logging.info("Auto-sync scheduled for 3 PM daily")
         else:
             logging.info("Auto-sync disabled")
     except Exception as e:
