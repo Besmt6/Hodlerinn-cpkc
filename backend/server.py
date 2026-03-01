@@ -504,6 +504,37 @@ async def verify_checkout(room_number: str, employee_number: str):
         "booking_id": booking['id']
     }
 
+# Lookup booking by room number only (for auto-fill employee number)
+@api_router.get("/lookup-room/{room_number}")
+async def lookup_room_booking(room_number: str):
+    """Lookup active booking by room number - returns guest info for auto-fill"""
+    # Find active booking for room
+    booking = await db.bookings.find_one({
+        "room_number": room_number,
+        "is_checked_out": False
+    }, {"_id": 0})
+    
+    if not booking:
+        raise HTTPException(status_code=404, detail=f"No active check-in found for Room {room_number}")
+    
+    # Get guest info
+    guest = await db.guests.find_one({"employee_number": booking['employee_number']}, {"_id": 0})
+    if not guest:
+        raise HTTPException(status_code=404, detail="Guest record not found")
+    
+    # Decrypt guest name
+    guest_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+    
+    return {
+        "found": True,
+        "employee_name": guest_name,
+        "employee_number": booking['employee_number'],
+        "room_number": room_number,
+        "check_in_date": booking['check_in_date'],
+        "check_in_time": booking['check_in_time'],
+        "booking_id": booking['id']
+    }
+
 # Check-Out
 @api_router.post("/checkout")
 async def check_out(input: CheckOutCreate):
