@@ -149,6 +149,39 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/settings`);
+      setPortalSettings({
+        api_global_username: response.data.api_global_username || "",
+        api_global_password: "",
+        alert_email: response.data.alert_email || "",
+        auto_sync_enabled: response.data.auto_sync_enabled || false,
+        api_global_password_set: response.data.api_global_password_set || false
+      });
+    } catch (error) {
+      console.error("Failed to load settings");
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await axios.post(`${API}/admin/settings`, {
+        api_global_username: portalSettings.api_global_username,
+        api_global_password: portalSettings.api_global_password || null,
+        alert_email: portalSettings.alert_email,
+        auto_sync_enabled: portalSettings.auto_sync_enabled
+      });
+      toast.success("Settings saved successfully");
+      fetchSettings();
+    } catch (error) {
+      toast.error("Failed to save settings");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const handleApplyFilter = () => {
     if (startDate || endDate) {
       setIsFiltered(true);
