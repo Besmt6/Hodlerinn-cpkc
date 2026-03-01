@@ -520,6 +520,10 @@ function CheckInForm({ setView, setSuccessMessage }) {
       const response = await axios.get(`${API}/guests/${employeeNumber}`);
       setVerifiedEmployee(response.data);
       toast.success(`Employee found: ${response.data.name}`);
+      // Auto-focus on room input after successful verification
+      setTimeout(() => {
+        roomInputRef.current?.focus();
+      }, 300);
     } catch (error) {
       toast.error("Employee not found. Please register first.");
       setVerifiedEmployee(null);
