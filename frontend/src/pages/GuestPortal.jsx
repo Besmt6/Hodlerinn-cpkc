@@ -124,7 +124,7 @@ export default function GuestPortal() {
   }, [view]);
 
   return (
-    <div className="kiosk-container grid-bg min-h-screen relative">
+    <div className="min-h-screen relative bg-gray-100">
       {/* Logo Header */}
       <div className="absolute top-6 left-6 flex items-center gap-3">
         <img 
@@ -133,8 +133,8 @@ export default function GuestPortal() {
           className="w-12 h-12 rounded-lg object-cover"
         />
         <div>
-          <h1 className="font-outfit font-bold text-vault-text text-xl tracking-tight">HODLER INN</h1>
-          <p className="font-mono text-[10px] text-vault-gold uppercase tracking-widest">Be Responsible to Be Free</p>
+          <h1 className="font-outfit font-bold text-gray-800 text-xl tracking-tight">HODLER INN</h1>
+          <p className="font-mono text-[10px] text-amber-600 uppercase tracking-widest">Be Responsible to Be Free</p>
         </div>
       </div>
 
@@ -143,7 +143,7 @@ export default function GuestPortal() {
         {/* Fullscreen/Kiosk Mode Button */}
         <button 
           onClick={toggleFullscreen}
-          className="flex items-center gap-2 text-vault-text-secondary hover:text-vault-gold transition-colors bg-vault-surface/50 px-3 py-2 rounded-lg border border-vault-border"
+          className="flex items-center gap-2 text-gray-600 hover:text-amber-600 transition-colors bg-white px-3 py-2 rounded-lg border border-gray-300 shadow-sm"
           data-testid="fullscreen-btn"
           title={isFullscreen ? "Exit Kiosk Mode" : "Enter Kiosk Mode"}
         >
