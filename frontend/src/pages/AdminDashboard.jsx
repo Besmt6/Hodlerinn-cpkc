@@ -96,6 +96,16 @@ export default function AdminDashboard() {
   });
   const [deleteRoomConfirm, setDeleteRoomConfirm] = useState(null);
   
+  // Portal Settings state
+  const [portalSettings, setPortalSettings] = useState({
+    api_global_username: "",
+    api_global_password: "",
+    alert_email: "",
+    auto_sync_enabled: false,
+    api_global_password_set: false
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+  
   const navigate = useNavigate();
 
   useEffect(() => {
