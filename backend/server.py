@@ -1200,6 +1200,10 @@ async def update_portal_settings(input: PortalSettingsUpdate):
         update_data["id"] = "portal_settings"
         await db.settings.insert_one(update_data)
     
+    # Update auto-sync schedule if the setting changed
+    if input.auto_sync_enabled is not None:
+        update_auto_sync_schedule(input.auto_sync_enabled)
+    
     return {"message": "Settings updated successfully"}
 
 @api_router.post("/admin/settings/test-connection")
