@@ -1204,6 +1204,9 @@ async def update_portal_settings(input: PortalSettingsUpdate):
     if input.auto_sync_enabled is not None:
         update_data["auto_sync_enabled"] = input.auto_sync_enabled
     
+    if input.auto_sync_start_date is not None:
+        update_data["auto_sync_start_date"] = input.auto_sync_start_date
+    
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     if existing:
@@ -1214,7 +1217,11 @@ async def update_portal_settings(input: PortalSettingsUpdate):
     
     # Update auto-sync schedule if the setting changed
     if input.auto_sync_enabled is not None:
-        update_auto_sync_schedule(input.auto_sync_enabled)
+        # Get the start date from input or existing settings
+        start_date = input.auto_sync_start_date
+        if start_date is None and existing:
+            start_date = existing.get("auto_sync_start_date")
+        update_auto_sync_schedule(input.auto_sync_enabled, start_date)
     
     return {"message": "Settings updated successfully"}
 
