@@ -481,7 +481,6 @@ function CheckInForm({ setView }) {
         check_in_time: time,
         signature
       });
-      toast.success("Check-in successful! Welcome to Hodler Inn.");
       
       // Voice message for check-in
       const greeting = getTimeBasedGreeting();
@@ -489,7 +488,17 @@ function CheckInForm({ setView }) {
         speakMessage(`${greeting}! Welcome to Hodler Inn. Have a good rest.`);
       }, 500);
       
-      setView("menu");
+      // Show success screen
+      setSuccessMessage({
+        title: `${greeting}!`,
+        message: "Welcome to Hodler Inn",
+        subMessage: "Have a good rest 🌙",
+        type: "checkin"
+      });
+      setView("checkin-success");
+      
+      // Auto-return to menu after 8 seconds
+      setTimeout(() => setView("menu"), 8000);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Check-in failed");
     } finally {
