@@ -292,15 +292,31 @@ class APIGlobalSyncAgent:
                                     room_input = inp
                                     break
                         
-                        # Find No Bill checkbox
+                        # Find No Bill checkbox - look for checkbox near "No Bill" label text
+                        # The portal uses JSF so checkbox IDs may be dynamically generated
                         no_bill_checkbox = await row.query_selector('input[type="checkbox"][id*="noBill"], input[type="checkbox"][name*="noBill"]')
                         if not no_bill_checkbox:
+                            # Try finding by looking for cell with "No Bill" text and nearby checkbox
+                            for cell in cells:
+                                cell_text = await cell.inner_text()
+                                if 'no bill' in cell_text.lower():
+                                    # Found the No Bill cell, look for checkbox in this cell or nearby
+                                    no_bill_checkbox = await cell.query_selector('input[type="checkbox"]')
+                                    if no_bill_checkbox:
+                                        break
+                        
+                        if not no_bill_checkbox:
+                            # Try finding all checkboxes and match by position/context
                             checkboxes = await row.query_selector_all('input[type="checkbox"]')
-                            for cb in checkboxes:
-                                cb_id = await cb.get_attribute('id') or ''
-                                if 'nobill' in cb_id.lower() or 'no_bill' in cb_id.lower():
-                                    no_bill_checkbox = cb
-                                    break
+                            # In the portal structure, "No Show" is first, "No Bill" is second checkbox
+                            if len(checkboxes) >= 2:
+                                no_bill_checkbox = checkboxes[1]  # Second checkbox is typically "No Bill"
+                            elif len(checkboxes) == 1:
+                                # If only one checkbox, check its ID/name
+                                cb_id = await checkboxes[0].get_attribute('id') or ''
+                                cb_name = await checkboxes[0].get_attribute('name') or ''
+                                if 'nobill' in cb_id.lower() or 'nobill' in cb_name.lower() or 'bill' in cb_id.lower():
+                                    no_bill_checkbox = checkboxes[0]
                         
                         if name_text:
                             # Check if already verified (has employee ID filled in)
