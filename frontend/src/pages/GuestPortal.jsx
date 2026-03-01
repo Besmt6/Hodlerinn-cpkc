@@ -947,13 +947,14 @@ function CheckOutForm({ setView, setSuccessMessage }) {
               <div>
                 <label className="vault-label">Room Number</label>
                 <div className="relative">
-                  <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                  <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
                   <Input
                     value={roomNumber}
                     onChange={(e) => setRoomNumber(e.target.value)}
-                    placeholder="Enter room number (e.g., 101)"
-                    className="vault-input pl-10"
+                    placeholder="⬇️ TAP HERE to enter room"
+                    className="vault-input pl-10 input-highlight text-lg"
                     data-testid="checkout-room-input"
+                    autoFocus
                   />
                 </div>
               </div>
