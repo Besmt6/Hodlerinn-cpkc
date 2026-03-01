@@ -1027,6 +1027,72 @@ async def delete_room(room_id: str):
     await db.rooms.delete_one({"id": room_id})
     return {"message": "Room deleted successfully"}
 
+# ==================== Portal Settings ====================
+
+@api_router.get("/admin/settings")
+async def get_portal_settings():
+    """Get portal settings (password is masked)"""
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    if not settings:
+        return {
+            "id": "portal_settings",
+            "api_global_username": "",
+            "api_global_password_set": False,
+            "alert_email": "",
+            "auto_sync_enabled": False
+        }
+    
+    # Mask password - only indicate if it's set
+    return {
+        "id": settings.get("id"),
+        "api_global_username": settings.get("api_global_username", ""),
+        "api_global_password_set": bool(settings.get("api_global_password_encrypted")),
+        "alert_email": settings.get("alert_email", ""),
+        "auto_sync_enabled": settings.get("auto_sync_enabled", False)
+    }
+
+@api_router.post("/admin/settings")
+async def update_portal_settings(input: PortalSettingsUpdate):
+    """Update portal settings"""
+    existing = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    
+    update_data = {}
+    
+    if input.api_global_username is not None:
+        update_data["api_global_username"] = input.api_global_username
+    
+    if input.api_global_password is not None and input.api_global_password != "":
+        # Encrypt password before storing
+        encrypted_password = encrypt_data(input.api_global_password)
+        update_data["api_global_password_encrypted"] = encrypted_password
+    
+    if input.alert_email is not None:
+        update_data["alert_email"] = input.alert_email
+    
+    if input.auto_sync_enabled is not None:
+        update_data["auto_sync_enabled"] = input.auto_sync_enabled
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    if existing:
+        await db.settings.update_one({"id": "portal_settings"}, {"$set": update_data})
+    else:
+        update_data["id"] = "portal_settings"
+        await db.settings.insert_one(update_data)
+    
+    return {"message": "Settings updated successfully"}
+
+@api_router.post("/admin/settings/test-connection")
+async def test_portal_connection():
+    """Test connection to API Global portal"""
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    
+    if not settings or not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
+        raise HTTPException(status_code=400, detail="Portal credentials not configured")
+    
+    # For now, just return success - actual test will be implemented with browser automation
+    return {"message": "Credentials saved. Connection test will be available when sync agent is activated."}
+
 # ==================== PDF Export ====================
 
 @api_router.get("/admin/export-pdf")
