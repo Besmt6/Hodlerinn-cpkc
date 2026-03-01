@@ -114,7 +114,7 @@ Build a two-part application for a hotel named "Hodler Inn":
 - Encrypted credential storage (username + password)
 - **Test Connection** - Successfully logs into the third-party railroad portal
 - **Run Sync Now** - Manual sync trigger
-- **Auto-Sync Toggle** - Automatically runs daily at 3 PM ⭐ NEW
+- **Auto-Sync Toggle** - Automatically runs daily at 3 PM
 - Full automation with Playwright browser:
   1. Login to portal ✓
   2. Navigate to Sign-in Sheets menu ✓
@@ -123,10 +123,19 @@ Build a two-part application for a hotel named "Hodler Inn":
   5. Extract employee entries from table ✓
   6. Match names against Hodler Inn records ✓
   7. Fill Employee ID + Room Number for matches ✓
-  8. Mark "No Bill" for non-matches ✓
+  8. Mark "No Bill" for non-matches ✓ (Fixed March 1, 2026)
 - Sync Status tracking with results history
 - Telegram notifications for sync results
 - Fuzzy name matching algorithm (handles LASTNAME/FIRSTNAME/SUFFIX format)
+
+### No Bill Checkbox Fix (March 1, 2026):
+- Updated selector logic to find "No Bill" checkbox using multiple strategies:
+  1. Direct ID/name selector (`input[type="checkbox"][id*="noBill"]`)
+  2. Cell text matching (looks for cell containing "No Bill" text)
+  3. Positional fallback (second checkbox in row is typically "No Bill")
+- Added click-based interaction instead of just `.check()` for better compatibility
+- Added verification step to confirm checkbox was actually checked
+- Improved logging for debugging
 
 ### Auto-Sync Feature:
 - Toggle ON/OFF from Portal Settings
