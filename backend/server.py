@@ -353,6 +353,8 @@ class PortalSettingsUpdate(BaseModel):
     alert_email: Optional[str] = None
     auto_sync_enabled: Optional[bool] = None
     auto_sync_start_date: Optional[str] = None  # Format: YYYY-MM-DD
+    voice_enabled: Optional[bool] = None  # Enable/disable voice messages
+    voice_volume: Optional[float] = None  # Voice volume 0.0 to 1.0
 
 # ==================== Helper Functions ====================
 
