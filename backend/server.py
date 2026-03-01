@@ -1233,8 +1233,24 @@ sync_status = {
 
 @api_router.get("/admin/sync/status")
 async def get_sync_status():
-    """Get current sync status"""
-    return sync_status
+    """Get current sync status including next scheduled run"""
+    # Get next scheduled run time if auto-sync is enabled
+    next_run = None
+    auto_sync_enabled = False
+    
+    try:
+        job = scheduler.get_job(AUTO_SYNC_JOB_ID)
+        if job:
+            next_run = job.next_run_time.isoformat() if job.next_run_time else None
+            auto_sync_enabled = True
+    except:
+        pass
+    
+    return {
+        **sync_status,
+        "auto_sync_enabled": auto_sync_enabled,
+        "next_scheduled_run": next_run
+    }
 
 @api_router.post("/admin/sync/run")
 async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str] = None):
