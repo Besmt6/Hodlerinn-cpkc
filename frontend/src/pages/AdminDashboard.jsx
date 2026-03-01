@@ -153,14 +153,18 @@ export default function AdminDashboard() {
 
   const fetchSettings = async () => {
     try {
-      const response = await axios.get(`${API}/admin/settings`);
+      const [settingsRes, syncStatusRes] = await Promise.all([
+        axios.get(`${API}/admin/settings`),
+        axios.get(`${API}/admin/sync/status`)
+      ]);
       setPortalSettings({
-        api_global_username: response.data.api_global_username || "",
+        api_global_username: settingsRes.data.api_global_username || "",
         api_global_password: "",
-        alert_email: response.data.alert_email || "",
-        auto_sync_enabled: response.data.auto_sync_enabled || false,
-        api_global_password_set: response.data.api_global_password_set || false
+        alert_email: settingsRes.data.alert_email || "",
+        auto_sync_enabled: settingsRes.data.auto_sync_enabled || false,
+        api_global_password_set: settingsRes.data.api_global_password_set || false
       });
+      setSyncStatus(syncStatusRes.data);
     } catch (error) {
       console.error("Failed to load settings");
     }
