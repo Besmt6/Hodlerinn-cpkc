@@ -868,13 +868,14 @@ function CheckOutForm({ setView, setSuccessMessage }) {
         check_out_time: time
       });
       
-      // Voice message for check-out
-      const greeting = getTimeBasedGreeting();
+      // Voice message for check-out (using audio files)
+      const timePeriod = getTimePeriod();
       setTimeout(() => {
-        speakMessage(`${greeting}! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.`);
+        playVoiceMessage(`checkout_${timePeriod}`);
       }, 500);
       
       // Show success screen
+      const greeting = getTimeBasedGreeting();
       setSuccessMessage({
         title: `${greeting}!`,
         message: "Thank you for staying at Hodler Inn",
