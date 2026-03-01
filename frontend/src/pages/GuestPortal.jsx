@@ -355,7 +355,25 @@ function CheckInForm({ setView }) {
   const [loading, setLoading] = useState(false);
   const [verifiedEmployee, setVerifiedEmployee] = useState(null);
   const [verifying, setVerifying] = useState(false);
+  const [availableRooms, setAvailableRooms] = useState([]);
+  const [loadingRooms, setLoadingRooms] = useState(true);
   const sigRef = useRef(null);
+
+  // Fetch available rooms on component mount
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const response = await axios.get(`${API}/rooms`);
+        setAvailableRooms(response.data || []);
+      } catch (error) {
+        console.error("Failed to fetch rooms:", error);
+        toast.error("Failed to load room list");
+      } finally {
+        setLoadingRooms(false);
+      }
+    };
+    fetchRooms();
+  }, []);
 
   const clearSignature = () => {
     sigRef.current?.clear();
