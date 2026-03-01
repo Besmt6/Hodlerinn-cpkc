@@ -1181,6 +1181,7 @@ export default function AdminDashboard() {
                               {records.filter(r => r.is_checked_out).reduce((sum, r) => sum + (r.total_nights || 0), 0)}
                             </TableCell>
                             <TableCell></TableCell>
+                            <TableCell></TableCell>
                           </TableRow>
                         )}
                       </TableBody>
