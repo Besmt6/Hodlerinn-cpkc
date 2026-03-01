@@ -1193,14 +1193,25 @@ async def get_voice_settings():
 
 # Pre-defined voice messages
 VOICE_MESSAGES = {
-    "checkin_morning": "Good morning! Welcome to Hodler Inn. Have a good rest.",
-    "checkin_afternoon": "Good afternoon! Welcome to Hodler Inn. Have a good rest.",
-    "checkin_evening": "Good evening! Welcome to Hodler Inn. Have a good rest.",
-    "checkin_night": "Good night! Welcome to Hodler Inn. Have a good rest.",
+    # Register welcome
+    "register_welcome": "Welcome to Hodler Inn. If you are first time here, please register your employee number and name, then go to check in.",
+    
+    # Check-in welcome (when clicking check-in button)
+    "checkin_welcome_morning": "Good morning. Welcome back to Hodler Inn.",
+    "checkin_welcome_afternoon": "Good afternoon. Welcome back to Hodler Inn.",
+    "checkin_welcome_evening": "Good evening. Welcome back to Hodler Inn.",
+    "checkin_welcome_night": "Good night. Welcome back to Hodler Inn.",
+    
+    # Check-in complete (after completing check-in)
+    "checkin_complete": "Have a good rest.",
+    
+    # Check-out messages
     "checkout_morning": "Good morning! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.",
     "checkout_afternoon": "Good afternoon! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.",
     "checkout_evening": "Good evening! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.",
     "checkout_night": "Good night! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.",
+    
+    # Other reminders
     "signature_reminder": "Please sign your full name legibly. A simple line or X will not be accepted.",
     "room_reminder": "Please select the room number from key on desk. Print your name and room number on yellow card.",
     "checkout_found": "Booking found. Please verify and complete check out."
