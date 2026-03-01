@@ -1169,7 +1169,8 @@ async def get_portal_settings():
             "api_global_username": "",
             "api_global_password_set": False,
             "alert_email": "",
-            "auto_sync_enabled": False
+            "auto_sync_enabled": False,
+            "auto_sync_start_date": None
         }
     
     # Mask password - only indicate if it's set
@@ -1178,7 +1179,8 @@ async def get_portal_settings():
         "api_global_username": settings.get("api_global_username", ""),
         "api_global_password_set": bool(settings.get("api_global_password_encrypted")),
         "alert_email": settings.get("alert_email", ""),
-        "auto_sync_enabled": settings.get("auto_sync_enabled", False)
+        "auto_sync_enabled": settings.get("auto_sync_enabled", False),
+        "auto_sync_start_date": settings.get("auto_sync_start_date")
     }
 
 @api_router.post("/admin/settings")
