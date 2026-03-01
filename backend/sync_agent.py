@@ -379,12 +379,43 @@ class APIGlobalSyncAgent:
                 # Check if already checked
                 is_checked = await entry["no_bill_checkbox"].is_checked()
                 if not is_checked:
-                    await entry["no_bill_checkbox"].check()
+                    # Try clicking the checkbox
+                    await entry["no_bill_checkbox"].click()
                     await self.page.wait_for_timeout(500)
+                    
+                    # Verify it was checked
+                    is_now_checked = await entry["no_bill_checkbox"].is_checked()
+                    if not is_now_checked:
+                        # Try using check() method as fallback
+                        await entry["no_bill_checkbox"].check()
+                        await self.page.wait_for_timeout(300)
+                        
                 logger.info(f"Marked No Bill: {entry['name']}")
                 return True
             else:
-                logger.warning(f"No Bill checkbox not found for: {entry['name']}")
+                # Try to find the checkbox in the row again
+                logger.warning(f"No Bill checkbox not found for: {entry['name']}, attempting re-search...")
+                
+                if entry.get("row"):
+                    # Look for any checkbox that might be the "No Bill" one
+                    checkboxes = await entry["row"].query_selector_all('input[type="checkbox"]')
+                    if len(checkboxes) >= 2:
+                        # Second checkbox is typically "No Bill" in this portal
+                        no_bill_cb = checkboxes[1]
+                        is_checked = await no_bill_cb.is_checked()
+                        if not is_checked:
+                            await no_bill_cb.click()
+                            await self.page.wait_for_timeout(500)
+                        logger.info(f"Marked No Bill (fallback): {entry['name']}")
+                        return True
+                    elif len(checkboxes) == 1:
+                        # Only one checkbox, try it
+                        await checkboxes[0].click()
+                        await self.page.wait_for_timeout(500)
+                        logger.info(f"Marked checkbox (single): {entry['name']}")
+                        return True
+                
+                logger.warning(f"Could not find No Bill checkbox for: {entry['name']}")
                 return False
             
         except Exception as e:
