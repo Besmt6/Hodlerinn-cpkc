@@ -107,13 +107,15 @@ Build a two-part application for a hotel named "Hodler Inn":
   - Provider options: Vapi.ai (recommended), Retell AI, Twilio + OpenAI
 
 ## AI Verification Agent (March 2026)
-**Status:** ✅ FULLY FUNCTIONAL - Complete automation working!
+**Status:** ✅ FULLY FUNCTIONAL with Auto-Sync!
 
 ### Features Implemented:
 - Portal Settings page in Admin Dashboard to store API Global credentials
 - Encrypted credential storage (username + password)
 - **Test Connection** - Successfully logs into the third-party railroad portal
-- **Run Sync Now** - Full automation with Playwright browser:
+- **Run Sync Now** - Manual sync trigger
+- **Auto-Sync Toggle** - Automatically runs daily at 3 PM ⭐ NEW
+- Full automation with Playwright browser:
   1. Login to portal ✓
   2. Navigate to Sign-in Sheets menu ✓
   3. Click Online Sign-in Sheets ✓
@@ -123,17 +125,26 @@ Build a two-part application for a hotel named "Hodler Inn":
   7. Fill Employee ID + Room Number for matches ✓
   8. Mark "No Bill" for non-matches ✓
 - Sync Status tracking with results history
+- Telegram notifications for sync results
 - Fuzzy name matching algorithm (handles LASTNAME/FIRSTNAME/SUFFIX format)
+
+### Auto-Sync Feature:
+- Toggle ON/OFF from Portal Settings
+- Runs daily at **3 PM** (when portal shows previous day's records)
+- Shows next scheduled sync time in UI
+- Sends Telegram notification with results
+- Persists setting across server restarts
 
 ### Technical Details:
 - Uses Playwright for headless browser automation
 - Chromium browser installed for ARM64 architecture
+- APScheduler for scheduled tasks
 - Async background task execution
 - Login URL: https://providerrail.apps-apiglobalsolutions.com/ACESSUPPLIER/faces/login.xhtml
 - Sign-in Sheet URL: /faces/views/viewSignInSheet.xhtml
 
 ### Business Logic:
-- **Best time to run sync:** 3 PM daily
+- **Best time to run sync:** 3 PM daily (auto-sync default)
 - Portal shows **previous day's records** by default
 - Example: Running Feb 28 at 3 PM → Verifies Feb 27 guest stays
 
