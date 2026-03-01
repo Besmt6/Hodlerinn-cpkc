@@ -1091,8 +1091,113 @@ async def test_portal_connection():
     if not settings or not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
         raise HTTPException(status_code=400, detail="Portal credentials not configured")
     
-    # For now, just return success - actual test will be implemented with browser automation
-    return {"message": "Credentials saved. Connection test will be available when sync agent is activated."}
+    try:
+        from sync_agent import test_connection
+        username = settings.get("api_global_username")
+        password = decrypt_data(settings.get("api_global_password_encrypted"))
+        result = await test_connection(username, password)
+        return result
+    except Exception as e:
+        return {"success": False, "message": f"Test failed: {str(e)}"}
+
+# Sync status storage (in-memory for now)
+sync_status = {
+    "running": False,
+    "last_run": None,
+    "last_results": None,
+    "progress": ""
+}
+
+@api_router.get("/admin/sync/status")
+async def get_sync_status():
+    """Get current sync status"""
+    return sync_status
+
+@api_router.post("/admin/sync/run")
+async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str] = None):
+    """Run sync with API Global portal"""
+    global sync_status
+    
+    if sync_status["running"]:
+        raise HTTPException(status_code=400, detail="Sync already in progress")
+    
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    if not settings or not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
+        raise HTTPException(status_code=400, detail="Portal credentials not configured")
+    
+    # Get Hodler Inn records for the target date
+    if target_date:
+        query = {"check_in_date": target_date}
+    else:
+        # Default to yesterday or today based on time
+        now = datetime.now()
+        if now.hour >= 18:
+            target = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        else:
+            target = now.strftime("%Y-%m-%d")
+        query = {"check_in_date": target}
+    
+    bookings = await db.bookings.find(query, {"_id": 0}).to_list(1000)
+    
+    # Get guest names
+    employee_numbers = [b['employee_number'] for b in bookings]
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
+    # Build records for sync agent
+    hodler_records = []
+    for booking in bookings:
+        guest = guests_dict.get(booking['employee_number'])
+        if guest:
+            decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+            hodler_records.append({
+                "employee_name": decrypted_name,
+                "employee_number": booking['employee_number'],
+                "room_number": booking['room_number']
+            })
+    
+    # Run sync in background
+    async def run_sync_task():
+        global sync_status
+        sync_status["running"] = True
+        sync_status["progress"] = "Starting sync..."
+        
+        try:
+            from sync_agent import APIGlobalSyncAgent
+            username = settings.get("api_global_username")
+            password = decrypt_data(settings.get("api_global_password_encrypted"))
+            
+            agent = APIGlobalSyncAgent(username, password)
+            results = await agent.run_sync(hodler_records)
+            
+            sync_status["last_results"] = results
+            sync_status["last_run"] = datetime.now(timezone.utc).isoformat()
+            sync_status["progress"] = "Sync completed"
+            
+            # Store sync history
+            await db.sync_history.insert_one({
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "target_date": target_date or target,
+                "results": results
+            })
+            
+        except Exception as e:
+            sync_status["progress"] = f"Sync failed: {str(e)}"
+            sync_status["last_results"] = {"errors": [str(e)]}
+        finally:
+            sync_status["running"] = False
+    
+    # Start background task
+    background_tasks.add_task(lambda: asyncio.create_task(run_sync_task()))
+    
+    return {"message": "Sync started", "hodler_records_count": len(hodler_records)}
+
+@api_router.get("/admin/sync/history")
+async def get_sync_history():
+    """Get sync history"""
+    history = await db.sync_history.find({}, {"_id": 0}).sort("timestamp", -1).to_list(20)
+    return history
 
 # ==================== PDF Export ====================
 
