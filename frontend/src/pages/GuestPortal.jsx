@@ -85,7 +85,8 @@ const pageVariants = {
 };
 
 export default function GuestPortal() {
-  const [view, setView] = useState("menu"); // menu, register, checkin, checkout, signin
+  const [view, setView] = useState("menu"); // menu, register, checkin, checkout, signin, checkin-success, checkout-success
+  const [successMessage, setSuccessMessage] = useState({ title: "", message: "", subMessage: "" });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
 
