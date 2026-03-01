@@ -514,6 +514,13 @@ async def check_out(input: CheckOutCreate):
     if not booking:
         raise HTTPException(status_code=404, detail="No active booking found for this room")
     
+    # Verify employee number if provided
+    if input.employee_number and booking['employee_number'] != input.employee_number:
+        raise HTTPException(
+            status_code=400, 
+            detail="Employee number does not match the check-in record. Please verify your employee ID."
+        )
+    
     # Get guest info for notification
     guest = await db.guests.find_one({"employee_number": booking['employee_number']}, {"_id": 0})
     
