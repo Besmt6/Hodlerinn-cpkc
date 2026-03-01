@@ -1405,6 +1405,48 @@ export default function AdminDashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">
+                  {/* Auto-Sync Toggle */}
+                  <div className="bg-black/50 border border-vault-border rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-vault-text font-medium">Auto-Sync (Daily at 3 PM)</h4>
+                        <p className="text-vault-text-secondary text-sm">
+                          Automatically verify previous day's records every day at 3 PM
+                        </p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const newValue = !portalSettings.auto_sync_enabled;
+                          setPortalSettings({...portalSettings, auto_sync_enabled: newValue});
+                          try {
+                            await axios.post(`${API}/admin/settings`, { auto_sync_enabled: newValue });
+                            toast.success(newValue ? "Auto-sync enabled! Will run daily at 3 PM" : "Auto-sync disabled");
+                          } catch (error) {
+                            toast.error("Failed to update auto-sync setting");
+                            setPortalSettings({...portalSettings, auto_sync_enabled: !newValue});
+                          }
+                        }}
+                        disabled={!portalSettings.api_global_password_set}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          portalSettings.auto_sync_enabled ? 'bg-emerald-600' : 'bg-gray-600'
+                        } ${!portalSettings.api_global_password_set ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        data-testid="auto-sync-toggle"
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            portalSettings.auto_sync_enabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    {syncStatus.next_scheduled_run && portalSettings.auto_sync_enabled && (
+                      <p className="text-emerald-400 text-sm mt-2">
+                        Next scheduled sync: {new Date(syncStatus.next_scheduled_run).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Manual Sync Buttons */}
                   <div className="flex flex-wrap gap-3">
                     <Button
                       onClick={handleTestConnection}
@@ -1450,6 +1492,11 @@ export default function AdminDashboard() {
                         <p className="text-blue-400">Missing: {syncStatus.last_results.missing_in_hodler?.length || 0}</p>
                         <p className="text-red-400">Errors: {syncStatus.last_results.errors?.length || 0}</p>
                       </div>
+                      {syncStatus.last_run && (
+                        <p className="text-vault-text-secondary text-xs mt-2">
+                          Last run: {new Date(syncStatus.last_run).toLocaleString()}
+                        </p>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -1461,15 +1508,17 @@ export default function AdminDashboard() {
                   <h3 className="font-outfit text-lg font-bold text-vault-gold mb-3">How AI Verification Works</h3>
                   <ol className="text-vault-text-secondary text-sm space-y-2 list-decimal list-inside">
                     <li>AI agent logs into API Global portal with your credentials</li>
-                    <li>Loads sign-in sheets for the correct date</li>
+                    <li>Loads sign-in sheets for the previous day</li>
                     <li>Matches names with your Hodler Inn records</li>
                     <li>Auto-fills Employee ID and Room Number for each match</li>
                     <li>Marks "No Bill" for entries not in your records</li>
-                    <li>Sends email alert for any missing records</li>
+                    <li>Sends Telegram notification with sync results</li>
                   </ol>
-                  <p className="text-vault-gold text-sm mt-4">
-                    <strong>Coming Soon:</strong> Automated daily sync feature
-                  </p>
+                  <div className="bg-emerald-900/30 border border-emerald-600/30 rounded-lg p-3 mt-4">
+                    <p className="text-emerald-400 text-sm">
+                      <strong>✓ Auto-Sync Available:</strong> Enable the toggle above to automatically run verification daily at 3 PM
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </>
