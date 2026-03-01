@@ -919,9 +919,6 @@ function CheckOutForm({ setView, setSuccessMessage }) {
                     data-testid="checkout-room-input"
                   />
                 </div>
-                <p className="text-vault-text-secondary text-xs mt-1">
-                  Enter your room number to find your booking
-                </p>
               </div>
               <Button
                 onClick={handleVerifyCheckout}
