@@ -180,8 +180,42 @@ Build a two-part application for a hotel named "Hodler Inn":
 ### Date Filtering
 - GET /api/admin/records?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
 
+## Updates (March 1, 2026)
+
+### Auto-Sync Schedule
+- Auto-sync starts **March 2nd, 2026 at 3 PM**
+- Runs daily at 3 PM to verify previous day's records
+
+### Room Number Validation
+- Guests can only enter room numbers from Room Management list
+- Invalid rooms rejected with error message
+
+### Check-Out Verification
+- Guests must verify Room + Employee ID before checkout
+- Prevents accidental wrong checkout
+
+### Voice Messages System
+- Check-In: "Welcome to Hodler Inn. Have a good rest."
+- Check-Out: "Thank you for staying. Have a safe journey. Please drop your room key in the key drop box in the lounge."
+- Time-based greetings (morning/afternoon/evening/night)
+
+### Voice Control (Admin Settings)
+- Enable/disable voice toggle
+- Volume slider (0-100%)
+- Test voice button
+
+### Signature Requirement
+- Visual warning about proper signature
+- Voice reminder when guest starts signing
+- No validation - easy check-in maintained
+
+### Success Screens
+- Animated checkmark
+- Key drop reminder on checkout
+- Auto-return to menu
+
 ## Next Tasks
-1. **Calibrate AI Sync Agent selectors** - User needs to provide portal UI screenshots after login
+1. **Elox Smart Lock Integration** - Pending call on Monday to check if web portal exists
 2. UnlockOS Smart Lock Integration (saved for later)
 3. Email notifications on check-in/out
 4. Room availability calendar view
