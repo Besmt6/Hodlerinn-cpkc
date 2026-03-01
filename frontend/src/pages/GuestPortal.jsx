@@ -998,7 +998,6 @@ function CheckOutForm({ setView, setSuccessMessage }) {
                     data-testid="checkout-time-input"
                   />
                 </div>
-                <p className="text-vault-text-secondary text-xs mt-1">Use 24-hour format (e.g., 14:00 for 2:00 PM)</p>
               </div>
               <Button
                 onClick={handleCheckOut}
