@@ -524,13 +524,13 @@ function CheckInForm({ setView }) {
                       {date ? format(date, "dd MMM yyyy") : "Select date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-vault-surface border-gray-200" align="start">
+                  <PopoverContent className="w-auto p-0 bg-white border-gray-200" align="start">
                     <Calendar
                       mode="single"
                       selected={date}
                       onSelect={setDate}
                       initialFocus
-                      className="bg-vault-surface text-gray-800"
+                      className="bg-white text-gray-800"
                       data-testid="checkin-calendar"
                     />
                   </PopoverContent>
@@ -563,7 +563,7 @@ function CheckInForm({ setView }) {
                     Clear
                   </button>
                 </div>
-                <div className="signature-wrapper">
+                <div className="bg-white border border-gray-300 rounded-lg">
                   <SignatureCanvas
                     ref={sigRef}
                     canvasProps={{
@@ -685,13 +685,13 @@ function CheckOutForm({ setView }) {
                   {date ? format(date, "dd MMM yyyy") : "Select date"}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-vault-surface border-gray-200" align="start">
+              <PopoverContent className="w-auto p-0 bg-white border-gray-200" align="start">
                 <Calendar
                   mode="single"
                   selected={date}
                   onSelect={setDate}
                   initialFocus
-                  className="bg-vault-surface text-gray-800"
+                  className="bg-white text-gray-800"
                   data-testid="checkout-calendar"
                 />
               </PopoverContent>
