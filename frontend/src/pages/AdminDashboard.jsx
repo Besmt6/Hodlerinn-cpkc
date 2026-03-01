@@ -534,6 +534,12 @@ export default function AdminDashboard() {
           >
             Rooms
           </button>
+          <button 
+            onClick={() => setActiveView('settings')}
+            className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'settings' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
+          >
+            Settings
+          </button>
         </div>
       </div>
 
