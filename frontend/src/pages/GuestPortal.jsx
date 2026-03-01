@@ -656,13 +656,14 @@ function CheckInForm({ setView, setSuccessMessage }) {
               <div>
                 <label className="vault-label">Employee Number</label>
                 <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
                   <Input
                     value={employeeNumber}
                     onChange={(e) => setEmployeeNumber(e.target.value)}
-                    placeholder="Enter employee number"
-                    className="vault-input pl-10"
+                    placeholder="⬇️ TAP HERE to enter number"
+                    className="vault-input pl-10 input-highlight text-lg"
                     data-testid="checkin-employee-input"
+                    autoFocus
                   />
                 </div>
               </div>
