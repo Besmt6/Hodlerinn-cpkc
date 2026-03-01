@@ -1782,6 +1782,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Root-level health check (required by some deployment systems)
+@app.get("/health")
+async def root_health_check():
+    """Root-level health check for deployment monitoring"""
+    try:
+        await db.command('ping')
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
