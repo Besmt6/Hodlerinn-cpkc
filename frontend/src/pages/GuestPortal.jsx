@@ -755,18 +755,6 @@ function CheckInForm({ setView, setSuccessMessage }) {
                     data-testid="checkin-signature-canvas"
                   />
                 </div>
-                <div className="bg-amber-900/30 border border-amber-500/50 rounded-lg p-3 mt-2">
-                  <p className="text-amber-400 text-sm font-medium flex items-start gap-2">
-                    <span className="text-lg">⚠️</span>
-                    <span>
-                      <strong>Proper Signature Required:</strong> Please sign your full name legibly. 
-                      A simple line, X, or scribble will not be accepted.
-                    </span>
-                  </p>
-                </div>
-                <p className="text-vault-text-secondary text-xs mt-2">
-                  This signature will be used for both check-in and check-out.
-                </p>
               </div>
               <Button
                 onClick={handleCheckIn}
@@ -775,6 +763,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 data-testid="submit-checkin-btn"
               >
                 {loading ? "Processing..." : "Complete Check-In"}
+              </Button>
               </Button>
             </>
           )}
