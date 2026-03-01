@@ -753,7 +753,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                   />
                 </div>
               </div>
-              <div>
+              <div ref={signatureContainerRef}>
                 <div className="flex justify-between items-center mb-2">
                   <label className="vault-label mb-0">Signature</label>
                   <button 
