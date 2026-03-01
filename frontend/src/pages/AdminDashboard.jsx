@@ -1512,6 +1512,132 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
 
+              {/* Voice Control */}
+              <Card className="bg-vault-surface border-vault-border max-w-2xl mt-6" data-testid="voice-control-card">
+                <CardHeader className="border-b border-vault-border">
+                  <CardTitle className="font-outfit text-xl text-vault-text flex items-center gap-2">
+                    {portalSettings.voice_enabled ? (
+                      <Volume2 className="w-5 h-5 text-vault-gold" />
+                    ) : (
+                      <VolumeX className="w-5 h-5 text-vault-text-secondary" />
+                    )}
+                    Voice Messages
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  <p className="text-vault-text-secondary text-sm">
+                    Control voice announcements on the guest kiosk after check-in and check-out.
+                  </p>
+                  
+                  {/* Voice Enable/Disable Toggle */}
+                  <div className="bg-black/50 border border-vault-border rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-vault-text font-medium">Voice Announcements</h4>
+                        <p className="text-vault-text-secondary text-sm">
+                          {portalSettings.voice_enabled 
+                            ? "Voice messages will play after check-in and check-out" 
+                            : "Voice messages are muted"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const newValue = !portalSettings.voice_enabled;
+                          setPortalSettings({...portalSettings, voice_enabled: newValue});
+                          try {
+                            await axios.post(`${API}/admin/settings`, { voice_enabled: newValue });
+                            toast.success(newValue ? "Voice enabled" : "Voice muted");
+                          } catch (error) {
+                            toast.error("Failed to update voice setting");
+                            setPortalSettings({...portalSettings, voice_enabled: !newValue});
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          portalSettings.voice_enabled ? 'bg-emerald-600' : 'bg-gray-600'
+                        } cursor-pointer`}
+                        data-testid="voice-toggle"
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            portalSettings.voice_enabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Volume Slider */}
+                  {portalSettings.voice_enabled && (
+                    <div className="bg-black/50 border border-vault-border rounded-lg p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-vault-text font-medium">Volume</h4>
+                          <span className="text-vault-gold font-mono text-sm">
+                            {Math.round(portalSettings.voice_volume * 100)}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={portalSettings.voice_volume * 100}
+                          onChange={async (e) => {
+                            const newVolume = parseInt(e.target.value) / 100;
+                            setPortalSettings({...portalSettings, voice_volume: newVolume});
+                          }}
+                          onMouseUp={async (e) => {
+                            const newVolume = parseInt(e.target.value) / 100;
+                            try {
+                              await axios.post(`${API}/admin/settings`, { voice_volume: newVolume });
+                              toast.success(`Volume set to ${Math.round(newVolume * 100)}%`);
+                            } catch (error) {
+                              toast.error("Failed to update volume");
+                            }
+                          }}
+                          onTouchEnd={async (e) => {
+                            const newVolume = portalSettings.voice_volume;
+                            try {
+                              await axios.post(`${API}/admin/settings`, { voice_volume: newVolume });
+                              toast.success(`Volume set to ${Math.round(newVolume * 100)}%`);
+                            } catch (error) {
+                              toast.error("Failed to update volume");
+                            }
+                          }}
+                          className="w-full h-2 bg-vault-border rounded-lg appearance-none cursor-pointer accent-vault-gold"
+                          data-testid="voice-volume-slider"
+                        />
+                        <div className="flex justify-between text-vault-text-secondary text-xs">
+                          <span>Mute</span>
+                          <span>Max</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Test Voice Button */}
+                  <Button
+                    onClick={() => {
+                      if ('speechSynthesis' in window) {
+                        window.speechSynthesis.cancel();
+                        const utterance = new SpeechSynthesisUtterance("Good afternoon! Welcome to Hodler Inn. Have a good rest.");
+                        utterance.volume = portalSettings.voice_volume;
+                        utterance.rate = 0.9;
+                        window.speechSynthesis.speak(utterance);
+                        toast.success("Playing test message...");
+                      } else {
+                        toast.error("Voice not supported in this browser");
+                      }
+                    }}
+                    disabled={!portalSettings.voice_enabled}
+                    className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                    data-testid="test-voice-btn"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    Test Voice
+                  </Button>
+                </CardContent>
+              </Card>
+
               {/* Info Box */}
               <Card className="bg-vault-surface-highlight/50 border-vault-border max-w-2xl mt-6">
                 <CardContent className="p-6">
