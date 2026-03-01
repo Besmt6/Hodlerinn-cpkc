@@ -428,6 +428,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
   const [verifying, setVerifying] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
+  const [signatureReminderSpoken, setSignatureReminderSpoken] = useState(false);
   const sigRef = useRef(null);
 
   // Fetch available rooms on component mount
@@ -446,8 +447,17 @@ function CheckInForm({ setView, setSuccessMessage }) {
     fetchRooms();
   }, []);
 
+  // Voice reminder for proper signature
+  const speakSignatureReminder = () => {
+    if (!signatureReminderSpoken) {
+      speakMessage("Please sign your full name legibly. A simple line or X will not be accepted.", 0.9);
+      setSignatureReminderSpoken(true);
+    }
+  };
+
   const clearSignature = () => {
     sigRef.current?.clear();
+    setSignatureReminderSpoken(false); // Reset so reminder plays again if cleared
   };
 
   const handleVerifyEmployee = async () => {
