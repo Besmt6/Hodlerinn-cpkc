@@ -256,18 +256,22 @@ async def shutdown_scheduler():
 # ==================== Telegram Notification ====================
 
 async def send_telegram_notification(message: str):
-    """Send notification to Telegram"""
+    """Send notification to Telegram (supports multiple chat IDs separated by comma)"""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
+    
+    # Support multiple chat IDs separated by comma
+    chat_ids = [cid.strip() for cid in TELEGRAM_CHAT_ID.split(',') if cid.strip()]
     
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         async with httpx.AsyncClient() as client:
-            await client.post(url, json={
-                "chat_id": TELEGRAM_CHAT_ID,
-                "text": message,
-                "parse_mode": "HTML"
-            })
+            for chat_id in chat_ids:
+                await client.post(url, json={
+                    "chat_id": chat_id,
+                    "text": message,
+                    "parse_mode": "HTML"
+                })
     except Exception as e:
         logging.error(f"Failed to send Telegram notification: {e}")
 
