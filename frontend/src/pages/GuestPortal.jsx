@@ -639,6 +639,24 @@ function CheckOutForm({ setView }) {
   const [date, setDate] = useState(new Date());
   const [time, setTime] = useState("");
   const [loading, setLoading] = useState(false);
+  const [availableRooms, setAvailableRooms] = useState([]);
+  const [loadingRooms, setLoadingRooms] = useState(true);
+
+  // Fetch available rooms on component mount
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const response = await axios.get(`${API}/rooms`);
+        setAvailableRooms(response.data || []);
+      } catch (error) {
+        console.error("Failed to fetch rooms:", error);
+        toast.error("Failed to load room list");
+      } finally {
+        setLoadingRooms(false);
+      }
+    };
+    fetchRooms();
+  }, []);
 
   const handleCheckOut = async () => {
     if (!roomNumber) {
