@@ -54,6 +54,19 @@ api_router = APIRouter(prefix="/api")
 # Admin password (simple protection)
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'hodlerinn2024')
 
+# ==================== Health Check Endpoint ====================
+
+@api_router.get("/health")
+async def health_check():
+    """Health check endpoint for deployment monitoring"""
+    try:
+        # Quick MongoDB ping to verify DB connection
+        await db.command('ping')
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        logging.error(f"Health check failed: {e}")
+        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+
 # ==================== Encryption Functions ====================
 
 def encrypt_data(data: str) -> str:
