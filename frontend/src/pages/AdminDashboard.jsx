@@ -1255,6 +1255,121 @@ export default function AdminDashboard() {
               </Card>
             </>
           )}
+
+          {/* Settings View */}
+          {activeView === 'settings' && (
+            <>
+              {/* Header */}
+              <div className="mb-6">
+                <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Portal Settings</h1>
+                <p className="text-vault-text-secondary font-manrope mt-1">Configure API Global portal integration for automated verification</p>
+              </div>
+
+              {/* Settings Card */}
+              <Card className="bg-vault-surface border-vault-border max-w-2xl" data-testid="settings-card">
+                <CardHeader className="border-b border-vault-border">
+                  <CardTitle className="font-outfit text-xl text-vault-text flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-vault-gold" />
+                    API Global Portal Credentials
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  {/* Username */}
+                  <div>
+                    <label className="text-xs text-vault-gold uppercase tracking-wider mb-2 block font-medium">
+                      Portal Username
+                    </label>
+                    <div className="relative">
+                      <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                      <Input
+                        value={portalSettings.api_global_username}
+                        onChange={(e) => setPortalSettings({...portalSettings, api_global_username: e.target.value})}
+                        placeholder="Enter your API Global username"
+                        className="bg-black/50 border-vault-border text-vault-text pl-10"
+                        data-testid="portal-username-input"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password */}
+                  <div>
+                    <label className="text-xs text-vault-gold uppercase tracking-wider mb-2 block font-medium">
+                      Portal Password
+                      {portalSettings.api_global_password_set && (
+                        <span className="text-green-400 ml-2 normal-case">(Password saved)</span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                      <Input
+                        type="password"
+                        value={portalSettings.api_global_password}
+                        onChange={(e) => setPortalSettings({...portalSettings, api_global_password: e.target.value})}
+                        placeholder={portalSettings.api_global_password_set ? "Enter new password to change" : "Enter your API Global password"}
+                        className="bg-black/50 border-vault-border text-vault-text pl-10"
+                        data-testid="portal-password-input"
+                      />
+                    </div>
+                    <p className="text-vault-text-secondary text-xs mt-1">
+                      Password is encrypted and stored securely. Leave blank to keep existing password.
+                    </p>
+                  </div>
+
+                  {/* Alert Email */}
+                  <div>
+                    <label className="text-xs text-vault-gold uppercase tracking-wider mb-2 block font-medium">
+                      Alert Email
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                      <Input
+                        type="email"
+                        value={portalSettings.alert_email}
+                        onChange={(e) => setPortalSettings({...portalSettings, alert_email: e.target.value})}
+                        placeholder="Enter email for sync alerts"
+                        className="bg-black/50 border-vault-border text-vault-text pl-10"
+                        data-testid="alert-email-input"
+                      />
+                    </div>
+                    <p className="text-vault-text-secondary text-xs mt-1">
+                      Receive notifications for missing records and sync status.
+                    </p>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="pt-4 border-t border-vault-border">
+                    <Button
+                      onClick={handleSaveSettings}
+                      disabled={savingSettings}
+                      className="vault-btn-primary flex items-center gap-2"
+                      data-testid="save-settings-btn"
+                    >
+                      <Save className="w-4 h-4" />
+                      {savingSettings ? "Saving..." : "Save Settings"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Info Box */}
+              <Card className="bg-vault-surface-highlight/50 border-vault-border max-w-2xl mt-6">
+                <CardContent className="p-6">
+                  <h3 className="font-outfit text-lg font-bold text-vault-gold mb-3">How AI Verification Works</h3>
+                  <ol className="text-vault-text-secondary text-sm space-y-2 list-decimal list-inside">
+                    <li>AI agent logs into API Global portal with your credentials</li>
+                    <li>Loads sign-in sheets for the correct date</li>
+                    <li>Matches names with your Hodler Inn records</li>
+                    <li>Auto-fills Employee ID and Room Number for each match</li>
+                    <li>Marks "No Bill" for entries not in your records</li>
+                    <li>Sends email alert for any missing records</li>
+                  </ol>
+                  <p className="text-vault-gold text-sm mt-4">
+                    <strong>Coming Soon:</strong> Automated daily sync feature
+                  </p>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </motion.div>
       </div>
       
