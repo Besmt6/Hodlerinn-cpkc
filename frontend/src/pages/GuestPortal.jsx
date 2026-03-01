@@ -577,13 +577,14 @@ function CheckInForm({ setView, setSuccessMessage }) {
         signature
       });
       
-      // Voice message for check-in
-      const greeting = getTimeBasedGreeting();
+      // Voice message for check-in (using audio files)
+      const timePeriod = getTimePeriod();
       setTimeout(() => {
-        speakMessage(`${greeting}! Welcome to Hodler Inn. Have a good rest.`);
+        playVoiceMessage(`checkin_${timePeriod}`);
       }, 500);
       
       // Show success screen
+      const greeting = getTimeBasedGreeting();
       setSuccessMessage({
         title: `${greeting}!`,
         message: "Welcome to Hodler Inn",
