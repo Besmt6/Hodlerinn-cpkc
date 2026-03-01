@@ -1153,6 +1153,18 @@ export default function AdminDashboard() {
                                   <span className="text-vault-text-secondary">No</span>
                                 )}
                               </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleEdit(record)}
+                                    className="p-1.5 rounded hover:bg-vault-surface-highlight text-vault-text-secondary hover:text-vault-gold transition-colors"
+                                    title="Edit record"
+                                    data-testid={`billing-edit-${record.id}`}
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </TableCell>
                             </TableRow>
                           ))
                         )}
