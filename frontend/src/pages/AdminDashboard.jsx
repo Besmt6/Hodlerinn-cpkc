@@ -1396,6 +1396,65 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
 
+              {/* Sync Controls Card */}
+              <Card className="bg-vault-surface border-vault-border max-w-2xl mt-6" data-testid="sync-controls-card">
+                <CardHeader className="border-b border-vault-border">
+                  <CardTitle className="font-outfit text-xl text-vault-text flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-vault-gold" />
+                    API Global Sync
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      onClick={handleTestConnection}
+                      disabled={runningSyncTest || !portalSettings.api_global_password_set}
+                      className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                      data-testid="test-connection-btn"
+                    >
+                      <Key className="w-4 h-4" />
+                      {runningSyncTest ? "Testing..." : "Test Connection"}
+                    </Button>
+                    <Button
+                      onClick={handleRunSync}
+                      disabled={syncStatus.running || !portalSettings.api_global_password_set}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+                      data-testid="run-sync-btn"
+                    >
+                      <Globe className="w-4 h-4" />
+                      {syncStatus.running ? "Syncing..." : "Run Sync Now"}
+                    </Button>
+                  </div>
+                  
+                  {!portalSettings.api_global_password_set && (
+                    <p className="text-amber-400 text-sm">
+                      Please save your portal credentials first before running sync.
+                    </p>
+                  )}
+                  
+                  {syncStatus.running && (
+                    <div className="bg-black/50 border border-vault-border rounded-lg p-4">
+                      <p className="text-vault-gold text-sm flex items-center gap-2">
+                        <span className="animate-spin">⚡</span>
+                        {syncStatus.progress || "Sync in progress..."}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {syncStatus.last_results && !syncStatus.running && (
+                    <div className="bg-black/50 border border-vault-border rounded-lg p-4">
+                      <h4 className="text-vault-gold font-bold mb-2">Last Sync Results:</h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <p className="text-green-400">Verified: {syncStatus.last_results.verified?.length || 0}</p>
+                        <p className="text-amber-400">No Bill: {syncStatus.last_results.no_bill?.length || 0}</p>
+                        <p className="text-blue-400">Missing: {syncStatus.last_results.missing_in_hodler?.length || 0}</p>
+                        <p className="text-red-400">Errors: {syncStatus.last_results.errors?.length || 0}</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Info Box */}
               <Card className="bg-vault-surface-highlight/50 border-vault-border max-w-2xl mt-6">
                 <CardContent className="p-6">
