@@ -1149,6 +1149,15 @@ async def get_rooms_public():
     rooms = await db.rooms.find({}, {"_id": 0, "room_number": 1, "room_type": 1, "floor": 1}).to_list(1000)
     return rooms
 
+@api_router.get("/voice-settings")
+async def get_voice_settings():
+    """Public endpoint for guest portal - returns voice settings"""
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    return {
+        "voice_enabled": settings.get("voice_enabled", True) if settings else True,
+        "voice_volume": settings.get("voice_volume", 1.0) if settings else 1.0
+    }
+
 @api_router.get("/admin/rooms")
 async def get_all_rooms():
     rooms = await db.rooms.find({}, {"_id": 0}).to_list(1000)
