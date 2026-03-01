@@ -1245,3 +1245,107 @@ function HelpView({ setView }) {
     </motion.div>
   );
 }
+
+function SuccessScreen({ setView, successMessage }) {
+  return (
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="w-full max-w-lg text-center"
+    >
+      <Card className="glass-card p-10" data-testid="success-screen-card">
+        <CardContent className="space-y-6">
+          {/* Success Icon */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="w-24 h-24 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center"
+          >
+            <svg className="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <motion.path
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={3}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </motion.div>
+
+          {/* Title - Time-based greeting */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="font-outfit text-4xl font-bold text-vault-gold"
+          >
+            {successMessage.title}
+          </motion.h1>
+
+          {/* Main Message */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-vault-text text-2xl"
+          >
+            {successMessage.message}
+          </motion.p>
+
+          {/* Sub Message */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="text-vault-text-secondary text-xl"
+          >
+            {successMessage.subMessage}
+          </motion.p>
+
+          {/* Key Reminder for Checkout */}
+          {successMessage.keyReminder && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="bg-amber-500/20 border-2 border-amber-500 rounded-lg p-4 mt-6"
+            >
+              <div className="flex items-center justify-center gap-3">
+                <svg className="w-8 h-8 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+                <p className="text-amber-400 text-lg font-semibold">
+                  {successMessage.keyReminder}
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Return to menu button */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+          >
+            <Button
+              onClick={() => setView("menu")}
+              className="vault-btn-secondary mt-4"
+              data-testid="return-to-menu-btn"
+            >
+              Return to Menu
+            </Button>
+            <p className="text-vault-text-secondary text-sm mt-2">
+              Auto-returning in a few seconds...
+            </p>
+          </motion.div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
