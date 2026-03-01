@@ -684,8 +684,15 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 <div className="relative">
                   <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
                   <Input
+                    ref={roomInputRef}
                     value={roomNumber}
-                    onChange={(e) => setRoomNumber(e.target.value)}
+                    onChange={(e) => {
+                      setRoomNumber(e.target.value);
+                      // Auto-focus time input after entering 3 digits
+                      if (e.target.value.length >= 3) {
+                        setTimeout(() => timeInputRef.current?.focus(), 300);
+                      }
+                    }}
                     onFocus={speakRoomReminder}
                     placeholder="Enter room number (e.g., 101)"
                     className="vault-input pl-10"
