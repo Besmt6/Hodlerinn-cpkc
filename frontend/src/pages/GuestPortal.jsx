@@ -482,6 +482,16 @@ function CheckInForm({ setView, setSuccessMessage }) {
   const handleClearVerification = () => {
     setVerifiedEmployee(null);
     setEmployeeNumber("");
+    setRoomReminderSpoken(false);
+  };
+
+  // Voice reminder for room selection
+  const [roomReminderSpoken, setRoomReminderSpoken] = useState(false);
+  const speakRoomReminder = () => {
+    if (!roomReminderSpoken) {
+      speakMessage("Please select the room number from key on desk. Print your name and room number on yellow card.", 0.9);
+      setRoomReminderSpoken(true);
+    }
   };
 
   const handleCheckIn = async () => {
