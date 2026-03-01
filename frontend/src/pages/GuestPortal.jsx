@@ -229,10 +229,10 @@ function MainMenu({ setView }) {
             <LogOut className="w-5 h-5" />
             Check Out
           </Button>
-          <div className="pt-4 border-t border-vault-border space-y-3">
+          <div className="pt-4 border-t border-gray-200 space-y-3">
             <Button
               onClick={() => setView("signin")}
-              className="w-full vault-btn-secondary h-12 flex items-center justify-center gap-3"
+              className="w-full h-12 flex items-center justify-center gap-3 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
               data-testid="signin-sheet-btn"
             >
               <ClipboardList className="w-5 h-5" />
