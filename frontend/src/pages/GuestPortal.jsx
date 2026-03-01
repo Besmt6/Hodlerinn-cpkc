@@ -737,7 +737,16 @@ function CheckInForm({ setView, setSuccessMessage }) {
                     ref={timeInputRef}
                     type="time"
                     value={time}
-                    onChange={(e) => setTime(e.target.value)}
+                    onChange={(e) => {
+                      setTime(e.target.value);
+                      // Auto-scroll to signature after time is selected
+                      if (e.target.value) {
+                        setTimeout(() => {
+                          signatureContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          speakSignatureReminder();
+                        }, 300);
+                      }
+                    }}
                     className="vault-input pl-10"
                     placeholder="HH:MM"
                     data-testid="checkin-time-input"
