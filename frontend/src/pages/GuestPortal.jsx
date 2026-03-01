@@ -288,47 +288,47 @@ function RegisterForm({ setView }) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="w-full max-w-md"
     >
-      <Card className="glass-card p-8" data-testid="register-form-card">
+      <Card className="bg-white border border-gray-200 shadow-xl p-8 rounded-2xl" data-testid="register-form-card">
         <CardHeader className="pb-6">
           <button 
             onClick={() => setView("menu")} 
-            className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
+            className="text-gray-500 hover:text-amber-600 transition-colors mb-4 flex items-center gap-2"
             data-testid="back-btn"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          <CardTitle className="font-outfit text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
-            <UserPlus className="w-6 h-6 text-vault-gold" />
+          <CardTitle className="font-outfit text-2xl font-bold text-gray-800 tracking-tight flex items-center gap-3">
+            <UserPlus className="w-6 h-6 text-amber-500" />
             Guest Registration
           </CardTitle>
-          <p className="text-vault-text-secondary text-sm mt-2">
+          <p className="text-gray-600 text-sm mt-2">
             Register with your employee details. Signature will be captured at check-in.
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <label className="vault-label">Employee Number</label>
+            <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Employee Number</label>
             <div className="relative">
-              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 value={employeeNumber}
                 onChange={(e) => setEmployeeNumber(e.target.value)}
                 placeholder="Enter employee number"
-                className="vault-input pl-10"
+                className="pl-10 bg-gray-50 border-gray-300 text-gray-800 focus:border-amber-500"
                 data-testid="employee-number-input"
               />
             </div>
           </div>
           <div>
-            <label className="vault-label">Full Name</label>
+            <label className="text-xs text-amber-600 uppercase tracking-wider mb-1 block font-medium">Full Name</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter your full name"
-                className="vault-input pl-10"
+                className="pl-10 bg-gray-50 border-gray-300 text-gray-800 focus:border-amber-500"
                 data-testid="name-input"
               />
             </div>
@@ -336,7 +336,7 @@ function RegisterForm({ setView }) {
           <Button
             onClick={handleRegister}
             disabled={loading}
-            className="w-full vault-btn-primary h-12"
+            className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold h-12"
             data-testid="submit-register-btn"
           >
             {loading ? "Registering..." : "Complete Registration"}
