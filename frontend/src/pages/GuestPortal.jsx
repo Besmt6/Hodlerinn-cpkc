@@ -1011,14 +1011,14 @@ function CheckOutForm({ setView, setSuccessMessage }) {
                 </Popover>
               </div>
               <div>
-                <label className="vault-label">Check-Out Time (24hr)</label>
+                <label className="vault-label">Check-Out Time (24hr format, e.g. 14:30)</label>
                 <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
                   <Input
                     type="time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
-                    className="vault-input pl-10"
+                    className="vault-input pl-10 input-highlight text-lg"
                     placeholder="HH:MM"
                     data-testid="checkout-time-input"
                   />
