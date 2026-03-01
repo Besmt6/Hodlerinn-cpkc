@@ -579,10 +579,9 @@ function CheckInForm({ setView, setSuccessMessage }) {
         signature
       });
       
-      // Voice message for check-in (using audio files)
-      const timePeriod = getTimePeriod();
+      // Voice message after completing check-in
       setTimeout(() => {
-        playVoiceMessage(`checkin_${timePeriod}`);
+        playVoiceMessage("checkin_complete");
       }, 500);
       
       // Show success screen
