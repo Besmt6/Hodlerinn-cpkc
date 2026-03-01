@@ -684,7 +684,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
   );
 }
 
-function CheckOutForm({ setView }) {
+function CheckOutForm({ setView, setSuccessMessage }) {
   const [roomNumber, setRoomNumber] = useState("");
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [date, setDate] = useState(new Date());
