@@ -1095,6 +1095,12 @@ async def export_billing_png():
 
 # ==================== Room Management ====================
 
+@api_router.get("/rooms")
+async def get_rooms_public():
+    """Public endpoint for guest portal - returns room list for dropdown"""
+    rooms = await db.rooms.find({}, {"_id": 0, "room_number": 1, "room_type": 1, "floor": 1}).to_list(1000)
+    return rooms
+
 @api_router.get("/admin/rooms")
 async def get_all_rooms():
     rooms = await db.rooms.find({}, {"_id": 0}).to_list(1000)
