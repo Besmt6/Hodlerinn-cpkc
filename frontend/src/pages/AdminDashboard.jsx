@@ -105,6 +105,8 @@ export default function AdminDashboard() {
     api_global_password_set: false
   });
   const [savingSettings, setSavingSettings] = useState(false);
+  const [syncStatus, setSyncStatus] = useState({ running: false, progress: "", last_results: null });
+  const [runningSyncTest, setRunningSyncTest] = useState(false);
   
   const navigate = useNavigate();
 
