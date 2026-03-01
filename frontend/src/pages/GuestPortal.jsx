@@ -316,12 +316,6 @@ function MainMenu({ setView }) {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
-            <p className="text-vault-text-secondary text-sm text-center">
-              <span className="text-vault-gold font-medium">Note:</span> Register only if this is your <span className="text-vault-gold font-medium">first time</span>. 
-              Already registered? Go directly to <span className="text-vault-gold font-medium">Check In</span>.
-            </p>
-          </div>
           <Button
             onClick={() => {
               playVoiceMessage("register_welcome");
