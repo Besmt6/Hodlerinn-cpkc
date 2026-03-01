@@ -200,16 +200,22 @@ export default function GuestPortal() {
           <RegisterForm key="register" setView={setView} />
         )}
         {view === "checkin" && (
-          <CheckInForm key="checkin" setView={setView} />
+          <CheckInForm key="checkin" setView={setView} setSuccessMessage={setSuccessMessage} />
         )}
         {view === "checkout" && (
-          <CheckOutForm key="checkout" setView={setView} />
+          <CheckOutForm key="checkout" setView={setView} setSuccessMessage={setSuccessMessage} />
         )}
         {view === "signin" && (
           <SignInSheetView key="signin" setView={setView} />
         )}
         {view === "help" && (
           <HelpView key="help" setView={setView} />
+        )}
+        {view === "checkin-success" && (
+          <SuccessScreen key="checkin-success" setView={setView} successMessage={successMessage} />
+        )}
+        {view === "checkout-success" && (
+          <SuccessScreen key="checkout-success" setView={setView} successMessage={successMessage} />
         )}
       </AnimatePresence>
     </div>
