@@ -228,8 +228,9 @@ async def start_scheduler():
     try:
         settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
         if settings and settings.get("auto_sync_enabled"):
-            update_auto_sync_schedule(True)
-            logging.info("Auto-sync restored from settings (enabled)")
+            start_date = settings.get("auto_sync_start_date")
+            update_auto_sync_schedule(True, start_date)
+            logging.info(f"Auto-sync restored from settings (enabled, start: {start_date or 'immediate'})")
     except Exception as e:
         logging.error(f"Failed to restore auto-sync settings: {e}")
 
