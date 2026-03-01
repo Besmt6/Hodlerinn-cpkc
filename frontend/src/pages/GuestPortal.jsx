@@ -186,23 +186,23 @@ function MainMenu({ setView }) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="w-full max-w-md"
     >
-      <Card className="glass-card p-8" data-testid="main-menu-card">
+      <Card className="bg-white border border-gray-200 shadow-xl p-8 rounded-2xl" data-testid="main-menu-card">
         <CardHeader className="text-center pb-8">
-          <CardTitle className="font-outfit text-3xl font-bold text-vault-text tracking-tight">
+          <CardTitle className="font-outfit text-3xl font-bold text-gray-800 tracking-tight">
             Welcome to Hodler Inn
           </CardTitle>
-          <p className="text-red-500 font-bold text-lg mt-3">
+          <p className="text-red-600 font-bold text-lg mt-3">
             Railroad Crew Check In Here
           </p>
-          <p className="text-vault-text-secondary font-manrope mt-2">
+          <p className="text-gray-600 font-manrope mt-2">
             Select an option below to continue
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-3 mb-2">
-            <p className="text-vault-text-secondary text-sm text-center">
-              <span className="text-vault-gold font-medium">Note:</span> Register only if this is your <span className="text-vault-gold">first time</span>. 
-              Already registered? Go directly to <span className="text-vault-gold">Check In</span>.
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
+            <p className="text-gray-600 text-sm text-center">
+              <span className="text-amber-600 font-medium">Note:</span> Register only if this is your <span className="text-amber-600 font-medium">first time</span>. 
+              Already registered? Go directly to <span className="text-amber-600 font-medium">Check In</span>.
             </p>
           </div>
           <Button
