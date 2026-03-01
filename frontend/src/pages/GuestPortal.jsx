@@ -733,6 +733,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 <div className="relative">
                   <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
                   <Input
+                    ref={timeInputRef}
                     type="time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
@@ -741,7 +742,6 @@ function CheckInForm({ setView, setSuccessMessage }) {
                     data-testid="checkin-time-input"
                   />
                 </div>
-                <p className="text-vault-text-secondary text-xs mt-1">Use 24-hour format (e.g., 14:00 for 2:00 PM)</p>
               </div>
               <div>
                 <div className="flex justify-between items-center mb-2">
