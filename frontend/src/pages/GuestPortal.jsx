@@ -511,15 +511,6 @@ function CheckInForm({ setView, setSuccessMessage }) {
       toast.error("Please provide your signature");
       return;
     }
-    
-    // Check if signature is too simple (basic validation)
-    const signatureData = sigRef.current.toData();
-    const totalPoints = signatureData.reduce((sum, stroke) => sum + stroke.length, 0);
-    if (totalPoints < 20) {
-      toast.error("Please provide a proper signature. A simple line or X is not accepted.");
-      speakMessage("Please provide a proper signature with your full name. A simple line or X is not accepted.");
-      return;
-    }
 
     setLoading(true);
     try {
