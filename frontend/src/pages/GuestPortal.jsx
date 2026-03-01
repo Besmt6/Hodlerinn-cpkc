@@ -690,6 +690,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 <div className="bg-vault-surface border border-gray-300 rounded-lg">
                   <SignatureCanvas
                     ref={sigRef}
+                    onBegin={speakSignatureReminder}
                     canvasProps={{
                       className: "signature-canvas w-full h-32 bg-transparent",
                       style: { width: "100%", height: "128px" }
