@@ -469,6 +469,14 @@ export default function AdminDashboard() {
             <Bed className="w-4 h-4" />
             <span className="font-manrope text-sm">Room Management</span>
           </div>
+          <div 
+            className={`admin-nav-item cursor-pointer ${activeView === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveView('settings')}
+            data-testid="nav-settings-view-btn"
+          >
+            <Settings className="w-4 h-4" />
+            <span className="font-manrope text-sm">Portal Settings</span>
+          </div>
         </nav>
 
         {/* Logout */}
