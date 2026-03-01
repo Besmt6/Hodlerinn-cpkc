@@ -107,31 +107,40 @@ Build a two-part application for a hotel named "Hodler Inn":
   - Provider options: Vapi.ai (recommended), Retell AI, Twilio + OpenAI
 
 ## AI Verification Agent (March 2026)
-**Status:** FUNCTIONAL - Login working, navigation needs calibration to portal UI
+**Status:** ✅ FULLY FUNCTIONAL - Complete automation working!
 
 ### Features Implemented:
 - Portal Settings page in Admin Dashboard to store API Global credentials
 - Encrypted credential storage (username + password)
 - **Test Connection** - Successfully logs into the third-party railroad portal
-- **Run Sync Now** - Background task automation with Playwright browser
+- **Run Sync Now** - Full automation with Playwright browser:
+  1. Login to portal ✓
+  2. Navigate to Sign-in Sheets menu ✓
+  3. Click Online Sign-in Sheets ✓
+  4. Click Load button ✓
+  5. Extract employee entries from table ✓
+  6. Match names against Hodler Inn records ✓
+  7. Fill Employee ID + Room Number for matches ✓
+  8. Mark "No Bill" for non-matches ✓
 - Sync Status tracking with results history
-- Name matching algorithm (fuzzy matching with SequenceMatcher)
+- Fuzzy name matching algorithm (handles LASTNAME/FIRSTNAME/SUFFIX format)
 
 ### Technical Details:
 - Uses Playwright for headless browser automation
 - Chromium browser installed for ARM64 architecture
 - Async background task execution
 - Login URL: https://providerrail.apps-apiglobalsolutions.com/ACESSUPPLIER/faces/login.xhtml
+- Sign-in Sheet URL: /faces/views/viewSignInSheet.xhtml
 
-### Known Limitations:
-- Navigation selectors need calibration based on actual portal UI structure
-- The third-party website UI may change, requiring selector updates
-- Currently, the "Sign In Sheets" menu navigation fails due to different menu structure
+### Business Logic:
+- **Best time to run sync:** 3 PM daily
+- Portal shows **previous day's records** by default
+- Example: Running Feb 28 at 3 PM → Verifies Feb 27 guest stays
 
-### Next Steps for Full Automation:
-1. User should capture screenshots of the portal's navigation flow after login
-2. Update selectors in `/app/backend/sync_agent.py` to match actual UI elements
-3. Test with real booking data matching the portal's date
+### Results Tracking:
+- **Verified:** Records matched with Hodler Inn data (Employee ID + Room filled)
+- **No Bill:** Portal records with no matching Hodler Inn guest (checkbox marked)
+- **Missing:** Hodler Inn guests not found in portal (needs manual review)
 
 ## Access Credentials
 - **Admin Dashboard**: /admin → Password: hodlerinn2024
