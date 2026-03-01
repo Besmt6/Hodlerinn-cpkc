@@ -755,6 +755,13 @@ function CheckOutForm({ setView }) {
         check_out_time: time
       });
       toast.success("Check-out successful! Thank you for staying at Hodler Inn.");
+      
+      // Voice message for check-out
+      const greeting = getTimeBasedGreeting();
+      setTimeout(() => {
+        speakMessage(`${greeting}! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.`);
+      }, 500);
+      
       setView("menu");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Check-out failed");
