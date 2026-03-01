@@ -428,25 +428,26 @@ function RegisterForm({ setView }) {
           <div>
             <label className="vault-label">Employee Number</label>
             <div className="relative">
-              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
               <Input
                 value={employeeNumber}
                 onChange={(e) => setEmployeeNumber(e.target.value)}
-                placeholder="Enter employee number"
-                className="pl-10 vault-input focus:border-amber-500"
+                placeholder="⬇️ TAP HERE to enter number"
+                className="pl-10 vault-input input-highlight text-lg"
                 data-testid="employee-number-input"
+                autoFocus
               />
             </div>
           </div>
           <div>
             <label className="vault-label">Full Name</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your full name"
-                className="pl-10 vault-input focus:border-amber-500"
+                placeholder="⬇️ TAP HERE to enter name"
+                className="pl-10 vault-input text-lg"
                 data-testid="name-input"
               />
             </div>
