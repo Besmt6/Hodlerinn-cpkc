@@ -1265,6 +1265,12 @@ async def update_portal_settings(input: PortalSettingsUpdate):
     if input.auto_sync_start_date is not None:
         update_data["auto_sync_start_date"] = input.auto_sync_start_date
     
+    if input.voice_enabled is not None:
+        update_data["voice_enabled"] = input.voice_enabled
+    
+    if input.voice_volume is not None:
+        update_data["voice_volume"] = max(0.0, min(1.0, input.voice_volume))  # Clamp 0-1
+    
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     if existing:
