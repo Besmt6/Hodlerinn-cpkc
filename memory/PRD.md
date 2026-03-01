@@ -234,7 +234,7 @@ Build a two-part application for a hotel named "Hodler Inn":
 - Enhances kiosk experience with minimal user effort
 
 ## Next Tasks
-1. **AI Verification Agent Selector Fix** - Update CSS selector in `sync_agent.py` to find "No Bill" checkbox
+1. ~~**AI Verification Agent Selector Fix**~~ ✅ Completed - Updated CSS selector logic
 2. **Elox Smart Lock Integration** - Pending call on Monday to check if web portal exists
 3. UnlockOS Smart Lock Integration (saved for later)
 4. Email notifications on check-in/out
