@@ -777,7 +777,6 @@ function CheckInForm({ setView, setSuccessMessage }) {
               >
                 {loading ? "Processing..." : "Complete Check-In"}
               </Button>
-              </Button>
             </>
           )}
         </CardContent>
