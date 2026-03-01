@@ -764,7 +764,6 @@ function CheckOutForm({ setView }) {
         check_out_date: format(date, "yyyy-MM-dd"),
         check_out_time: time
       });
-      toast.success("Check-out successful! Thank you for staying at Hodler Inn.");
       
       // Voice message for check-out
       const greeting = getTimeBasedGreeting();
@@ -772,7 +771,18 @@ function CheckOutForm({ setView }) {
         speakMessage(`${greeting}! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.`);
       }, 500);
       
-      setView("menu");
+      // Show success screen
+      setSuccessMessage({
+        title: `${greeting}!`,
+        message: "Thank you for staying at Hodler Inn",
+        subMessage: "Have a safe journey! 🚂",
+        keyReminder: "Please drop your room key in the Key Drop Box in the Lounge",
+        type: "checkout"
+      });
+      setView("checkout-success");
+      
+      // Auto-return to menu after 10 seconds
+      setTimeout(() => setView("menu"), 10000);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Check-out failed");
     } finally {
