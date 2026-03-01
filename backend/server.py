@@ -1156,19 +1156,25 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
                 "room_number": booking['room_number']
             })
     
-    # Run sync in background
-    async def run_sync_task():
+    # Store sync params for background task
+    sync_params = {
+        "username": settings.get("api_global_username"),
+        "password": decrypt_data(settings.get("api_global_password_encrypted")),
+        "hodler_records": hodler_records,
+        "target": target_date or target
+    }
+    
+    # Run sync in background using asyncio.create_task
+    async def run_sync_task_wrapper():
         global sync_status
         sync_status["running"] = True
         sync_status["progress"] = "Starting sync..."
         
         try:
             from sync_agent import APIGlobalSyncAgent
-            username = settings.get("api_global_username")
-            password = decrypt_data(settings.get("api_global_password_encrypted"))
             
-            agent = APIGlobalSyncAgent(username, password)
-            results = await agent.run_sync(hodler_records)
+            agent = APIGlobalSyncAgent(sync_params["username"], sync_params["password"])
+            results = await agent.run_sync(sync_params["hodler_records"])
             
             sync_status["last_results"] = results
             sync_status["last_run"] = datetime.now(timezone.utc).isoformat()
@@ -1178,7 +1184,7 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
             await db.sync_history.insert_one({
                 "id": str(uuid.uuid4()),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "target_date": target_date or target,
+                "target_date": sync_params["target"],
                 "results": results
             })
             
@@ -1188,8 +1194,8 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
         finally:
             sync_status["running"] = False
     
-    # Start background task
-    background_tasks.add_task(lambda: asyncio.create_task(run_sync_task()))
+    # Start background task using asyncio.create_task directly
+    asyncio.create_task(run_sync_task_wrapper())
     
     return {"message": "Sync started", "hodler_records_count": len(hodler_records)}
 
