@@ -102,7 +102,9 @@ export default function AdminDashboard() {
     api_global_password: "",
     alert_email: "",
     auto_sync_enabled: false,
-    api_global_password_set: false
+    api_global_password_set: false,
+    voice_enabled: true,
+    voice_volume: 1.0
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ running: false, progress: "", last_results: null });
