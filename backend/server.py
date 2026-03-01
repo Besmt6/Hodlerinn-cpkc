@@ -351,6 +351,7 @@ class PortalSettingsUpdate(BaseModel):
     api_global_password: Optional[str] = None
     alert_email: Optional[str] = None
     auto_sync_enabled: Optional[bool] = None
+    auto_sync_start_date: Optional[str] = None  # Format: YYYY-MM-DD
 
 # ==================== Helper Functions ====================
 
