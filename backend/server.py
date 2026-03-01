@@ -74,9 +74,12 @@ def decrypt_data(encrypted_data: str) -> str:
         # If decryption fails, data might not be encrypted (old data)
         return encrypted_data
 
-# ==================== Scheduler for Monthly Reset ====================
+# ==================== Scheduler for Monthly Reset & Auto-Sync ====================
 
 scheduler = AsyncIOScheduler()
+
+# Auto-sync job ID for managing the scheduled task
+AUTO_SYNC_JOB_ID = "auto_sync_daily"
 
 async def monthly_data_reset():
     """Reset all guest and booking data on 1st of each month"""
@@ -99,12 +102,128 @@ async def monthly_data_reset():
     except Exception as e:
         logging.error(f"Monthly reset failed: {e}")
 
+async def auto_sync_task():
+    """Automated daily sync at 3 PM - verifies previous day's records"""
+    logging.info("Auto-sync task triggered at 3 PM")
+    try:
+        # Check if auto-sync is still enabled
+        settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+        if not settings or not settings.get("auto_sync_enabled"):
+            logging.info("Auto-sync is disabled, skipping")
+            return
+        
+        if not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
+            logging.warning("Auto-sync: Portal credentials not configured")
+            return
+        
+        # Get yesterday's date for sync
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        
+        # Get Hodler Inn records for yesterday
+        bookings = await db.bookings.find({"check_in_date": yesterday}, {"_id": 0}).to_list(1000)
+        
+        # Get guest names
+        employee_numbers = [b['employee_number'] for b in bookings]
+        guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+        guests_dict = {g['employee_number']: g for g in guests_list}
+        
+        # Build records for sync agent
+        hodler_records = []
+        for booking in bookings:
+            guest = guests_dict.get(booking['employee_number'])
+            if guest:
+                decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+                hodler_records.append({
+                    "employee_name": decrypted_name,
+                    "employee_number": booking['employee_number'],
+                    "room_number": booking['room_number']
+                })
+        
+        logging.info(f"Auto-sync: Processing {len(hodler_records)} Hodler Inn records for {yesterday}")
+        
+        # Run the sync
+        from sync_agent import APIGlobalSyncAgent
+        username = settings.get("api_global_username")
+        password = decrypt_data(settings.get("api_global_password_encrypted"))
+        
+        agent = APIGlobalSyncAgent(username, password)
+        results = await agent.run_sync(hodler_records)
+        
+        # Store sync history
+        await db.sync_history.insert_one({
+            "id": str(uuid.uuid4()),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "target_date": yesterday,
+            "results": results,
+            "auto_triggered": True
+        })
+        
+        # Update sync status
+        global sync_status
+        sync_status["last_run"] = datetime.now(timezone.utc).isoformat()
+        sync_status["last_results"] = results
+        sync_status["progress"] = "Auto-sync completed"
+        
+        logging.info(f"Auto-sync completed: Verified={len(results.get('verified', []))}, No Bill={len(results.get('no_bill', []))}")
+        
+        # Send Telegram notification about sync results
+        await send_telegram_notification(
+            f"🤖 <b>AUTO-SYNC COMPLETED</b>\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"📅 Date Synced: {yesterday}\n"
+            f"✅ Verified: {len(results.get('verified', []))}\n"
+            f"❌ No Bill: {len(results.get('no_bill', []))}\n"
+            f"⚠️ Missing: {len(results.get('missing_in_hodler', []))}\n"
+            f"🔴 Errors: {len(results.get('errors', []))}\n"
+            f"━━━━━━━━━━━━━━━"
+        )
+        
+    except Exception as e:
+        logging.error(f"Auto-sync failed: {e}")
+        await send_telegram_notification(
+            f"🚨 <b>AUTO-SYNC FAILED</b>\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"❌ Error: {str(e)[:200]}\n"
+            f"━━━━━━━━━━━━━━━"
+        )
+
+def update_auto_sync_schedule(enabled: bool):
+    """Add or remove the auto-sync scheduled job"""
+    try:
+        # Remove existing job if present
+        if scheduler.get_job(AUTO_SYNC_JOB_ID):
+            scheduler.remove_job(AUTO_SYNC_JOB_ID)
+            logging.info("Removed existing auto-sync job")
+        
+        if enabled:
+            # Schedule for 3 PM (15:00) every day
+            scheduler.add_job(
+                lambda: asyncio.create_task(auto_sync_task()),
+                CronTrigger(hour=15, minute=0),
+                id=AUTO_SYNC_JOB_ID,
+                replace_existing=True
+            )
+            logging.info("Auto-sync scheduled for 3 PM daily")
+        else:
+            logging.info("Auto-sync disabled")
+    except Exception as e:
+        logging.error(f"Error updating auto-sync schedule: {e}")
+
 @app.on_event("startup")
 async def start_scheduler():
     # Run on 1st of every month at 00:00 (midnight)
     scheduler.add_job(monthly_data_reset, CronTrigger(day=1, hour=0, minute=0))
     scheduler.start()
     logging.info("Monthly reset scheduler started - will reset data on 1st of each month")
+    
+    # Check if auto-sync was enabled and restore the schedule
+    try:
+        settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+        if settings and settings.get("auto_sync_enabled"):
+            update_auto_sync_schedule(True)
+            logging.info("Auto-sync restored from settings (enabled)")
+    except Exception as e:
+        logging.error(f"Failed to restore auto-sync settings: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_scheduler():
