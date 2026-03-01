@@ -412,6 +412,12 @@ function CheckInForm({ setView }) {
       toast.error("Please enter room number");
       return;
     }
+    // Validate room number exists in available rooms
+    const validRoom = availableRooms.find(r => r.room_number === roomNumber.trim());
+    if (!validRoom) {
+      toast.error(`Room ${roomNumber} does not exist. Available rooms: ${availableRooms.map(r => r.room_number).join(", ")}`);
+      return;
+    }
     if (!date) {
       toast.error("Please select check-in date");
       return;
