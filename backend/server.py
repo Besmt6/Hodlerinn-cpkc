@@ -207,6 +207,22 @@ class RoomUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
 
+# Settings Models for API Global Integration
+class PortalSettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = "portal_settings"
+    api_global_username: Optional[str] = None
+    api_global_password: Optional[str] = None  # Will be encrypted
+    alert_email: Optional[str] = None
+    auto_sync_enabled: bool = False
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PortalSettingsUpdate(BaseModel):
+    api_global_username: Optional[str] = None
+    api_global_password: Optional[str] = None
+    alert_email: Optional[str] = None
+    auto_sync_enabled: Optional[bool] = None
+
 # ==================== Helper Functions ====================
 
 def calculate_stay_duration(check_in_date: str, check_in_time: str, check_out_date: str, check_out_time: str):
