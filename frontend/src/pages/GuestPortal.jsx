@@ -774,27 +774,21 @@ function CheckOutForm({ setView, setSuccessMessage }) {
       toast.error("Please enter room number");
       return;
     }
-    if (!employeeNumber) {
-      toast.error("Please enter employee number");
-      return;
-    }
-    
-    // Validate room number exists
-    const validRoom = availableRooms.find(r => r.room_number === roomNumber.trim());
-    if (!validRoom) {
-      toast.error(`Room ${roomNumber} is not valid. Please check the room number on your key.`);
-      return;
-    }
 
     setVerifying(true);
     try {
-      // Verify the booking exists and matches
-      const response = await axios.get(`${API}/verify-checkout/${roomNumber.trim()}/${employeeNumber.trim()}`);
+      // Lookup booking by room number - auto-fills employee info
+      const response = await axios.get(`${API}/lookup-room/${roomNumber.trim()}`);
+      setEmployeeNumber(response.data.employee_number);
       setVerifiedBooking(response.data);
-      toast.success(`Verified: ${response.data.employee_name} in Room ${roomNumber}`);
+      toast.success(`Found: ${response.data.employee_name} in Room ${roomNumber}`);
+      
+      // Voice confirmation
+      speakMessage(`Found booking for ${response.data.employee_name}. Please verify and complete check out.`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Verification failed. Please check room number and employee ID.");
+      toast.error(error.response?.data?.detail || "No active booking found for this room.");
       setVerifiedBooking(null);
+      setEmployeeNumber("");
     } finally {
       setVerifying(false);
     }
