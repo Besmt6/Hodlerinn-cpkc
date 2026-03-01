@@ -1197,6 +1197,25 @@ function HelpView({ setView }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Video Tutorial */}
+          <div className="bg-vault-surface-highlight/50 border-2 border-vault-gold rounded-lg p-4">
+            <h3 className="font-outfit text-lg font-bold text-vault-gold mb-3 flex items-center gap-2">
+              🎥 Video Tutorial
+            </h3>
+            <video 
+              controls 
+              className="w-full rounded-lg"
+              poster=""
+              data-testid="help-video"
+            >
+              <source src="https://customer-assets.emergentagent.com/job_8e63b3ed-49af-4684-8c2d-bb694ad7e6af/artifacts/t2459xk0_Screen_Recording_20260301_063143_Chrome.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+            <p className="text-vault-text-secondary text-xs mt-2 text-center">
+              Watch how to Register, Check-In, and Check-Out
+            </p>
+          </div>
+
           {/* Step 1: Register */}
           <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-4">
             <div className="flex items-start gap-4">
