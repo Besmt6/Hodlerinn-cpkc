@@ -393,7 +393,7 @@ function RegisterForm({ setView }) {
   );
 }
 
-function CheckInForm({ setView }) {
+function CheckInForm({ setView, setSuccessMessage }) {
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
   const [date, setDate] = useState(new Date());
