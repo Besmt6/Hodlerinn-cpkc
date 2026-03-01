@@ -624,11 +624,14 @@ function CheckInForm({ setView }) {
 
 function CheckOutForm({ setView }) {
   const [roomNumber, setRoomNumber] = useState("");
+  const [employeeNumber, setEmployeeNumber] = useState("");
   const [date, setDate] = useState(new Date());
   const [time, setTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
+  const [verifiedBooking, setVerifiedBooking] = useState(null);
+  const [verifying, setVerifying] = useState(false);
 
   // Fetch available rooms on component mount
   useEffect(() => {
@@ -646,15 +649,46 @@ function CheckOutForm({ setView }) {
     fetchRooms();
   }, []);
 
-  const handleCheckOut = async () => {
+  const handleVerifyCheckout = async () => {
     if (!roomNumber) {
       toast.error("Please enter room number");
       return;
     }
-    // Validate room number exists in available rooms
+    if (!employeeNumber) {
+      toast.error("Please enter employee number");
+      return;
+    }
+    
+    // Validate room number exists
     const validRoom = availableRooms.find(r => r.room_number === roomNumber.trim());
     if (!validRoom) {
       toast.error(`Room ${roomNumber} does not exist. Available rooms: ${availableRooms.map(r => r.room_number).join(", ")}`);
+      return;
+    }
+
+    setVerifying(true);
+    try {
+      // Verify the booking exists and matches
+      const response = await axios.get(`${API}/verify-checkout/${roomNumber.trim()}/${employeeNumber.trim()}`);
+      setVerifiedBooking(response.data);
+      toast.success(`Verified: ${response.data.employee_name} in Room ${roomNumber}`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Verification failed. Please check room number and employee ID.");
+      setVerifiedBooking(null);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleClearVerification = () => {
+    setVerifiedBooking(null);
+    setRoomNumber("");
+    setEmployeeNumber("");
+  };
+
+  const handleCheckOut = async () => {
+    if (!verifiedBooking) {
+      toast.error("Please verify your room and employee number first");
       return;
     }
     if (!date) {
@@ -669,7 +703,8 @@ function CheckOutForm({ setView }) {
     setLoading(true);
     try {
       await axios.post(`${API}/checkout`, {
-        room_number: roomNumber,
+        room_number: roomNumber.trim(),
+        employee_number: employeeNumber.trim(),
         check_out_date: format(date, "yyyy-MM-dd"),
         check_out_time: time
       });
