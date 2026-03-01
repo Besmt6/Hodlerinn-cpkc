@@ -59,7 +59,9 @@ import {
   Key,
   Mail,
   Globe,
-  Save
+  Save,
+  Volume2,
+  VolumeX
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
