@@ -198,6 +198,7 @@ Build a two-part application for a hotel named "Hodler Inn":
 - Check-In: "Welcome to Hodler Inn. Have a good rest."
 - Check-Out: "Thank you for staying. Have a safe journey. Please drop your room key in the key drop box in the lounge."
 - Time-based greetings (morning/afternoon/evening/night)
+- Uses pre-generated MP3 audio files for reliable playback on kiosk browsers
 
 ### Voice Control (Admin Settings)
 - Enable/disable voice toggle
@@ -214,10 +215,20 @@ Build a two-part application for a hotel named "Hodler Inn":
 - Key drop reminder on checkout
 - Auto-return to menu
 
+### Auto-Navigation Feature (March 1, 2026) ✅ NEW
+- **Clean UI:** All instructional text removed from guest portal (relies on voice prompts)
+- **Auto-focus flow for Check-In:**
+  1. After employee verification → Focus automatically moves to Room Number input
+  2. After entering room number (3+ digits) → Focus moves to Time input
+  3. After selecting time → Page scrolls to Signature canvas + voice reminder plays
+- Uses `useRef` hooks for smooth focus transitions
+- Enhances kiosk experience with minimal user effort
+
 ## Next Tasks
-1. **Elox Smart Lock Integration** - Pending call on Monday to check if web portal exists
-2. UnlockOS Smart Lock Integration (saved for later)
-3. Email notifications on check-in/out
-4. Room availability calendar view
-5. Blockchain integration (saved for later)
-6. AI Phone Bot (saved for later)
+1. **AI Verification Agent Selector Fix** - Update CSS selector in `sync_agent.py` to find "No Bill" checkbox
+2. **Elox Smart Lock Integration** - Pending call on Monday to check if web portal exists
+3. UnlockOS Smart Lock Integration (saved for later)
+4. Email notifications on check-in/out
+5. Room availability calendar view
+6. Blockchain integration (saved for later)
+7. AI Phone Bot (saved for later)
