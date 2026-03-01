@@ -291,6 +291,7 @@ class CheckInCreate(BaseModel):
 
 class CheckOutCreate(BaseModel):
     room_number: str
+    employee_number: Optional[str] = None  # For verification
     check_out_date: str
     check_out_time: str
 
