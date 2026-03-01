@@ -1191,6 +1191,82 @@ async def get_voice_settings():
         "voice_volume": settings.get("voice_volume", 1.0) if settings else 1.0
     }
 
+# Pre-defined voice messages
+VOICE_MESSAGES = {
+    "checkin_morning": "Good morning! Welcome to Hodler Inn. Have a good rest.",
+    "checkin_afternoon": "Good afternoon! Welcome to Hodler Inn. Have a good rest.",
+    "checkin_evening": "Good evening! Welcome to Hodler Inn. Have a good rest.",
+    "checkin_night": "Good night! Welcome to Hodler Inn. Have a good rest.",
+    "checkout_morning": "Good morning! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.",
+    "checkout_afternoon": "Good afternoon! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.",
+    "checkout_evening": "Good evening! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.",
+    "checkout_night": "Good night! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.",
+    "signature_reminder": "Please sign your full name legibly. A simple line or X will not be accepted.",
+    "room_reminder": "Please select the room number from key on desk. Print your name and room number on yellow card.",
+    "checkout_found": "Booking found. Please verify and complete check out."
+}
+
+@api_router.get("/voice/{message_id}")
+async def get_voice_message(message_id: str):
+    """Get pre-generated voice message audio file"""
+    audio_file = AUDIO_DIR / f"{message_id}.mp3"
+    
+    if audio_file.exists():
+        return FileResponse(audio_file, media_type="audio/mpeg")
+    
+    # Generate the audio if it doesn't exist
+    if message_id not in VOICE_MESSAGES:
+        raise HTTPException(status_code=404, detail="Voice message not found")
+    
+    try:
+        from emergentintegrations.llm.openai import OpenAITextToSpeech
+        
+        tts = OpenAITextToSpeech(api_key=os.getenv("EMERGENT_LLM_KEY"))
+        audio_bytes = await tts.generate_speech(
+            text=VOICE_MESSAGES[message_id],
+            model="tts-1",
+            voice="nova",  # Friendly, upbeat voice
+            speed=0.95
+        )
+        
+        # Save to file for caching
+        with open(audio_file, "wb") as f:
+            f.write(audio_bytes)
+        
+        return FileResponse(audio_file, media_type="audio/mpeg")
+        
+    except Exception as e:
+        logging.error(f"Failed to generate voice: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate voice message")
+
+@api_router.post("/generate-all-voices")
+async def generate_all_voice_messages():
+    """Pre-generate all voice messages (admin only)"""
+    try:
+        from emergentintegrations.llm.openai import OpenAITextToSpeech
+        
+        tts = OpenAITextToSpeech(api_key=os.getenv("EMERGENT_LLM_KEY"))
+        generated = []
+        
+        for message_id, text in VOICE_MESSAGES.items():
+            audio_file = AUDIO_DIR / f"{message_id}.mp3"
+            if not audio_file.exists():
+                audio_bytes = await tts.generate_speech(
+                    text=text,
+                    model="tts-1",
+                    voice="nova",
+                    speed=0.95
+                )
+                with open(audio_file, "wb") as f:
+                    f.write(audio_bytes)
+                generated.append(message_id)
+        
+        return {"message": "Voice messages generated", "generated": generated}
+        
+    except Exception as e:
+        logging.error(f"Failed to generate voices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.get("/admin/rooms")
 async def get_all_rooms():
     rooms = await db.rooms.find({}, {"_id": 0}).to_list(1000)
