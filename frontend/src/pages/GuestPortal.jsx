@@ -58,22 +58,80 @@ const fetchVoiceSettings = async () => {
 // Initialize voice settings on load
 fetchVoiceSettings();
 
-// Voice message helper using Web Speech API
-const speakMessage = (message, rate = 0.9) => {
-  // Check if voice is enabled
+// Get time period for voice message selection
+const getTimePeriod = () => {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return "morning";
+  if (hour >= 12 && hour < 17) return "afternoon";
+  if (hour >= 17 && hour < 21) return "evening";
+  return "night";
+};
+
+// Audio player for voice messages (works on Fully Kiosk)
+const playVoiceMessage = (messageId) => {
   if (!voiceSettings.enabled) {
     console.log("Voice is disabled");
     return;
   }
   
+  const audio = new Audio(`${API}/voice/${messageId}`);
+  audio.volume = voiceSettings.volume;
+  audio.play().catch(err => {
+    console.log("Audio play failed:", err);
+    // Fallback to Web Speech API if audio fails
+    if ('speechSynthesis' in window) {
+      const messages = {
+        "checkin_morning": "Good morning! Welcome to Hodler Inn. Have a good rest.",
+        "checkin_afternoon": "Good afternoon! Welcome to Hodler Inn. Have a good rest.",
+        "checkin_evening": "Good evening! Welcome to Hodler Inn. Have a good rest.",
+        "checkin_night": "Good night! Welcome to Hodler Inn. Have a good rest.",
+        "checkout_morning": "Good morning! Thank you for staying at Hodler Inn. Have a safe journey.",
+        "checkout_afternoon": "Good afternoon! Thank you for staying at Hodler Inn. Have a safe journey.",
+        "checkout_evening": "Good evening! Thank you for staying at Hodler Inn. Have a safe journey.",
+        "checkout_night": "Good night! Thank you for staying at Hodler Inn. Have a safe journey.",
+        "signature_reminder": "Please sign your full name legibly.",
+        "room_reminder": "Please select the room number from key on desk.",
+        "checkout_found": "Booking found. Please verify and complete check out."
+      };
+      const text = messages[messageId];
+      if (text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.volume = voiceSettings.volume;
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  });
+};
+
+// Legacy speakMessage function (now uses audio files)
+const speakMessage = (message, rate = 0.9) => {
+  // Map common messages to pre-generated audio
+  const messageMap = {
+    "Please sign your full name legibly": "signature_reminder",
+    "Please select the room number from key on desk": "room_reminder",
+    "Booking found": "checkout_found"
+  };
+  
+  // Check if we have a pre-generated audio for this message
+  for (const [key, id] of Object.entries(messageMap)) {
+    if (message.includes(key)) {
+      playVoiceMessage(id);
+      return;
+    }
+  }
+  
+  // Fallback to Web Speech API for custom messages
+  if (!voiceSettings.enabled) return;
+  
   if ('speechSynthesis' in window) {
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
-    
     const utterance = new SpeechSynthesisUtterance(message);
     utterance.rate = rate;
-    utterance.pitch = 1;
     utterance.volume = voiceSettings.volume;
+    window.speechSynthesis.speak(utterance);
+  }
+};
     
     // Try to use a natural sounding voice
     const voices = window.speechSynthesis.getVoices();
