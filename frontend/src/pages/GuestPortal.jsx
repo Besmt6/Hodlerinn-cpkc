@@ -628,9 +628,11 @@ function CheckInForm({ setView, setSuccessMessage }) {
                     data-testid="checkin-room-input"
                   />
                 </div>
-                <p className="text-vault-text-secondary text-xs mt-1">
-                  Available rooms: {availableRooms.map(r => r.room_number).join(", ") || "Loading..."}
-                </p>
+                <div className="bg-blue-900/30 border border-blue-500/50 rounded-lg p-3 mt-2">
+                  <p className="text-blue-400 text-sm">
+                    📋 Please select the room number from key on desk. Print your name and room number on yellow card.
+                  </p>
+                </div>
               </div>
               <div>
                 <label className="vault-label">Check-In Date</label>
