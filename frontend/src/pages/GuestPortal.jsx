@@ -469,7 +469,12 @@ function CheckInForm({ setView, setSuccessMessage }) {
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
   const [date, setDate] = useState(new Date());
-  const [time, setTime] = useState("");
+  // Auto-capture current time in 24-hour format
+  const getCurrentTime = () => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  };
+  const [time, setTime] = useState(getCurrentTime());
   const [loading, setLoading] = useState(false);
   const [verifiedEmployee, setVerifiedEmployee] = useState(null);
   const [verifying, setVerifying] = useState(false);
@@ -481,6 +486,14 @@ function CheckInForm({ setView, setSuccessMessage }) {
   const roomInputRef = useRef(null);
   const timeInputRef = useRef(null);
   const signatureContainerRef = useRef(null);
+  
+  // Auto-update time every minute to keep it current
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTime(getCurrentTime());
+    }, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch available rooms on component mount
   useEffect(() => {
