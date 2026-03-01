@@ -124,7 +124,7 @@ export default function GuestPortal() {
   }, [view]);
 
   return (
-    <div className="min-h-screen relative bg-gray-100">
+    <div className="kiosk-container grid-bg min-h-screen relative">
       {/* Logo Header */}
       <div className="absolute top-6 left-6 flex items-center gap-3">
         <img 
