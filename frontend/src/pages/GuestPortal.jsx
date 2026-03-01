@@ -812,25 +812,12 @@ function CheckOutForm({ setView, setSuccessMessage }) {
   const [roomNumber, setRoomNumber] = useState("");
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [date, setDate] = useState(new Date());
-  // Auto-capture current time in 24-hour format
-  const getCurrentTime = () => {
-    const now = new Date();
-    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  };
-  const [time, setTime] = useState(getCurrentTime());
+  const [time, setTime] = useState(""); // Manual entry for checkout time
   const [loading, setLoading] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [verifiedBooking, setVerifiedBooking] = useState(null);
   const [verifying, setVerifying] = useState(false);
-
-  // Auto-update time every minute to keep it current
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTime(getCurrentTime());
-    }, 60000); // Update every minute
-    return () => clearInterval(interval);
-  }, []);
 
   // Fetch available rooms on component mount
   useEffect(() => {
