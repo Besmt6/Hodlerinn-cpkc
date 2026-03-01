@@ -200,6 +200,49 @@ export default function AdminDashboard() {
     toast.success("Filter cleared");
   };
 
+  const handleTestConnection = async () => {
+    setRunningSyncTest(true);
+    try {
+      const response = await axios.post(`${API}/admin/settings/test-connection`);
+      if (response.data.success) {
+        toast.success(response.data.message);
+      } else {
+        toast.error(response.data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Connection test failed");
+    } finally {
+      setRunningSyncTest(false);
+    }
+  };
+
+  const handleRunSync = async () => {
+    try {
+      const response = await axios.post(`${API}/admin/sync/run`);
+      toast.success(`Sync started! Processing ${response.data.hodler_records_count} records...`);
+      setSyncStatus({ ...syncStatus, running: true, progress: "Starting..." });
+      
+      // Poll for status
+      const pollStatus = setInterval(async () => {
+        try {
+          const statusRes = await axios.get(`${API}/admin/sync/status`);
+          setSyncStatus(statusRes.data);
+          if (!statusRes.data.running) {
+            clearInterval(pollStatus);
+            if (statusRes.data.last_results) {
+              const results = statusRes.data.last_results;
+              toast.success(`Sync completed! Verified: ${results.verified?.length || 0}, No Bill: ${results.no_bill?.length || 0}`);
+            }
+          }
+        } catch (e) {
+          clearInterval(pollStatus);
+        }
+      }, 2000);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to start sync");
+    }
+  };
+
   const handleExportSignIn = async () => {
     try {
       const response = await axios.get(`${API}/admin/export`, {
