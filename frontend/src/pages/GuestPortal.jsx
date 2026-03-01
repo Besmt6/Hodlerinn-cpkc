@@ -716,15 +716,36 @@ function CheckOutForm({ setView }) {
           <div>
             <label className="vault-label">Room Number</label>
             <div className="relative">
-              <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
-              <Input
+              <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary z-10" />
+              <select
                 value={roomNumber}
                 onChange={(e) => setRoomNumber(e.target.value)}
-                placeholder="Enter room number"
-                className="vault-input pl-10"
-                data-testid="checkout-room-input"
-              />
+                className="vault-input pl-10 w-full appearance-none cursor-pointer bg-vault-surface border border-vault-border rounded-lg h-10 text-vault-text"
+                data-testid="checkout-room-select"
+                disabled={loadingRooms}
+              >
+                <option value="" className="bg-vault-surface text-vault-text-secondary">
+                  {loadingRooms ? "Loading rooms..." : "Select your room"}
+                </option>
+                {availableRooms.map((room) => (
+                  <option 
+                    key={room.id || room.room_number} 
+                    value={room.room_number}
+                    className="bg-vault-surface text-vault-text"
+                  >
+                    Room {room.room_number} {room.room_type ? `(${room.room_type})` : ""} {room.floor ? `- Floor ${room.floor}` : ""}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-4 h-4 text-vault-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
+            {availableRooms.length === 0 && !loadingRooms && (
+              <p className="text-amber-400 text-xs mt-1">No rooms available. Please contact front desk.</p>
+            )}
           </div>
           <div>
             <label className="vault-label">Check-Out Date</label>
