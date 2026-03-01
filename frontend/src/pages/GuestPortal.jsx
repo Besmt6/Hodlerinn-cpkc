@@ -633,6 +633,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                   <Input
                     value={roomNumber}
                     onChange={(e) => setRoomNumber(e.target.value)}
+                    onFocus={speakRoomReminder}
                     placeholder="Enter room number (e.g., 101)"
                     className="vault-input pl-10"
                     data-testid="checkin-room-input"
