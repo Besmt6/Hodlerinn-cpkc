@@ -81,10 +81,12 @@ const playVoiceMessage = (messageId) => {
     // Fallback to Web Speech API if audio fails
     if ('speechSynthesis' in window) {
       const messages = {
-        "checkin_morning": "Good morning! Welcome to Hodler Inn. Have a good rest.",
-        "checkin_afternoon": "Good afternoon! Welcome to Hodler Inn. Have a good rest.",
-        "checkin_evening": "Good evening! Welcome to Hodler Inn. Have a good rest.",
-        "checkin_night": "Good night! Welcome to Hodler Inn. Have a good rest.",
+        "register_welcome": "Welcome to Hodler Inn. If you are first time here, please register your employee number and name, then go to check in.",
+        "checkin_welcome_morning": "Good morning. Welcome back to Hodler Inn.",
+        "checkin_welcome_afternoon": "Good afternoon. Welcome back to Hodler Inn.",
+        "checkin_welcome_evening": "Good evening. Welcome back to Hodler Inn.",
+        "checkin_welcome_night": "Good night. Welcome back to Hodler Inn.",
+        "checkin_complete": "Have a good rest.",
         "checkout_morning": "Good morning! Thank you for staying at Hodler Inn. Have a safe journey.",
         "checkout_afternoon": "Good afternoon! Thank you for staying at Hodler Inn. Have a safe journey.",
         "checkout_evening": "Good evening! Thank you for staying at Hodler Inn. Have a safe journey.",
