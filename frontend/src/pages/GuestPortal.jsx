@@ -742,73 +742,117 @@ function CheckOutForm({ setView }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div>
-            <label className="vault-label">Room Number</label>
-            <div className="relative">
-              <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
-              <Input
-                value={roomNumber}
-                onChange={(e) => setRoomNumber(e.target.value)}
-                placeholder="Enter room number (e.g., 101)"
-                className="vault-input pl-10"
-                data-testid="checkout-room-input"
-              />
-            </div>
-            <p className="text-vault-text-secondary text-xs mt-1">
-              Available rooms: {availableRooms.map(r => r.room_number).join(", ") || "Loading..."}
-            </p>
-          </div>
-          <div>
-            <label className="vault-label">Check-Out Date</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full vault-input justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                  data-testid="checkout-date-btn"
+          {!verifiedBooking ? (
+            <>
+              <div>
+                <label className="vault-label">Room Number</label>
+                <div className="relative">
+                  <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                  <Input
+                    value={roomNumber}
+                    onChange={(e) => setRoomNumber(e.target.value)}
+                    placeholder="Enter room number (e.g., 101)"
+                    className="vault-input pl-10"
+                    data-testid="checkout-room-input"
+                  />
+                </div>
+                <p className="text-vault-text-secondary text-xs mt-1">
+                  Available rooms: {availableRooms.map(r => r.room_number).join(", ") || "Loading..."}
+                </p>
+              </div>
+              <div>
+                <label className="vault-label">Employee Number</label>
+                <div className="relative">
+                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                  <Input
+                    value={employeeNumber}
+                    onChange={(e) => setEmployeeNumber(e.target.value)}
+                    placeholder="Enter your employee number"
+                    className="vault-input pl-10"
+                    data-testid="checkout-employee-input"
+                  />
+                </div>
+                <p className="text-vault-text-secondary text-xs mt-1">
+                  Enter the same employee number you used at check-in
+                </p>
+              </div>
+              <Button
+                onClick={handleVerifyCheckout}
+                disabled={verifying}
+                className="w-full vault-btn-primary h-12"
+                data-testid="verify-checkout-btn"
+              >
+                {verifying ? "Verifying..." : "Verify & Continue"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="bg-emerald-900/30 border border-emerald-600/50 rounded-lg p-4">
+                <p className="text-emerald-400 text-xs uppercase tracking-wide mb-1">Verified Guest</p>
+                <p className="text-vault-text font-bold text-lg">{verifiedBooking.employee_name}</p>
+                <p className="text-vault-text-secondary text-sm">ID: {verifiedBooking.employee_number}</p>
+                <p className="text-vault-text-secondary text-sm">Room: {verifiedBooking.room_number}</p>
+                <p className="text-vault-text-secondary text-sm">Checked in: {verifiedBooking.check_in_date} at {verifiedBooking.check_in_time}</p>
+                <button
+                  onClick={handleClearVerification}
+                  className="text-vault-text-secondary hover:text-vault-gold text-xs underline mt-2"
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4 text-vault-text-secondary" />
-                  {date ? format(date, "dd MMM yyyy") : "Select date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  initialFocus
-                  className="bg-vault-surface text-vault-text"
-                  data-testid="checkout-calendar"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div>
-            <label className="vault-label">Check-Out Time (24hr)</label>
-            <div className="relative">
-              <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
-              <Input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="vault-input pl-10"
-                placeholder="HH:MM"
-                data-testid="checkout-time-input"
-              />
-            </div>
-            <p className="text-vault-text-secondary text-xs mt-1">Use 24-hour format (e.g., 14:00 for 2:00 PM)</p>
-          </div>
-          <Button
-            onClick={handleCheckOut}
-            disabled={loading}
-            className="w-full vault-btn-primary h-12"
-            data-testid="submit-checkout-btn"
-          >
-            {loading ? "Processing..." : "Complete Check-Out"}
-          </Button>
+                  Not you? Change
+                </button>
+              </div>
+              <div>
+                <label className="vault-label">Check-Out Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full vault-input justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
+                      )}
+                      data-testid="checkout-date-btn"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-vault-text-secondary" />
+                      {date ? format(date, "dd MMM yyyy") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={setDate}
+                      initialFocus
+                      className="bg-vault-surface text-vault-text"
+                      data-testid="checkout-calendar"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <label className="vault-label">Check-Out Time (24hr)</label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                  <Input
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="vault-input pl-10"
+                    placeholder="HH:MM"
+                    data-testid="checkout-time-input"
+                  />
+                </div>
+                <p className="text-vault-text-secondary text-xs mt-1">Use 24-hour format (e.g., 14:00 for 2:00 PM)</p>
+              </div>
+              <Button
+                onClick={handleCheckOut}
+                disabled={loading}
+                className="w-full vault-btn-primary h-12"
+                data-testid="submit-checkout-btn"
+              >
+                {loading ? "Processing..." : "Complete Check-Out"}
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
     </motion.div>
