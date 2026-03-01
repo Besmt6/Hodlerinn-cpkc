@@ -116,6 +116,7 @@ export default function AdminDashboard() {
     }
     fetchData();
     fetchRooms();
+    fetchSettings();
   }, [navigate]);
 
   const fetchData = async (filterStart = null, filterEnd = null) => {
