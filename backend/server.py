@@ -429,21 +429,33 @@ async def root():
 # Guest Registration (no signature - signature is captured at check-in)
 @api_router.post("/guests/register", response_model=GuestRegistration)
 async def register_guest(input: GuestRegistrationCreate):
+    # Verify employee ID is in the admin's approved list
+    valid_employee = await db.employees.find_one({
+        "employee_number": input.employee_number,
+        "is_active": True
+    }, {"_id": 0})
+    
+    if not valid_employee:
+        raise HTTPException(
+            status_code=400, 
+            detail="Employee ID not found in approved list. Please contact admin."
+        )
+    
     # Check if employee already registered as guest
     existing = await db.guests.find_one({"employee_number": input.employee_number}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Employee already registered")
     
+    # Use name from the admin's approved list (not user input)
     guest = GuestRegistration(
         employee_number=input.employee_number,
-        name=input.name
+        name=valid_employee["name"]
     )
     doc = guest.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     
     # Encrypt sensitive data before storing
     doc['name_encrypted'] = encrypt_data(doc['name'])
-    # No signature at registration - captured at check-in
     
     await db.guests.insert_one(doc)
     return guest
