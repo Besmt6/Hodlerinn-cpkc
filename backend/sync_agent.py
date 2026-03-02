@@ -69,26 +69,24 @@ def match_names(api_name: str, hodler_name: str, threshold: float = 0.6) -> bool
         logger.info(f"CONTAINS MATCH: {norm_api} / {norm_hodler}")
         return True
     
-    # Check individual name parts
+    # Check individual name parts - BOTH first and last name must match
     api_parts = set(norm_api.split())
     hodler_parts = set(norm_hodler.split())
     if api_parts and hodler_parts:
         common_parts = api_parts & hodler_parts
-        # If both first and last name match (in any order)
+        # Require at least 2 common parts (first AND last name)
         if len(common_parts) >= 2:
             logger.info(f"PARTS MATCH (2+): {common_parts} for {norm_api} / {norm_hodler}")
             return True
-        # If at least one significant name part matches
-        if len(common_parts) >= 1:
-            # Use fuzzy match for additional confirmation
-            ratio = SequenceMatcher(None, norm_api, norm_hodler).ratio()
-            if ratio >= 0.5:
-                logger.info(f"FUZZY MATCH: ratio={ratio} for {norm_api} / {norm_hodler}")
-                return True
+        # Single match is NOT enough - too many false positives (e.g., same first name)
     
-    # Fuzzy match using sequence matcher
+    # Fuzzy match - use higher threshold and require more similarity
     ratio = SequenceMatcher(None, norm_api, norm_hodler).ratio()
-    return ratio >= threshold
+    if ratio >= 0.85:  # Much stricter threshold
+        logger.info(f"FUZZY MATCH: ratio={ratio} for {norm_api} / {norm_hodler}")
+        return True
+    
+    return False
 
 
 class APIGlobalSyncAgent:
