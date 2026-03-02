@@ -286,12 +286,41 @@ Build a two-part application for a hotel named "Hodler Inn":
 - Import time: ~2-3 minutes (depending on data volume)
 - Duplicate detection: Skips employees already in database
 
+## Public API Access (March 2, 2026)
+**Status:** ✅ IMPLEMENTED!
+
+### Features:
+- **API Key Authentication:** Secure access via configurable API key in Admin Settings
+- **Sign-in Sheets Endpoint:** `GET /api/public/signin-sheets?api_key=YOUR_KEY`
+- **Billing Report Endpoint:** `GET /api/public/billing-report?api_key=YOUR_KEY`
+- **Date Range Filtering:** Optional `start_date` and `end_date` query parameters
+- **Multiple Formats:** JSON (default) or CSV (`format=csv`)
+
+### API Usage Examples:
+```bash
+# JSON format
+curl "https://your-domain/api/public/signin-sheets?api_key=YOUR_KEY"
+curl "https://your-domain/api/public/billing-report?api_key=YOUR_KEY"
+
+# CSV format
+curl "https://your-domain/api/public/signin-sheets?api_key=YOUR_KEY&format=csv"
+
+# With date filtering
+curl "https://your-domain/api/public/billing-report?api_key=YOUR_KEY&start_date=2026-03-01&end_date=2026-03-31"
+```
+
+### Security:
+- API key stored in settings, manageable from Admin Dashboard
+- Invalid/missing API key returns 401/403 errors
+- All endpoints require valid API key
+
 ## Next Tasks
 1. ~~**AI Verification Agent Selector Fix**~~ ✅ Completed - Updated CSS selector logic
 2. ~~**Employee Collection AI Agent**~~ ✅ Completed - March 2, 2026
-3. **Elox Smart Lock Integration** - Pending call on Monday to check if web portal exists
-4. UnlockOS Smart Lock Integration (saved for later)
-5. Email notifications on check-in/out
-6. Room availability calendar view
-7. Blockchain integration (saved for later)
-8. AI Phone Bot (saved for later)
+3. ~~**Public API Access**~~ ✅ Completed - March 2, 2026
+4. **Elox Smart Lock Integration** - Pending call on Monday to check if web portal exists
+5. UnlockOS Smart Lock Integration (saved for later)
+6. Email notifications on check-in/out
+7. Room availability calendar view
+8. Blockchain integration (saved for later)
+9. AI Phone Bot (saved for later)

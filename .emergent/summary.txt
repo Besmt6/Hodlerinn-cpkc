@@ -19,34 +19,39 @@ Build a two-part application for a hotel named Hodler Inn.
 **User's preferred language**: English
 
 **what currently exists?**
-A full-stack application with a React frontend and FastAPI backend that is deployed and operational.
--   **Guest Portal:** A simplified kiosk interface. The main menu has Check In, Check Out, and Help. The Check In flow validates the entered Employee ID against an admin-managed list. If valid, the guest's name is displayed (read-only), and they can proceed. If invalid, they are blocked. The UI features auto-advancing focus, glowing input borders, and TAP HERE prompts to guide the user. Check-in time is captured automatically, while checkout time is entered manually.
--   **Admin Dashboard:** A password-protected  area featuring guest records, sign-in sheets, a billing report (using calendar-night logic), room management, and a comprehensive Employee List management panel.
--   **Employee Management:** Admins can add/edit/delete employees individually, bulk-import from a CSV, or import from the app's own historical guest records. A button for Import from Portal exists but is non-functional.
+A full-stack application with a React frontend and FastAPI backend.
+-   **Guest Portal:** A streamlined, single-page check-in kiosk. It verifies the Employee ID; if found, it auto-registers the guest (if new) and immediately displays the full check-in form (room, date, signature). If not found, it prompts the guest to enter their name and sends a request to the admin's Telegram for approval.
+-   **Admin Dashboard:** A password-protected  area featuring:
+    -   **Employee Management:** A searchable and sortable (A-Z, ID) list of all employees.
+    -   **Data Import:** Fully functional Import from Portal (AI agent scrapes up to 12 months of data) and Import from Guest Records tools.
+    -   **Reporting:** Sign-in sheets and billing reports are sorted by date. PDF exports now correctly embed guest signature images.
+    -   **Settings:** The admin can configure third-party portal credentials, the Telegram Group Chat ID for all alerts, and generate/manage a public API key.
 -   **AI Agents:**
-    -   A **Daily Sync Agent** (working) runs at 3 PM to verify stays on the live Online Sign-in Sheets and mark No Bill as needed.
-    -   An **Employee Collection Agent** (broken) is intended to scrape historical Sign-in Reports from the portal to build the master employee list.
--   **Notifications:** A Telegram bot sends alerts for check-ins and check-outs to a configured group chat.
+    -   The **Employee Collection Agent** is now fixed, enhanced, and scrapes up to 12 months of historical data reliably.
+    -   The **Daily Sync Agent** remains operational.
+-   **Notifications & Approvals:** A Telegram bot sends all alerts (check-in, check-out, access requests) to a single group chat. Admins receive Approve/Reject buttons for new employee requests, allowing them to add employees directly from Telegram.
+-   **Public API:** New endpoints for external access to reports (, ) have been created, secured by an API key.
 
 **Last working item**:
--   **Last item agent was working:** The user requested to fix the Import from Portal AI agent, which was failing to collect employee data from the railroad portal's historical Sign-in Report section. After the initial fix attempt timed out, the user decided to deploy the application with the other working features and postpone the AI agent fix to a future session.
--   **Status:** BLOCKED
--   **Agent Testing Done:** N
--   **Which testing method agent to use?** Backend testing agent. The test should run the  endpoint and validate that it returns a list of employees or a success message, while monitoring backend logs for Playwright errors.
--   **User Testing Done:** Y (User confirmed the feature was timing out/failing).
+-   **Last item agent was working:** Creating public API endpoints for external access to the sign-in sheet and billing report, secured by a new API key. The agent identified that the endpoints were failing due to a missing  statement in .
+-   **Status:** IN PROGRESS
+-   **Agent Testing Done:** N (Test failed with a 404 error, leading to the discovery of the missing import).
+-   **Which testing method agent to use?** Manual testing by curl.
+-   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
--   **Issue 1: Fix the Import from Portal AI Agent (Priority: P0)**
+-   **Issue 1: Fix Public API Endpoints (Priority: P0)**
 
     -   **Issues Detail:**
-        -   **Issue 1:** When the admin clicks the Import from Portal button in the Employee List panel, the process starts but eventually times out or fails without importing any employees. The agent needs to scrape historical data from the Sign-in Report section of the third-party portal, not the Online Sign-in Sheets.
-            -   **Attempted fixes:** The agent wrote the initial Playwright script to navigate to the Sign-in Report section, select the last month, click Create, and then loop through View Details links for each day to scrape the  and . This logic failed in practice.
+        -   **Issue 1:** The new public API endpoints (, ) are returning a 404 error because the FastAPI application fails to start properly due to a missing  statement in .
+            -   **Attempted fixes:** The agent created the endpoints, API key logic, and UI fields. Testing with  failed, which led to the diagnosis.
             -   **Next debug checklist:**
-                1.  Examine the logs in  to find the specific Playwright error (e.g., timeout, selector not found).
-                2.  In , within the  function, add extensive logging at each step (e.g., Navigating to Sign-in Report, Clicked Create button, Found X detail links).
-                3.  Increase the default timeout for Playwright actions (e.g., ) to handle slow page loads on the third-party portal.
-                4.  Verify the CSS selectors used to find the Billing Period dropdown, Create button, View Details links, and the final data table (, ). The portal may be using dynamic IDs that change.
-            -   **Why fix this issue and what will be achieved with the fix?** This will allow the admin to automatically build a comprehensive list of all potential guests, including those who have not stayed at the hotel yet, ensuring the check-in validation is robust.
+                1.  Add  to the top of .
+                2.  Wait for the backend to hot-reload.
+                3.  In the Admin Dashboard, go to Settings and generate/copy the API Key.
+                4.  Use  to test the endpoint, replacing  and : 
+                5.  Verify the command returns CSV data.
+            -   **Why fix this issue and what will be achieved with the fix?** This will enable external systems to securely access sign-in and billing data, fulfilling the user's request.
             -   **Status:** IN PROGRESS
             -   **Is recurring issue?** N
             -   **Should Test frontend/backend/both after fix?** Backend
@@ -57,35 +62,26 @@ A full-stack application with a React frontend and FastAPI backend that is deplo
 
 **Upcoming and Future Tasks**
 -   **Future Tasks:**
-    -   **(P1) Smart Lock Integration:** User is interested in integrating a smart lock system (like Elox). This is blocked pending user research on their vendor's API/portal capabilities.
-    -   **(P2) White-Label SaaS Version:** User expressed interest in packaging the application as a multi-tenant SaaS product to sell to other hotels. This would require significant architectural changes.
-    -   **(P2) Blockchain Integration:** The user showed interest in using blockchain to create an immutable, trustworthy ledger of check-in/out records for billing disputes.
+    -   **(P1) Smart Lock Integration:** Blocked pending user research on their vendor's API/portal capabilities.
+    -   **(P2) White-Label SaaS Version:** User expressed interest in packaging the application as a multi-tenant SaaS product.
+    -   **(P2) Blockchain Integration:** The user showed interest in using blockchain to create an immutable ledger of check-in/out records.
 
 **Completed work in this session**
--   **Registration & Security Overhaul:**
-    -   Implemented a mandatory employee validation system. Guests can only register if their ID is in the admin's pre-approved list.
-    -   Created a full Employee List management panel in the admin dashboard.
-    -   Added functionality for admins to add employees individually, via bulk CSV import, and by importing from the app's existing guest records.
-    -   Removed the separate Register button and integrated registration into the Check-In flow.
--   **Deployment and Production Fixes:**
-    -   Resolved a critical production outage (Error 520) by adding a  endpoint and guiding the user to redeploy.
-    -   Fixed a production login failure by diagnosing and correcting a misconfigured  environment variable.
-    -   Guided the user through linking their custom domain to the new deployment.
--   **Billing and UI Enhancements:**
-    -   Changed billing logic from hour-based to **calendar-night-based** to prevent lost revenue on early checkouts.
-    -   Added Edit functionality to the Admin Billing Report.
-    -   Improved UI/UX by adding glowing borders and TAP HERE text to guide guests on the kiosk.
-    -   Auto-captured check-in time to reduce user error.
--   **Telegram Notifications:**
-    -   Upgraded the notification system to support sending messages to a group chat, allowing the user's wife to receive alerts.
-    -   Created a new, more reliable Telegram bot and guided the user through setup.
-    -   Debugged and fixed notification delivery issues related to production environment variables.
--   **Kiosk Troubleshooting:**
-    -   Provided detailed settings for Fully Kiosk Browser to resolve signature pad issues.
-    -   Offered and explained alternatives like Chrome + Android Screen Pinning.
+-   **AI Employee Import Agent (Fixed & Enhanced):** Fixed the broken Import from Portal agent by correcting Playwright dependencies for production and making the scraping logic more robust to handle navigation issues and scrape up to 12 months of data.
+-   **Import from Guest Records (Fixed):** Corrected the database query to properly join collections and retrieve employee names.
+-   **Streamlined Check-In Flow (Overhauled):** Rebuilt the guest check-in into a seamless, single-page experience that auto-registers pre-approved employees without requiring extra button clicks.
+-   **Telegram-based Employee Approval (New Feature):** Implemented a flow where admins can approve or reject new employee access requests via buttons directly within Telegram.
+-   **Persistent Access Requests:** Pending employee access requests are now stored in a MongoDB collection to persist across server restarts.
+-   **Telegram Notification System (Improved):**
+    -   Added a Telegram Chat ID field in the Admin Settings so the notification destination can be changed from the UI.
+    -   Suppressed unnecessary NEW REGISTRATION and FIRST TIME alerts for pre-approved employees.
+-   **Employee List UI/UX (Enhanced):** Added search and sort (A-Z, ID) functionality to the admin's employee list.
+-   **Sign-in Sheet Enhancements:**
+    -   Modified PDF exports to embed actual signature images.
+    -   Ensured all sign-in sheets (UI, PDF, Excel) are sorted chronologically by check-in date and time.
 
 **Earlier issues found/mentioned but not fixed**
--   The Import from Portal AI agent is broken. This is the main pending issue (Issue #1).
+-   None.
 
 **Known issue recurrence from previous fork**
 -   None.
@@ -94,73 +90,95 @@ A full-stack application with a React frontend and FastAPI backend that is deplo
 
 
 **Key Technical Concepts**
--   **Frontend:** React, Tailwind CSS, Framer Motion, .
--   **Backend:** FastAPI, , , .
+-   **Frontend:** React, Tailwind CSS, , .
+-   **Backend:** FastAPI, , , , , .
 -   **Database:** MongoDB.
--   **Automation:** Playwright is used for two distinct tasks: a daily sync against live data and a one-time historical data scrape.
+-   **Automation:** Playwright is used for web scraping the third-party portal.
+-   **API Security:** API Key-based authentication for the new public endpoints.
 
 **key DB schema**
--   **employees:**  (New collection for the approved list).
+-   **employees:** 
 -   **bookings:** 
 -   **guests:** 
+-   **settings:**  (Single document collection)
+-   **pending_requests:**  (New collection)
 
 **changes in tech stack**
--   None.
+-    was added to  to ensure it's installed in production.
+-    was used to embed images into generated PDF files.
 
 **All files of reference**
--   : Contains the broken  function that needs debugging.
--   : Contains the API endpoints for employee management and the AI agent trigger.
--   : Contains the UI for the Employee List panel and the Import from Portal button.
+-   : Heavily modified. Contains the new public API endpoints (which need fixing), API key logic, Telegram webhook handlers, date-sorted queries, and PDF generation with images.
+-   : Updated with more robust scraping logic to handle 12 months of data. A startup function was added to  to handle Playwright browser installation.
+-   : Overhauled for the single-page check-in flow, auto-registration, and access request UI.
+-   : Updated with employee list sorting/searching and new settings fields for the Telegram Chat ID and Public API Key.
 
 **Areas that need refactoring**:
--    is now over 800 lines. The endpoints should be split into multiple router files (e.g., , , ).
--    is extremely large (over 1500 lines). It should be broken down into smaller components for each admin section (e.g., , ).
+-    is now over 2500 lines and contains logic for guests, admin, reports, public APIs, and Telegram. It should be broken down into separate router files for maintainability.
+-    has grown significantly and should be refactored into smaller, more focused components (e.g., , , ).
 
 **key api endpoints**
--    (GET, POST): Manages the master employee list.
--    (POST): Populates the employee list from existing booking records.
--    (POST): Triggers the broken AI agent to scrape the third-party portal.
--    (GET): Health check endpoint for deployment verification.
+-    (POST): Triggers the fixed AI scraping agent.
+-    (POST): Endpoint for unregistered guests to request system access.
+-    (POST): Handles callbacks from Telegram buttons (e.g., Approve click).
+-    (GET, POST): Manages  and the new .
+-    (GET): New public endpoint for external data access (Needs fix).
+-    (GET): New public endpoint for external data access (Needs fix).
 
 **Critical Info for New Agent**
 -   **Admin Password:** .
--   **Primary Blocker:** The Import from Portal AI agent is the main unfinished feature. The user opted to deploy without it. Your first task is to debug and fix this agent.
--   **Workaround In Place:** The user can currently build their employee list using the Import from Guest Records button (which uses the app's own data) or by manually adding employees. Fixing the portal import is for adding employees who have *not* yet stayed at the hotel.
+-   **Immediate Task:** Your first task is to fix the public API endpoints by adding  to  and then testing them.
+-   **Production Dependencies:** The agent solved a critical production bug where the AI agent failed because Playwright's browser was not installed. The fix involved adding  to  and adding a startup event to  to run Downloading Chrome for Testing 145.0.7632.6 (playwright chromium v1208) from https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/1208/chromium-linux-arm64.zip
+|                                                                                |   0% of 179.6 MiB
+|■■■■■■■■                                                                        |  10% of 179.6 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 179.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 179.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 179.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 179.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 179.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 179.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 179.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 179.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 179.6 MiB
+Chrome for Testing 145.0.7632.6 (playwright chromium v1208) downloaded to /pw-browsers/chromium-1208. This context is vital for any future deployments.
+-   **Refactoring:** The codebase is becoming difficult to maintain due to very large files (, ). Prioritizing refactoring after fixing the current issue would be beneficial.
 
 **documents and test reports created in this job**
 -    (updated)
--    (from testing the auto-navigation feature)
+-    (from testing the simplified check-in flow)
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** Asked if the AI agent could collect unique employee data from the portal. **Status:** Confirmed, agent logic for this was planned.
-2.  **User:** Provided screenshots of the portal's Sign-in Report section, which contains historical data. **Status:** Completed, agent used this to plan the new scraping logic.
-3.  **User:** Confirmed the daily sync AI agent should remain unchanged. **Status:** Confirmed.
-4.  **User:** Clarified the No Bill logic for the daily sync agent. **Status:** Confirmed, no changes needed.
-5.  **User:** Stated they would deploy the app. **Status:** Acknowledged.
-6.  **User:** After deploying, reported the new admin tabs weren't visible on mobile. **Status:** Resolved, advised to clear cache/wait for deployment to finish.
-7.  **User:** After clicking Import from Portal, reported it was stuck for 20+ minutes. **Status:** Confirmed failure, proposed using the Import from Guest Records workaround.
-8.  **User:** Reported Import from Guest Records showed 0. **Status:** Resolved, explained a redeploy was needed to push the new endpoint to production.
-9.  **User:** Asked to prioritize fixing the AI agent to get more employee details from the portal. **Status:** Acknowledged.
-10. **User:** Changed mind, decided to deploy with the last working changes and fix the AI agent in a future fork. **Status:** This is the current state. The user has deployed the app with the broken AI agent feature.
+1.  **User:** Asked for public API access to sign-in sheets and billing reports with an API key. **Status:** In Progress.
+2.  **User:** After deploying, reported Import from portal was still not working. **Status:** Diagnosed as a Playwright browser dependency issue in the production environment.
+3.  **Agent:** Fixed the Playwright dependency issue. User confirmed Working now. **Status:** Completed.
+4.  **User:** Asked the AI agent to scrape the last 12 months of data. **Status:** Completed.
+5.  **User:** Asked to add alphabetical sorting and search to the employee list. **Status:** Completed.
+6.  **User:** Reported that signature images were not showing in the PDF export. **Status:** Completed.
+7.  **User:** Requested that all sign-in sheets be sorted by check-in date. **Status:** Completed.
+8.  **User:** Re-iterated the need for public API access. **Status:** In Progress. The agent began implementation.
+9.  **Agent:** Implemented the public API but ran into a  error.
+10. **Agent:** Diagnosed the error as a missing  statement. **Status:** This is the current state. The fix has been identified but not implemented.
 
 **Project Health Check:**
 -   **Broken:**
-    -   The Import from Portal AI agent in  fails to scrape historical employee data.
+    -    endpoint.
+    -    endpoint.
+    (Both are failing due to a missing Python import in ).
 
 **3rd Party Integrations**
--   **API Global Solutions - Provider Rail Portal:** Integrated via Playwright for two purposes: daily live data sync and historical data scraping. Requires user credentials stored in the admin dashboard.
--   **OpenAI TTS-1:** Integrated via  for generating MP3 voice files. Uses the Emergent LLM Key.
--   **Telegram:** Integrated for admin notifications. Bot token and chat ID are stored as environment variables.
+-   **API Global Solutions - Provider Rail Portal:** Integrated via Playwright for scraping historical employee data.
+-   **OpenAI TTS-1:** Integrated via  for voice guidance audio files. Uses the Emergent LLM Key.
+-   **Telegram:** Integrated via  for sending admin notifications and handling interactive button callbacks for approvals.
 
 **Testing status**
--   **Testing agent used after significant changes:** YES (early in the session for UI fixes).
+-   **Testing agent used after significant changes:** YES (for the simplified check-in flow).
 -   **Troubleshoot agent used after agent stuck in loop:** NO
 -   **Test files created:** []
 -   **Known regressions:** None.
 
 **Credentials to test flow:**
 -   **Admin Login:** Access at  with password .
--   **Test Guest:** Use an Employee ID from the admin-managed list (e.g., create one like ).
+-   **Public API Key:** Can be generated and viewed in the Admin Dashboard under Portal Settings.
 
 **What agent forgot to execute**
--   The agent did not complete the debugging and fixing of the Import from Portal AI agent. The user made the decision to postpone this work for a future session.</analysis>
+-   The agent did not execute the final  command to add  to  to fix the public API endpoints it was working on.</analysis>

@@ -132,7 +132,9 @@ export default function AdminDashboard() {
     api_global_password_set: false,
     voice_enabled: true,
     voice_volume: 1.0,
-    telegram_chat_id: ""
+    telegram_chat_id: "",
+    public_api_key: "",
+    nightly_rate: 75.0
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ running: false, progress: "", last_results: null });
@@ -347,7 +349,9 @@ export default function AdminDashboard() {
         api_global_password_set: settingsRes.data.api_global_password_set || false,
         voice_enabled: settingsRes.data.voice_enabled !== false,
         voice_volume: settingsRes.data.voice_volume || 1.0,
-        telegram_chat_id: settingsRes.data.telegram_chat_id || ""
+        telegram_chat_id: settingsRes.data.telegram_chat_id || "",
+        public_api_key: settingsRes.data.public_api_key || "",
+        nightly_rate: settingsRes.data.nightly_rate || 75.0
       });
       setSyncStatus(syncStatusRes.data);
     } catch (error) {
@@ -363,7 +367,9 @@ export default function AdminDashboard() {
         api_global_password: portalSettings.api_global_password || null,
         alert_email: portalSettings.alert_email,
         auto_sync_enabled: portalSettings.auto_sync_enabled,
-        telegram_chat_id: portalSettings.telegram_chat_id
+        telegram_chat_id: portalSettings.telegram_chat_id,
+        public_api_key: portalSettings.public_api_key,
+        nightly_rate: portalSettings.nightly_rate
       });
       toast.success("Settings saved successfully");
       fetchSettings();
@@ -2106,6 +2112,70 @@ export default function AdminDashboard() {
                       <br />
                       <span className="text-vault-gold">Your group ID: -1003798795772</span>
                     </p>
+                  </div>
+
+                  {/* Public API Section */}
+                  <div className="pt-4 border-t border-vault-border">
+                    <h4 className="text-vault-gold font-medium mb-4">Public API Access</h4>
+                    
+                    {/* API Key */}
+                    <div className="mb-4">
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-2 block font-medium">
+                        API Key
+                      </label>
+                      <div className="relative">
+                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                        <Input
+                          type="text"
+                          value={portalSettings.public_api_key}
+                          onChange={(e) => setPortalSettings({...portalSettings, public_api_key: e.target.value})}
+                          placeholder="Enter API key for external access"
+                          className="bg-black/50 border-vault-border text-vault-text pl-10 font-mono text-sm"
+                          data-testid="public-api-key-input"
+                        />
+                      </div>
+                      <p className="text-vault-text-secondary text-xs mt-1">
+                        Share this key with authorized systems to access Sign-in Sheets and Billing Reports.
+                      </p>
+                    </div>
+
+                    {/* Nightly Rate */}
+                    <div className="mb-4">
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-2 block font-medium">
+                        Nightly Rate ($)
+                      </label>
+                      <Input
+                        type="number"
+                        value={portalSettings.nightly_rate}
+                        onChange={(e) => setPortalSettings({...portalSettings, nightly_rate: parseFloat(e.target.value) || 0})}
+                        placeholder="75.00"
+                        className="bg-black/50 border-vault-border text-vault-text w-32"
+                        data-testid="nightly-rate-input"
+                      />
+                      <p className="text-vault-text-secondary text-xs mt-1">
+                        Rate per night used in billing calculations.
+                      </p>
+                    </div>
+
+                    {/* API Endpoints Info */}
+                    {portalSettings.public_api_key && (
+                      <div className="bg-black/70 rounded-lg p-3 mt-4">
+                        <p className="text-vault-gold text-xs font-medium mb-2">Public API Endpoints:</p>
+                        <div className="space-y-2 text-xs font-mono">
+                          <div>
+                            <span className="text-green-400">GET</span>
+                            <span className="text-vault-text-secondary ml-2">/api/public/signin-sheets?api_key=YOUR_KEY</span>
+                          </div>
+                          <div>
+                            <span className="text-green-400">GET</span>
+                            <span className="text-vault-text-secondary ml-2">/api/public/billing-report?api_key=YOUR_KEY</span>
+                          </div>
+                          <p className="text-vault-text-secondary mt-2">
+                            Optional params: start_date, end_date, format (json/csv)
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Save Button */}

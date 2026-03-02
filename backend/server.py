@@ -11,6 +11,7 @@ from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
 import io
+import csv
 import xlsxwriter
 import math
 import httpx
@@ -402,6 +403,8 @@ class PortalSettingsUpdate(BaseModel):
     voice_enabled: Optional[bool] = None  # Enable/disable voice messages
     voice_volume: Optional[float] = None  # Voice volume 0.0 to 1.0
     telegram_chat_id: Optional[str] = None  # Telegram group/chat ID for notifications
+    public_api_key: Optional[str] = None  # API key for public endpoints
+    nightly_rate: Optional[float] = None  # Nightly room rate for billing
 
 # ==================== Helper Functions ====================
 
@@ -1782,7 +1785,10 @@ async def get_portal_settings():
             "auto_sync_start_date": None,
             "voice_enabled": True,
             "voice_volume": 1.0,
-            "telegram_chat_id": TELEGRAM_CHAT_ID or ""
+            "telegram_chat_id": TELEGRAM_CHAT_ID or "",
+            "public_api_key": "",
+            "public_api_key_set": False,
+            "nightly_rate": 75.0
         }
     
     # Mask password - only indicate if it's set
@@ -1795,7 +1801,10 @@ async def get_portal_settings():
         "auto_sync_start_date": settings.get("auto_sync_start_date"),
         "voice_enabled": settings.get("voice_enabled", True),
         "voice_volume": settings.get("voice_volume", 1.0),
-        "telegram_chat_id": settings.get("telegram_chat_id", "") or TELEGRAM_CHAT_ID or ""
+        "telegram_chat_id": settings.get("telegram_chat_id", "") or TELEGRAM_CHAT_ID or "",
+        "public_api_key": settings.get("public_api_key", ""),
+        "public_api_key_set": bool(settings.get("public_api_key")),
+        "nightly_rate": settings.get("nightly_rate", 75.0)
     }
 
 @api_router.post("/admin/settings")
@@ -1830,6 +1839,12 @@ async def update_portal_settings(input: PortalSettingsUpdate):
     
     if input.telegram_chat_id is not None:
         update_data["telegram_chat_id"] = input.telegram_chat_id
+    
+    if input.public_api_key is not None:
+        update_data["public_api_key"] = input.public_api_key
+    
+    if input.nightly_rate is not None:
+        update_data["nightly_rate"] = max(0.0, input.nightly_rate)
     
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
@@ -2326,9 +2341,6 @@ async def export_billing_pdf(
         headers={"Content-Disposition": "attachment; filename=hodler_inn_billing_report.pdf"}
     )
 
-# Include the router in the main app
-app.include_router(api_router)
-
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -2372,6 +2384,215 @@ async def root_health_check():
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+
+
+# ==================== PUBLIC API ENDPOINTS (with API Key auth) ====================
+
+async def verify_api_key(api_key: str = Query(..., description="API Key for authentication")):
+    """Verify API key from database settings"""
+    settings = await db.settings.find_one({}, {"_id": 0})
+    stored_key = settings.get("public_api_key") if settings else None
+    
+    if not stored_key:
+        raise HTTPException(status_code=403, detail="Public API not configured. Please set API key in Admin Settings.")
+    
+    if api_key != stored_key:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    
+    return True
+
+
+@api_router.get("/public/signin-sheets")
+async def public_signin_sheets(
+    api_key: str = Query(..., description="API Key for authentication"),
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    format: str = Query("json", description="Output format: json, csv")
+):
+    """
+    Public API to access Sign-in Sheets data.
+    
+    Usage: GET /api/public/signin-sheets?api_key=YOUR_KEY&start_date=2026-03-01&end_date=2026-03-31
+    """
+    await verify_api_key(api_key)
+    
+    # Build query
+    query = {}
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date
+        if date_filter:
+            query["check_in_date"] = date_filter
+    
+    # Get bookings sorted by date
+    bookings = await db.bookings.find(query, {"_id": 0}).sort([
+        ("check_in_date", 1),
+        ("check_in_time", 1)
+    ]).to_list(1000)
+    
+    # Get guest names
+    employee_numbers = list(set(b['employee_number'] for b in bookings))
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
+    # Build response data
+    records = []
+    for booking in bookings:
+        guest = guests_dict.get(booking['employee_number'])
+        name = ""
+        if guest:
+            if guest.get('name_encrypted'):
+                try:
+                    name = decrypt_data(guest['name_encrypted'])
+                except:
+                    name = guest.get('name', '')
+            else:
+                name = guest.get('name', '')
+        
+        records.append({
+            "employee_number": booking['employee_number'],
+            "employee_name": name,
+            "room_number": booking['room_number'],
+            "check_in_date": booking['check_in_date'],
+            "check_in_time": booking['check_in_time'],
+            "check_out_date": booking.get('check_out_date'),
+            "check_out_time": booking.get('check_out_time'),
+            "is_checked_out": booking.get('is_checked_out', False),
+            "total_nights": booking.get('total_nights', 0)
+        })
+    
+    if format == "csv":
+        # Return CSV format
+        output = io.StringIO()
+        if records:
+            writer = csv.DictWriter(output, fieldnames=records[0].keys())
+            writer.writeheader()
+            writer.writerows(records)
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=signin_sheets_{start_date or 'all'}_{end_date or 'present'}.csv"}
+        )
+    
+    return {
+        "success": True,
+        "count": len(records),
+        "date_range": {"start": start_date, "end": end_date},
+        "records": records
+    }
+
+
+@api_router.get("/public/billing-report")
+async def public_billing_report(
+    api_key: str = Query(..., description="API Key for authentication"),
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    format: str = Query("json", description="Output format: json, csv")
+):
+    """
+    Public API to access Billing Report data.
+    Calculates billable nights based on calendar nights.
+    
+    Usage: GET /api/public/billing-report?api_key=YOUR_KEY&start_date=2026-03-01&end_date=2026-03-31
+    """
+    await verify_api_key(api_key)
+    
+    # Build query - only checked out bookings for billing
+    query = {"is_checked_out": True}
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date
+        if date_filter:
+            query["check_in_date"] = date_filter
+    
+    # Get bookings
+    bookings = await db.bookings.find(query, {"_id": 0}).sort([
+        ("check_in_date", 1)
+    ]).to_list(1000)
+    
+    # Get guest names
+    employee_numbers = list(set(b['employee_number'] for b in bookings))
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
+    # Build billing records
+    billing_records = []
+    total_nights = 0
+    total_amount = 0
+    
+    # Get nightly rate from settings
+    settings = await db.settings.find_one({}, {"_id": 0})
+    nightly_rate = settings.get("nightly_rate", 75.0) if settings else 75.0
+    
+    for booking in bookings:
+        guest = guests_dict.get(booking['employee_number'])
+        name = ""
+        if guest:
+            if guest.get('name_encrypted'):
+                try:
+                    name = decrypt_data(guest['name_encrypted'])
+                except:
+                    name = guest.get('name', '')
+            else:
+                name = guest.get('name', '')
+        
+        nights = booking.get('total_nights', 0)
+        is_no_bill = booking.get('is_no_bill', False)
+        billable_nights = 0 if is_no_bill else nights
+        amount = billable_nights * nightly_rate
+        
+        billing_records.append({
+            "employee_number": booking['employee_number'],
+            "employee_name": name,
+            "room_number": booking['room_number'],
+            "check_in_date": booking['check_in_date'],
+            "check_out_date": booking.get('check_out_date'),
+            "total_nights": nights,
+            "is_no_bill": is_no_bill,
+            "billable_nights": billable_nights,
+            "nightly_rate": nightly_rate,
+            "amount": amount
+        })
+        
+        total_nights += billable_nights
+        total_amount += amount
+    
+    if format == "csv":
+        output = io.StringIO()
+        if billing_records:
+            writer = csv.DictWriter(output, fieldnames=billing_records[0].keys())
+            writer.writeheader()
+            writer.writerows(billing_records)
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=billing_report_{start_date or 'all'}_{end_date or 'present'}.csv"}
+        )
+    
+    return {
+        "success": True,
+        "count": len(billing_records),
+        "date_range": {"start": start_date, "end": end_date},
+        "summary": {
+            "total_billable_nights": total_nights,
+            "nightly_rate": nightly_rate,
+            "total_amount": total_amount
+        },
+        "records": billing_records
+    }
+
+
+# Include the router in the main app (MUST be after all route definitions)
+app.include_router(api_router)
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
