@@ -533,27 +533,29 @@ class APIGlobalSyncAgent:
                 await self.page.wait_for_timeout(1000)
             
             if len(text_inputs) >= 2:
-                # Second input is Room Number - use fill (like paste)
+                # Second input is Room Number - type character by character
                 room_input = text_inputs[1]
                 await room_input.click()
-                await self.page.wait_for_timeout(300)
-                await room_input.fill(str(room_number))
-                logger.info(f"Pasted Room Number: {room_number}")
+                await self.page.wait_for_timeout(500)
+                # Clear any existing value
+                await room_input.evaluate('el => el.value = ""')
+                await self.page.wait_for_timeout(200)
+                # Type room number character by character
+                for char in str(room_number):
+                    await room_input.type(char, delay=150)
+                logger.info(f"Typed Room Number: {room_number}")
                 await self.page.wait_for_timeout(1000)
             
             # Click on empty space near "Heavener" or "HEAVENER-OK" to trigger save
-            # Try to find and click near the city/supplier label area
             try:
                 heavener_elem = await self.page.query_selector('text=HEAVENER')
                 if heavener_elem:
                     await heavener_elem.click()
                     logger.info("Clicked near HEAVENER to trigger save")
                 else:
-                    # Fallback: click on page header area
                     await self.page.click('body', position={"x": 300, "y": 150})
                     logger.info("Clicked on header area to trigger save")
             except:
-                # Fallback: click somewhere safe on the page
                 await self.page.click('body', position={"x": 300, "y": 150})
                 logger.info("Clicked on page to trigger save")
             
