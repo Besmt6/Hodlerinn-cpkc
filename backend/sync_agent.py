@@ -539,6 +539,65 @@ class APIGlobalSyncAgent:
             logger.error(f"Error marking no bill for {entry.get('name', 'unknown')}: {str(e)}")
             return False
     
+    async def save_changes(self) -> bool:
+        """Click the Save button to persist all changes."""
+        try:
+            logger.info("Looking for Save button...")
+            
+            # Try multiple selectors for the Save button
+            save_selectors = [
+                'input[type="submit"][value="Save"]',
+                'button:has-text("Save")',
+                'input[value="Save"]',
+                '.ui-button:has-text("Save")',
+                'input[type="button"][value="Save"]',
+                'a:has-text("Save")',
+                'span:has-text("Save")'
+            ]
+            
+            save_button = None
+            for selector in save_selectors:
+                try:
+                    btn = self.page.locator(selector).first
+                    if await btn.count() > 0:
+                        save_button = btn
+                        logger.info(f"Found Save button with selector: {selector}")
+                        break
+                except:
+                    continue
+            
+            if save_button:
+                await save_button.click(force=True)
+                logger.info("Clicked Save button")
+                
+                # Wait for save to complete
+                await self.page.wait_for_load_state("networkidle", timeout=15000)
+                await self.page.wait_for_timeout(2000)
+                
+                # Check for success message or confirmation
+                page_text = await self.page.inner_text('body')
+                if 'success' in page_text.lower() or 'saved' in page_text.lower():
+                    logger.info("Changes saved successfully")
+                else:
+                    logger.info("Save completed (no confirmation message found)")
+                
+                return True
+            else:
+                logger.warning("Save button not found - changes may not be persisted!")
+                
+                # Take screenshot for debugging
+                try:
+                    await self.page.screenshot(path="/tmp/sync_no_save_btn.png")
+                    logger.info("Screenshot saved to /tmp/sync_no_save_btn.png")
+                except:
+                    pass
+                
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error saving changes: {str(e)}")
+            return False
+    
     async def run_sync(self, hodler_records: list, target_date: str = None) -> dict:
         """
         Run the full sync process.
@@ -622,6 +681,11 @@ class APIGlobalSyncAgent:
                         "room": record.get("room_number"),
                         "note": "Guest checked in at Hodler Inn but not listed in API Global portal"
                     })
+            
+            # IMPORTANT: Click Save button to persist all changes
+            if self.results["no_bill"] or self.results["verified"]:
+                logger.info("Saving changes to portal...")
+                await self.save_changes()
             
             logger.info(f"Sync completed. Verified: {len(self.results['verified'])}, No Bill: {len(self.results['no_bill'])}")
             return self.results
