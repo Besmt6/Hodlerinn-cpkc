@@ -1431,6 +1431,237 @@ export default function AdminDashboard() {
             </>
           )}
 
+          {/* Employee List View */}
+          {activeView === 'employees' && (
+            <>
+              {/* Header */}
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Employee List</h1>
+                  <p className="text-vault-text-secondary font-manrope mt-1">Manage authorized employees who can check in</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setShowBulkImport(true)}
+                    className="bg-vault-surface border border-vault-border hover:bg-vault-surface-highlight text-vault-text"
+                    data-testid="bulk-import-employees-btn"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Bulk Import
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setEditingEmployee(null);
+                      setEmployeeForm({ employee_number: "", name: "" });
+                      setShowEmployeeDialog(true);
+                    }}
+                    className="vault-btn-primary"
+                    data-testid="add-employee-btn"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Employee
+                  </Button>
+                </div>
+              </div>
+
+              {/* Employee Stats */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <Card className="bg-vault-surface border-vault-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-vault-gold/20 rounded-lg">
+                        <Users className="w-5 h-5 text-vault-gold" />
+                      </div>
+                      <div>
+                        <p className="text-vault-text-secondary text-sm">Total Employees</p>
+                        <p className="text-2xl font-bold text-vault-text font-mono">{employees.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-vault-surface border-vault-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-500/20 rounded-lg">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      </div>
+                      <div>
+                        <p className="text-vault-text-secondary text-sm">Active Employees</p>
+                        <p className="text-2xl font-bold text-vault-text font-mono">{employees.filter(e => e.is_active !== false).length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Employee Table */}
+              <Card className="bg-vault-surface border-vault-border">
+                <CardHeader className="border-b border-vault-border">
+                  <CardTitle className="font-outfit text-xl text-vault-text flex items-center gap-2">
+                    <Users className="w-5 h-5 text-vault-gold" />
+                    All Employees
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[400px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="table-header border-vault-border hover:bg-transparent">
+                          <TableHead className="text-vault-gold">Employee ID</TableHead>
+                          <TableHead className="text-vault-gold">Name</TableHead>
+                          <TableHead className="text-vault-gold">Status</TableHead>
+                          <TableHead className="text-vault-gold">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {employees.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-vault-text-secondary py-8">
+                              No employees added yet. Click "Add Employee" or "Bulk Import" to get started.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          employees.map((employee) => (
+                            <TableRow key={employee.id} className="table-row border-vault-border" data-testid={`employee-row-${employee.id}`}>
+                              <TableCell className="font-mono text-vault-gold font-bold">{employee.employee_number}</TableCell>
+                              <TableCell className="text-vault-text">{employee.name}</TableCell>
+                              <TableCell>
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  employee.is_active !== false ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                                }`}>
+                                  {employee.is_active !== false ? 'Active' : 'Inactive'}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-vault-text-secondary hover:text-vault-gold h-8 w-8 p-0"
+                                    onClick={() => handleEditEmployee(employee)}
+                                    data-testid={`edit-employee-${employee.id}`}
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-vault-text-secondary hover:text-red-500 h-8 w-8 p-0"
+                                    onClick={() => setDeleteEmployeeConfirm(employee)}
+                                    data-testid={`delete-employee-${employee.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+
+              {/* Add/Edit Employee Dialog */}
+              <Dialog open={showEmployeeDialog} onOpenChange={setShowEmployeeDialog}>
+                <DialogContent className="bg-vault-surface border-vault-border">
+                  <DialogHeader>
+                    <DialogTitle className="font-outfit text-vault-text">
+                      {editingEmployee ? 'Edit Employee' : 'Add New Employee'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <label className="text-sm text-vault-text-secondary mb-2 block">Employee ID</label>
+                      <Input
+                        value={employeeForm.employee_number}
+                        onChange={(e) => setEmployeeForm({...employeeForm, employee_number: e.target.value})}
+                        placeholder="Enter employee ID"
+                        className="vault-input"
+                        data-testid="employee-id-input"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-vault-text-secondary mb-2 block">Full Name</label>
+                      <Input
+                        value={employeeForm.name}
+                        onChange={(e) => setEmployeeForm({...employeeForm, name: e.target.value})}
+                        placeholder="Enter full name"
+                        className="vault-input"
+                        data-testid="employee-name-input"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="ghost" className="text-vault-text-secondary">Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleSaveEmployee} className="vault-btn-primary" data-testid="save-employee-btn">
+                      {editingEmployee ? 'Update' : 'Add'} Employee
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Bulk Import Dialog */}
+              <Dialog open={showBulkImport} onOpenChange={setShowBulkImport}>
+                <DialogContent className="bg-vault-surface border-vault-border max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle className="font-outfit text-vault-text">Bulk Import Employees</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <p className="text-sm text-vault-text-secondary">
+                      Enter employee data, one per line in format: <code className="text-vault-gold">ID,Name</code>
+                    </p>
+                    <textarea
+                      value={bulkImportText}
+                      onChange={(e) => setBulkImportText(e.target.value)}
+                      placeholder="EMP001,John Smith&#10;EMP002,Jane Doe&#10;EMP003,Bob Wilson"
+                      className="w-full h-40 p-3 vault-input font-mono text-sm resize-none"
+                      data-testid="bulk-import-textarea"
+                    />
+                    <p className="text-xs text-vault-text-secondary">
+                      Duplicate employee IDs will be skipped automatically.
+                    </p>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="ghost" className="text-vault-text-secondary">Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleBulkImport} className="vault-btn-primary" data-testid="import-employees-btn">
+                      Import Employees
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Delete Employee Confirmation */}
+              <Dialog open={!!deleteEmployeeConfirm} onOpenChange={() => setDeleteEmployeeConfirm(null)}>
+                <DialogContent className="bg-vault-surface border-vault-border">
+                  <DialogHeader>
+                    <DialogTitle className="font-outfit text-vault-text">Delete Employee</DialogTitle>
+                  </DialogHeader>
+                  <p className="text-vault-text-secondary">
+                    Are you sure you want to delete employee <span className="text-vault-gold font-mono">{deleteEmployeeConfirm?.employee_number}</span> ({deleteEmployeeConfirm?.name})?
+                  </p>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="ghost" className="text-vault-text-secondary">Cancel</Button>
+                    </DialogClose>
+                    <Button 
+                      onClick={() => handleDeleteEmployee(deleteEmployeeConfirm?.id)}
+                      className="bg-red-600 hover:bg-red-700"
+                      data-testid="confirm-delete-employee-btn"
+                    >
+                      Delete
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+
           {/* Settings View */}
           {activeView === 'settings' && (
             <>
