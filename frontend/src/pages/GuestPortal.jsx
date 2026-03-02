@@ -457,41 +457,31 @@ function RegisterForm({ setView }) {
 
 function CheckInForm({ setView, setSuccessMessage }) {
   const [employeeNumber, setEmployeeNumber] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
   const [date, setDate] = useState(new Date());
-  // Auto-capture current time in 24-hour format
   const getCurrentTime = () => {
     const now = new Date();
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   };
   const [time, setTime] = useState(getCurrentTime());
   const [loading, setLoading] = useState(false);
-  const [verifiedEmployee, setVerifiedEmployee] = useState(null);
   const [verifying, setVerifying] = useState(false);
+  const [employeeStatus, setEmployeeStatus] = useState(null); // 'found', 'not_found', 'new_guest', null
   const [availableRooms, setAvailableRooms] = useState([]);
-  const [loadingRooms, setLoadingRooms] = useState(true);
   const [signatureReminderSpoken, setSignatureReminderSpoken] = useState(false);
-  const [roomReminderSpoken, setRoomReminderSpoken] = useState(false);
-  const [isNewGuest, setIsNewGuest] = useState(false);
-  const [guestName, setGuestName] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [registering, setRegistering] = useState(false);
+  const [requestingAccess, setRequestingAccess] = useState(false);
   const sigRef = useRef(null);
   const roomInputRef = useRef(null);
-  const timeInputRef = useRef(null);
   const signatureContainerRef = useRef(null);
-  const nameInputRef = useRef(null);
-  const companyInputRef = useRef(null);
-  
-  // Auto-update time every minute to keep it current
+
+  // Auto-update time every minute
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTime(getCurrentTime());
-    }, 60000); // Update every minute
+    const interval = setInterval(() => setTime(getCurrentTime()), 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch available rooms on component mount
+  // Fetch available rooms on mount
   useEffect(() => {
     const fetchRooms = async () => {
       try {
@@ -499,137 +489,110 @@ function CheckInForm({ setView, setSuccessMessage }) {
         setAvailableRooms(response.data || []);
       } catch (error) {
         console.error("Failed to fetch rooms:", error);
-        toast.error("Failed to load room list");
-      } finally {
-        setLoadingRooms(false);
       }
     };
     fetchRooms();
   }, []);
 
-  // Voice reminder for proper signature
+  // Auto-verify employee when number changes (debounced)
+  useEffect(() => {
+    if (employeeNumber.length < 4) {
+      setEmployeeStatus(null);
+      setEmployeeName("");
+      return;
+    }
+
+    const verifyEmployee = async () => {
+      setVerifying(true);
+      try {
+        // First check if already registered as a guest
+        const response = await axios.get(`${API}/guests/${employeeNumber}`);
+        setEmployeeName(response.data.name);
+        setEmployeeStatus('found');
+        const timePeriod = getTimePeriod();
+        playVoiceMessage(`checkin_welcome_${timePeriod}`);
+        setTimeout(() => roomInputRef.current?.focus(), 300);
+      } catch (error) {
+        // Check if employee ID is in admin's approved list
+        try {
+          const empResponse = await axios.get(`${API}/employees/verify/${employeeNumber}`);
+          setEmployeeName(empResponse.data.name);
+          setEmployeeStatus('new_guest');
+        } catch (empError) {
+          setEmployeeName("");
+          setEmployeeStatus('not_found');
+        }
+      } finally {
+        setVerifying(false);
+      }
+    };
+
+    const timer = setTimeout(verifyEmployee, 500);
+    return () => clearTimeout(timer);
+  }, [employeeNumber]);
+
+  const handleRegisterAndContinue = async () => {
+    if (!employeeName.trim()) return;
+    setLoading(true);
+    try {
+      await axios.post(`${API}/guests/register`, {
+        employee_number: employeeNumber,
+        name: employeeName.trim()
+      });
+      setEmployeeStatus('found');
+      toast.success(`Welcome, ${employeeName}!`);
+      setTimeout(() => roomInputRef.current?.focus(), 300);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Registration failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRequestAccess = async () => {
+    setRequestingAccess(true);
+    try {
+      // Send request to admin via API (which will send Telegram notification)
+      await axios.post(`${API}/request-employee-access`, {
+        employee_number: employeeNumber
+      });
+      toast.success("Access request sent to admin. Please wait for approval.");
+    } catch (error) {
+      // If endpoint doesn't exist, show manual message
+      toast.info("Please contact admin to add your Employee ID to the system.");
+    } finally {
+      setRequestingAccess(false);
+    }
+  };
+
   const speakSignatureReminder = () => {
     if (!signatureReminderSpoken) {
-      speakMessage("Please sign your full name legibly. A simple line or X will not be accepted.", 0.9);
+      speakMessage("Please sign your full name legibly.", 0.9);
       setSignatureReminderSpoken(true);
     }
   };
 
   const clearSignature = () => {
     sigRef.current?.clear();
-    setSignatureReminderSpoken(false); // Reset so reminder plays again if cleared
-  };
-
-  const handleVerifyEmployee = async () => {
-    if (!employeeNumber) {
-      toast.error("Please enter employee number");
-      return;
-    }
-
-    setVerifying(true);
-    try {
-      // First check if already registered as a guest
-      const response = await axios.get(`${API}/guests/${employeeNumber}`);
-      setVerifiedEmployee(response.data);
-      setIsNewGuest(false);
-      toast.success(`Welcome back, ${response.data.name}!`);
-      // Auto-focus on room input after successful verification
-      setTimeout(() => {
-        roomInputRef.current?.focus();
-      }, 300);
-    } catch (error) {
-      // Guest not registered - check if employee ID is in the admin's approved list
-      try {
-        const empResponse = await axios.get(`${API}/employees/verify/${employeeNumber}`);
-        // Employee ID is valid in admin list but not registered as guest yet
-        setIsNewGuest(true);
-        setGuestName(empResponse.data.name); // Pre-fill name from employee list
-        setVerifiedEmployee(null);
-        playVoiceMessage("register_welcome");
-        toast.info(`Welcome ${empResponse.data.name}! Please confirm to register.`);
-        setTimeout(() => {
-          nameInputRef.current?.focus();
-        }, 300);
-      } catch (empError) {
-        // Employee ID not in the approved list
-        setIsNewGuest(false);
-        setVerifiedEmployee(null);
-        toast.error("Employee ID not found. Please contact admin.");
-      }
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  const handleRegisterAndContinue = async () => {
-    if (!guestName.trim()) {
-      toast.error("Please confirm your name");
-      return;
-    }
-
-    setRegistering(true);
-    try {
-      const response = await axios.post(`${API}/guests/register`, {
-        employee_number: employeeNumber,
-        name: guestName.trim()
-      });
-      
-      setVerifiedEmployee({
-        employee_number: employeeNumber,
-        name: guestName.trim()
-      });
-      setIsNewGuest(false);
-      toast.success(`Registration successful! Welcome, ${guestName}!`);
-      
-      // Auto-focus on room input after registration
-      setTimeout(() => {
-        roomInputRef.current?.focus();
-      }, 300);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || "Registration failed");
-    } finally {
-      setRegistering(false);
-    }
-  };
-
-  const handleClearVerification = () => {
-    setVerifiedEmployee(null);
-    setEmployeeNumber("");
-    setRoomReminderSpoken(false);
-    setIsNewGuest(false);
-    setGuestName("");
-    setCompanyName("");
-  };
-
-  // Voice reminder for room selection
-  const speakRoomReminder = () => {
-    if (!roomReminderSpoken) {
-      speakMessage("Please select the room number from key on desk. Print your name and room number on yellow card.", 0.9);
-      setRoomReminderSpoken(true);
-    }
+    setSignatureReminderSpoken(false);
   };
 
   const handleCheckIn = async () => {
-    if (!verifiedEmployee) {
-      toast.error("Please verify employee number first");
+    if (employeeStatus !== 'found') {
+      toast.error("Please enter a valid employee number");
       return;
     }
     if (!roomNumber) {
       toast.error("Please enter room number");
       return;
     }
-    // Validate room number exists in available rooms
     const validRoom = availableRooms.find(r => r.room_number === roomNumber.trim());
     if (!validRoom) {
       toast.error(`Room ${roomNumber} is not valid. Please check the room number on your key.`);
       return;
     }
-    if (!date) {
-      toast.error("Please select check-in date");
-      return;
-    }
-    if (!time) {
-      toast.error("Please select check-in time");
+    if (!date || !time) {
+      toast.error("Please select date and time");
       return;
     }
     if (sigRef.current?.isEmpty()) {
@@ -648,12 +611,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
         signature
       });
       
-      // Voice message after completing check-in
-      setTimeout(() => {
-        playVoiceMessage("checkin_complete");
-      }, 500);
+      setTimeout(() => playVoiceMessage("checkin_complete"), 500);
       
-      // Show success screen
       const greeting = getTimeBasedGreeting();
       setSuccessMessage({
         title: `${greeting}!`,
@@ -662,8 +621,6 @@ function CheckInForm({ setView, setSuccessMessage }) {
         type: "checkin"
       });
       setView("checkin-success");
-      
-      // Auto-return to menu after 8 seconds
       setTimeout(() => setView("menu"), 8000);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Check-in failed");
@@ -696,91 +653,89 @@ function CheckInForm({ setView, setSuccessMessage }) {
             Guest Check-In
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Employee Verification Section */}
-          {!verifiedEmployee && !isNewGuest ? (
-            <div className="space-y-4">
-              <div>
-                <label className="vault-label">Employee Number</label>
-                <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
-                  <Input
-                    value={employeeNumber}
-                    onChange={(e) => setEmployeeNumber(e.target.value)}
-                    placeholder="⬇️ TAP HERE to enter number"
-                    className="vault-input pl-10 input-highlight text-lg"
-                    data-testid="checkin-employee-input"
-                    autoFocus
-                  />
+        <CardContent className="space-y-5">
+          {/* Employee Number */}
+          <div>
+            <label className="vault-label">Employee Number</label>
+            <div className="relative">
+              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
+              <Input
+                value={employeeNumber}
+                onChange={(e) => setEmployeeNumber(e.target.value)}
+                placeholder="⬇️ TAP HERE to enter number"
+                className="vault-input pl-10 input-highlight text-lg"
+                data-testid="checkin-employee-input"
+                autoFocus
+              />
+              {verifying && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="w-5 h-5 border-2 border-vault-gold border-t-transparent rounded-full animate-spin"></div>
                 </div>
-              </div>
-              <Button
-                onClick={handleVerifyEmployee}
-                disabled={verifying}
-                className="w-full vault-btn-primary h-12"
-                data-testid="verify-employee-btn"
-              >
-                {verifying ? "Verifying..." : "Continue"}
-              </Button>
+              )}
             </div>
-          ) : isNewGuest && !verifiedEmployee ? (
-            /* New Guest Registration - Employee ID verified from admin list */
-            <div className="space-y-4">
-              <div className="bg-green-900/40 border-2 border-green-500 rounded-lg p-4">
-                <p className="text-green-400 text-lg font-bold uppercase tracking-wide mb-2">✓ Employee ID Verified</p>
-                <p className="text-vault-text font-mono text-lg">ID: {employeeNumber}</p>
-                <p className="text-vault-text mt-1">Name: <span className="text-vault-gold">{guestName}</span></p>
-                <p className="text-vault-text-secondary mt-2">First time? Confirm your name to register.</p>
-                <button
-                  onClick={handleClearVerification}
-                  className="text-vault-text-secondary hover:text-vault-gold text-sm underline mt-3"
-                >
-                  ← Wrong person? Try different ID
-                </button>
-              </div>
-              <div>
-                <label className="vault-label">Confirm Your Name</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
-                  <Input
-                    ref={nameInputRef}
-                    value={guestName}
-                    onChange={(e) => setGuestName(e.target.value)}
-                    className="vault-input pl-10 text-lg"
-                    data-testid="register-name-input"
-                    readOnly
-                  />
-                </div>
-                <p className="text-xs text-vault-text-secondary mt-1">Name is from admin records</p>
-              </div>
-              <Button
-                onClick={handleRegisterAndContinue}
-                disabled={registering}
-                className="w-full vault-btn-primary h-12"
-                data-testid="register-continue-btn"
-              >
-                {registering ? "Registering..." : "Confirm & Continue Check-In"}
-              </Button>
-            </div>
-          ) : (
-            <>
-              {/* Verified Employee Info */}
-              <div className="bg-vault-success/10 border border-vault-success/30 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-vault-success text-xs uppercase tracking-wider mb-1">Verified Employee</p>
-                    <p className="text-vault-text font-bold text-lg">{verifiedEmployee.name}</p>
-                    <p className="text-vault-text-secondary font-mono text-sm">ID: {verifiedEmployee.employee_number}</p>
-                  </div>
-                  <button 
-                    onClick={handleClearVerification}
-                    className="text-vault-text-secondary hover:text-vault-gold text-xs underline"
-                  >
-                    Change
-                  </button>
-                </div>
-              </div>
+          </div>
 
+          {/* Employee Name - Auto-filled when found */}
+          <div>
+            <label className="vault-label">Name</label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
+              <Input
+                value={employeeName}
+                readOnly
+                placeholder="Name will appear automatically"
+                className={cn(
+                  "vault-input pl-10 text-lg",
+                  employeeStatus === 'found' && "border-emerald-500 bg-emerald-900/20",
+                  employeeStatus === 'new_guest' && "border-amber-500 bg-amber-900/20",
+                  employeeStatus === 'not_found' && "border-red-500 bg-red-900/20"
+                )}
+                data-testid="checkin-name-input"
+              />
+            </div>
+            {/* Status Messages */}
+            {employeeStatus === 'found' && (
+              <p className="text-emerald-400 text-sm mt-1 flex items-center gap-1">
+                <span>✓</span> Welcome back!
+              </p>
+            )}
+            {employeeStatus === 'new_guest' && (
+              <div className="mt-2">
+                <p className="text-amber-400 text-sm mb-2">First time? Tap below to register:</p>
+                <Button
+                  onClick={handleRegisterAndContinue}
+                  disabled={loading}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white h-10"
+                  data-testid="register-continue-btn"
+                >
+                  {loading ? "Registering..." : `Register as ${employeeName}`}
+                </Button>
+              </div>
+            )}
+            {employeeStatus === 'not_found' && (
+              <div className="mt-2 bg-red-900/30 border border-red-600/50 rounded-lg p-3">
+                <p className="text-red-400 text-sm mb-2">
+                  Employee ID not found in system.
+                </p>
+                <Button
+                  onClick={handleRequestAccess}
+                  disabled={requestingAccess}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white h-10"
+                  data-testid="request-access-btn"
+                >
+                  {requestingAccess ? "Sending Request..." : "Request Access from Admin"}
+                </Button>
+                <p className="text-red-300 text-xs mt-2 text-center">
+                  Admin will be notified via Telegram
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Only show rest of form when employee is found/registered */}
+          {employeeStatus === 'found' && (
+            <>
+              {/* Room Number */}
               <div>
                 <label className="vault-label">Room Number</label>
                 <div className="relative">
@@ -788,20 +743,15 @@ function CheckInForm({ setView, setSuccessMessage }) {
                   <Input
                     ref={roomInputRef}
                     value={roomNumber}
-                    onChange={(e) => {
-                      setRoomNumber(e.target.value);
-                      // Auto-focus time input after entering 3 digits
-                      if (e.target.value.length >= 3) {
-                        setTimeout(() => timeInputRef.current?.focus(), 300);
-                      }
-                    }}
-                    onFocus={speakRoomReminder}
+                    onChange={(e) => setRoomNumber(e.target.value)}
                     placeholder="⬇️ TAP HERE to enter room"
                     className="vault-input pl-10 input-highlight text-lg"
                     data-testid="checkin-room-input"
                   />
                 </div>
               </div>
+
+              {/* Date */}
               <div>
                 <label className="vault-label">Check-In Date</label>
                 <Popover>
@@ -825,41 +775,33 @@ function CheckInForm({ setView, setSuccessMessage }) {
                       onSelect={setDate}
                       initialFocus
                       className="bg-vault-surface text-vault-text"
-                      data-testid="checkin-calendar"
                     />
                   </PopoverContent>
                 </Popover>
               </div>
+
+              {/* Time */}
               <div>
                 <label className="vault-label">Check-In Time (24hr)</label>
                 <div className="relative">
                   <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
                   <Input
-                    ref={timeInputRef}
                     type="time"
                     value={time}
-                    onChange={(e) => {
-                      setTime(e.target.value);
-                      // Auto-scroll to signature after time is selected
-                      if (e.target.value) {
-                        setTimeout(() => {
-                          signatureContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          speakSignatureReminder();
-                        }, 300);
-                      }
-                    }}
+                    onChange={(e) => setTime(e.target.value)}
                     className="vault-input pl-10"
-                    placeholder="HH:MM"
                     data-testid="checkin-time-input"
                   />
                 </div>
               </div>
+
+              {/* Signature */}
               <div ref={signatureContainerRef}>
                 <div className="flex justify-between items-center mb-2">
                   <label className="vault-label mb-0">Signature</label>
                   <button 
                     onClick={clearSignature}
-                    className="text-vault-text-secondary hover:text-vault-gold text-xs flex items-center gap-1 transition-colors"
+                    className="text-vault-text-secondary hover:text-vault-gold text-xs flex items-center gap-1"
                     data-testid="clear-checkin-signature-btn"
                   >
                     <Eraser className="w-3 h-3" />
@@ -876,10 +818,11 @@ function CheckInForm({ setView, setSuccessMessage }) {
                     }}
                     penColor="#fbbf24"
                     backgroundColor="transparent"
-                    data-testid="checkin-signature-canvas"
                   />
                 </div>
               </div>
+
+              {/* Submit */}
               <Button
                 onClick={handleCheckIn}
                 disabled={loading}
@@ -1364,55 +1307,37 @@ function HelpView({ setView }) {
               Your browser does not support the video tag.
             </video>
             <p className="text-vault-text-secondary text-xs mt-2 text-center">
-              Watch how to Register, Check-In, and Check-Out
+              Watch how to Check-In and Check-Out
             </p>
           </div>
 
-          {/* Step 1: Register */}
-          <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-4">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
-                <span className="text-black font-bold text-lg">1</span>
-              </div>
-              <div>
-                <h3 className="font-outfit text-lg font-bold text-vault-gold mb-1">REGISTER (First-Time Only)</h3>
-                <ul className="text-vault-text-secondary text-sm space-y-1">
-                  <li>• Tap the <span className="text-amber-400 font-medium">GOLD "Register"</span> button</li>
-                  <li>• Enter your <span className="text-vault-text">Employee Number</span></li>
-                  <li>• Enter your <span className="text-vault-text">Full Name</span></li>
-                  <li>• Tap "Complete Registration"</li>
-                </ul>
-                <p className="text-vault-gold text-xs mt-2 italic">You only need to register once!</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Step 2: Check In */}
+          {/* Step 1: Check In */}
           <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-4">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-                <span className="text-black font-bold text-lg">2</span>
+                <span className="text-black font-bold text-lg">1</span>
               </div>
               <div>
                 <h3 className="font-outfit text-lg font-bold text-emerald-400 mb-1">CHECK IN</h3>
                 <ul className="text-vault-text-secondary text-sm space-y-1">
                   <li>• Tap the <span className="text-emerald-400 font-medium">GREEN "Check In"</span> button</li>
-                  <li>• Enter your <span className="text-vault-text">Employee Number</span> → Tap "Verify"</li>
+                  <li>• Enter your <span className="text-vault-text">Employee Number</span> — your name appears automatically</li>
+                  <li>• <span className="text-amber-400">First time?</span> Tap the orange "Register" button</li>
                   <li>• Enter your assigned <span className="text-vault-text">Room Number</span></li>
-                  <li>• Select <span className="text-vault-text">Check-In Date</span> from calendar</li>
-                  <li>• Enter <span className="text-vault-text">Check-In Time</span> (24hr format: 14:00 = 2PM)</li>
+                  <li>• Date and time are auto-filled</li>
                   <li>• Sign your name in the <span className="text-vault-text">Signature Box</span></li>
                   <li>• Tap "Complete Check-In"</li>
                 </ul>
+                <p className="text-vault-gold text-xs mt-2 italic">Everything is on one screen - no extra steps!</p>
               </div>
             </div>
           </div>
 
-          {/* Step 3: Check Out */}
+          {/* Step 2: Check Out */}
           <div className="bg-vault-surface-highlight/50 border border-vault-border rounded-lg p-4">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-lg">3</span>
+                <span className="text-white font-bold text-lg">2</span>
               </div>
               <div>
                 <h3 className="font-outfit text-lg font-bold text-red-400 mb-1">CHECK OUT</h3>
@@ -1424,6 +1349,23 @@ function HelpView({ setView }) {
                   <li>• Tap "Complete Check-Out"</li>
                 </ul>
                 <p className="text-vault-gold text-xs mt-2 italic">No signature needed - your check-in signature is used automatically.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Not Found? */}
+          <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-4">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-lg">?</span>
+              </div>
+              <div>
+                <h3 className="font-outfit text-lg font-bold text-red-400 mb-1">EMPLOYEE ID NOT FOUND?</h3>
+                <ul className="text-vault-text-secondary text-sm space-y-1">
+                  <li>• If your ID is not in the system, tap <span className="text-red-400">"Request Access"</span></li>
+                  <li>• Admin will be notified via Telegram</li>
+                  <li>• Please wait for admin to add you to the system</li>
+                </ul>
               </div>
             </div>
           </div>

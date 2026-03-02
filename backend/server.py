@@ -485,6 +485,49 @@ async def get_guest(employee_number: str):
     
     return guest
 
+
+# Request employee access - sends Telegram notification to admin
+class AccessRequest(BaseModel):
+    employee_number: str
+
+@api_router.post("/request-employee-access")
+async def request_employee_access(request: AccessRequest):
+    """Guest requests access when their Employee ID is not in the system.
+    Sends a Telegram notification to admin for approval."""
+    
+    # Check if already in system
+    existing_employee = await db.employees.find_one({"employee_number": request.employee_number})
+    if existing_employee:
+        raise HTTPException(status_code=400, detail="Employee ID already exists in system")
+    
+    existing_guest = await db.guests.find_one({"employee_number": request.employee_number})
+    if existing_guest:
+        raise HTTPException(status_code=400, detail="Guest already registered")
+    
+    # Send Telegram notification to admin
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        try:
+            message = (
+                f"🆕 *NEW ACCESS REQUEST*\n\n"
+                f"📋 Employee ID: `{request.employee_number}`\n"
+                f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                f"This employee is not in the system.\n"
+                f"Please add them to the Employee List if approved."
+            )
+            
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            async with httpx.AsyncClient() as client:
+                await client.post(url, json={
+                    "chat_id": TELEGRAM_CHAT_ID,
+                    "text": message,
+                    "parse_mode": "Markdown"
+                })
+        except Exception as e:
+            logging.error(f"Failed to send Telegram notification: {e}")
+    
+    return {"message": "Access request sent to admin", "employee_number": request.employee_number}
+
+
 # Admin: Get all registered guests with verification status
 @api_router.get("/admin/guests")
 async def get_all_guests():
