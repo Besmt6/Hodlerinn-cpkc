@@ -2118,7 +2118,7 @@ async def export_signin_pdf(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None)
 ):
-    """Export Sign-In Sheet as PDF"""
+    """Export Sign-In Sheet as PDF with signature images"""
     query = {}
     if start_date or end_date:
         date_filter = {}
@@ -2151,24 +2151,35 @@ async def export_signin_pdf(
         elements.append(Paragraph(date_range, subtitle_style))
     elements.append(Spacer(1, 0.3*inch))
     
-    # Table data
-    table_data = [['#', 'Stay Type', 'Name', 'Employee ID', 'Sig In', 'Sig Out', 'Date In', 'Time In', 'Date Out', 'Time Out', 'Room']]
+    # Table data with signature images
+    table_data = [['#', 'Name', 'Employee ID', 'Signature', 'Date In', 'Time In', 'Date Out', 'Time Out', 'Room']]
     
     for idx, booking in enumerate(bookings):
         guest = guests_dict.get(booking['employee_number'])
         if guest:
             decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
-            # Signature is now in booking
-            has_sig = bool(booking.get('signature_encrypted'))
-            is_out = booking.get('is_checked_out', False)
+            
+            # Get signature image
+            sig_element = '-'
+            if booking.get('signature_encrypted'):
+                try:
+                    sig_data = decrypt_data(booking['signature_encrypted'])
+                    if sig_data and sig_data.startswith('data:image'):
+                        # Remove data URL prefix
+                        base64_data = sig_data.split(',')[1] if ',' in sig_data else sig_data
+                        sig_bytes = base64.b64decode(base64_data)
+                        sig_buffer = io.BytesIO(sig_bytes)
+                        sig_img = RLImage(sig_buffer, width=60, height=25)
+                        sig_element = sig_img
+                except Exception as e:
+                    logging.warning(f"Could not decode signature for booking {booking.get('id')}: {e}")
+                    sig_element = 'Yes'
             
             table_data.append([
                 str(idx + 1),
-                'Single Stay',
                 decrypted_name[:20],
                 booking['employee_number'],
-                'Yes' if has_sig else '-',
-                'Yes' if (has_sig and is_out) else '-',
+                sig_element,
                 booking['check_in_date'],
                 booking['check_in_time'],
                 booking.get('check_out_date', '-'),
@@ -2177,17 +2188,22 @@ async def export_signin_pdf(
             ])
     
     if len(table_data) == 1:
-        table_data.append(['-', '-', 'No records found', '-', '-', '-', '-', '-', '-', '-', '-'])
+        table_data.append(['-', 'No records found', '-', '-', '-', '-', '-', '-', '-'])
     
-    table = Table(table_data, repeatRows=1)
+    # Adjust column widths to accommodate signature images
+    col_widths = [0.4*inch, 1.3*inch, 0.9*inch, 1.0*inch, 0.8*inch, 0.6*inch, 0.8*inch, 0.6*inch, 0.5*inch]
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fbbf24')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 1), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
         ('BACKGROUND', (0, 1), (-1, -1), colors.white),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.gray),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f5f5f5')]),
