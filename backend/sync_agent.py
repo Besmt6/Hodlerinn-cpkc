@@ -523,22 +523,38 @@ class APIGlobalSyncAgent:
                 emp_input = text_inputs[0]
                 await emp_input.click()
                 await self.page.wait_for_timeout(300)
-                # Select all and paste
                 await emp_input.fill(str(employee_id))
                 logger.info(f"Pasted Employee ID: {employee_id}")
-                # Wait 5 seconds for auto-save
-                await self.page.wait_for_timeout(5000)
+                await self.page.wait_for_timeout(1000)
             
             if len(text_inputs) >= 2:
                 # Second input is Room Number - type it
                 room_input = text_inputs[1]
                 await room_input.click()
                 await self.page.wait_for_timeout(300)
-                # Type room number
                 await room_input.type(str(room_number), delay=100)
                 logger.info(f"Typed Room Number: {room_number}")
-                # Wait 5 seconds for auto-save
-                await self.page.wait_for_timeout(5000)
+                await self.page.wait_for_timeout(1000)
+            
+            # Click on empty space near "Heavener" or "HEAVENER-OK" to trigger save
+            # Try to find and click near the city/supplier label area
+            try:
+                heavener_elem = await self.page.query_selector('text=HEAVENER')
+                if heavener_elem:
+                    await heavener_elem.click()
+                    logger.info("Clicked near HEAVENER to trigger save")
+                else:
+                    # Fallback: click on page header area
+                    await self.page.click('body', position={"x": 300, "y": 150})
+                    logger.info("Clicked on header area to trigger save")
+            except:
+                # Fallback: click somewhere safe on the page
+                await self.page.click('body', position={"x": 300, "y": 150})
+                logger.info("Clicked on page to trigger save")
+            
+            # Wait 5 seconds for auto-save to complete
+            logger.info("Waiting 5 seconds for auto-save...")
+            await self.page.wait_for_timeout(5000)
             
             logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
             return True
