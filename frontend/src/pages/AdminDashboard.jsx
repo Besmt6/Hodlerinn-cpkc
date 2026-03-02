@@ -313,6 +313,21 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleImportFromGuests = async () => {
+    try {
+      toast.info("Importing employees from your guest records...");
+      const response = await axios.post(`${API}/admin/import-from-guests`);
+      if (response.data.success) {
+        toast.success(response.data.message);
+        fetchEmployees();
+      } else {
+        toast.error(response.data.message || "Failed to import employees");
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to import from guest records");
+    }
+  };
+
   const fetchSettings = async () => {
     try {
       const [settingsRes, syncStatusRes] = await Promise.all([
@@ -1501,6 +1516,15 @@ export default function AdminDashboard() {
                   <p className="text-vault-text-secondary font-manrope mt-1">Manage authorized employees who can check in</p>
                 </div>
                 <div className="flex gap-2">
+                  <Button
+                    onClick={handleImportFromGuests}
+                    disabled={collectingEmployees}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    data-testid="import-from-guests-btn"
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    Import from Guest Records
+                  </Button>
                   <Button
                     onClick={handleCollectFromPortal}
                     disabled={collectingEmployees}

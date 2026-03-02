@@ -1804,6 +1804,50 @@ async def get_sync_history():
     history = await db.sync_history.find({}, {"_id": 0}).sort("timestamp", -1).to_list(20)
     return history
 
+@api_router.post("/admin/import-from-guests")
+async def import_employees_from_guests():
+    """Import employees from existing Hodler Inn guest records into the Employee List."""
+    # Get all guests from bookings
+    bookings = await db.bookings.find({}, {"_id": 0, "employee_number": 1, "employee_name": 1}).to_list(1000)
+    
+    imported = 0
+    skipped = 0
+    
+    seen_ids = set()
+    for booking in bookings:
+        employee_number = booking.get("employee_number", "").strip()
+        name = booking.get("employee_name", "").strip()
+        
+        if not employee_number or not name or employee_number in seen_ids:
+            continue
+        
+        seen_ids.add(employee_number)
+        
+        # Check if already exists in employee list
+        existing = await db.employees.find_one({"employee_number": employee_number}, {"_id": 0})
+        if existing:
+            skipped += 1
+            continue
+        
+        # Add to employee list
+        employee = {
+            "id": str(uuid.uuid4()),
+            "employee_number": employee_number,
+            "name": name,
+            "is_active": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "source": "guest_import"
+        }
+        await db.employees.insert_one(employee)
+        imported += 1
+    
+    return {
+        "success": True,
+        "message": f"Imported {imported} employees from guest records, skipped {skipped} duplicates.",
+        "imported": imported,
+        "skipped": skipped
+    }
+
 @api_router.post("/admin/collect-employees")
 async def collect_employees_from_portal_endpoint():
     """Use AI agent to collect employee names and IDs from the railroad portal Sign-in Report."""
