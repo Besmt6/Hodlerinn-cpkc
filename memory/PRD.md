@@ -233,11 +233,38 @@ Build a two-part application for a hotel named "Hodler Inn":
 - Uses `useRef` hooks for smooth focus transitions
 - Enhances kiosk experience with minimal user effort
 
+## Employee Collection AI Agent (March 2026)
+**Status:** ✅ FULLY FUNCTIONAL!
+
+### Features Implemented:
+- **Import from Portal Button** in Admin Employee Management panel
+- Navigates to Sign-in Report section (not Online Sign-in Sheets)
+- Iterates through multiple billing periods (up to 6 months of historical data)
+- Clicks "View Details" for each day to access individual employee records
+- Extracts Crew ID and Crew Name from detail tables
+- Formats names from portal format (LASTNAME/FIRSTNAME/SUFFIX) to readable format (Firstname Lastname)
+- Imports unique employees to database with `source: "portal_import"` marker
+- Successfully imported 63 employees in first run
+
+### Technical Details:
+- Located in `backend/sync_agent.py` → `collect_employees_from_portal()` function
+- API Endpoint: POST `/api/admin/collect-employees`
+- Uses Playwright for headless browser automation
+- Handles navigation between billing periods with re-navigation to Sign-in Report page
+- Robust column detection (finds CrewId and Crew Name columns dynamically)
+- Validates employee IDs (alphanumeric, <=15 chars, no metadata like "Hotel:", "City:")
+
+### Results:
+- Total employees imported: 63 (from 6 months of data)
+- Import time: ~2-3 minutes (depending on data volume)
+- Duplicate detection: Skips employees already in database
+
 ## Next Tasks
 1. ~~**AI Verification Agent Selector Fix**~~ ✅ Completed - Updated CSS selector logic
-2. **Elox Smart Lock Integration** - Pending call on Monday to check if web portal exists
-3. UnlockOS Smart Lock Integration (saved for later)
-4. Email notifications on check-in/out
-5. Room availability calendar view
-6. Blockchain integration (saved for later)
-7. AI Phone Bot (saved for later)
+2. ~~**Employee Collection AI Agent**~~ ✅ Completed - March 2, 2026
+3. **Elox Smart Lock Integration** - Pending call on Monday to check if web portal exists
+4. UnlockOS Smart Lock Integration (saved for later)
+5. Email notifications on check-in/out
+6. Room availability calendar view
+7. Blockchain integration (saved for later)
+8. AI Phone Bot (saved for later)
