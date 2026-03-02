@@ -109,6 +109,7 @@ export default function AdminDashboard() {
   const [deleteEmployeeConfirm, setDeleteEmployeeConfirm] = useState(null);
   const [bulkImportText, setBulkImportText] = useState("");
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [collectingEmployees, setCollectingEmployees] = useState(false);
   
   // Portal Settings state
   const [portalSettings, setPortalSettings] = useState({
