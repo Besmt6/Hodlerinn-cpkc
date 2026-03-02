@@ -177,6 +177,82 @@ export default function AdminDashboard() {
     }
   };
 
+  // Employee CRUD functions
+  const handleSaveEmployee = async () => {
+    if (!employeeForm.employee_number || !employeeForm.name) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    
+    try {
+      if (editingEmployee) {
+        await axios.put(`${API}/admin/employees/${editingEmployee.id}`, employeeForm);
+        toast.success("Employee updated successfully");
+      } else {
+        await axios.post(`${API}/admin/employees`, employeeForm);
+        toast.success("Employee added successfully");
+      }
+      setShowEmployeeDialog(false);
+      setEditingEmployee(null);
+      setEmployeeForm({ employee_number: "", name: "" });
+      fetchEmployees();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to save employee");
+    }
+  };
+
+  const handleEditEmployee = (employee) => {
+    setEditingEmployee(employee);
+    setEmployeeForm({
+      employee_number: employee.employee_number,
+      name: employee.name
+    });
+    setShowEmployeeDialog(true);
+  };
+
+  const handleDeleteEmployee = async (employeeId) => {
+    try {
+      await axios.delete(`${API}/admin/employees/${employeeId}`);
+      toast.success("Employee deleted successfully");
+      setDeleteEmployeeConfirm(null);
+      fetchEmployees();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to delete employee");
+    }
+  };
+
+  const handleBulkImport = async () => {
+    if (!bulkImportText.trim()) {
+      toast.error("Please enter employee data");
+      return;
+    }
+    
+    try {
+      // Parse CSV/text format: "employee_number,name" or "employee_number name"
+      const lines = bulkImportText.trim().split('\n');
+      const employeesToImport = lines.map(line => {
+        const parts = line.split(/[,\t]/).map(p => p.trim());
+        if (parts.length >= 2) {
+          return { employee_number: parts[0], name: parts[1] };
+        }
+        return null;
+      }).filter(e => e !== null);
+      
+      if (employeesToImport.length === 0) {
+        toast.error("No valid employee data found. Use format: ID,Name");
+        return;
+      }
+      
+      const response = await axios.post(`${API}/admin/employees/bulk`, employeesToImport);
+      toast.success(response.data.message);
+      setBulkImportText("");
+      setShowBulkImport(false);
+      fetchEmployees();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to import employees");
+    }
+  };
+
   const fetchSettings = async () => {
     try {
       const [settingsRes, syncStatusRes] = await Promise.all([
