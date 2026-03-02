@@ -510,17 +510,36 @@ async def check_in(input: CheckInCreate):
     
     await db.bookings.insert_one(doc)
     
+    # Check if this is a first-time check-in (new registration)
+    check_in_count = await db.bookings.count_documents({"employee_number": input.employee_number})
+    is_first_time = check_in_count == 1
+    
     # Send Telegram notification for check-in
-    await send_telegram_notification(
-        f"🟢🟢🟢 <b>CHECK-IN</b> 🟢🟢🟢\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"✅ <b>Guest:</b> {guest_name}\n"
-        f"✅ <b>Employee ID:</b> {input.employee_number}\n"
-        f"✅ <b>Room:</b> {input.room_number}\n"
-        f"✅ <b>Date:</b> {input.check_in_date}\n"
-        f"✅ <b>Time:</b> {input.check_in_time}\n"
-        f"━━━━━━━━━━━━━━━"
-    )
+    if is_first_time:
+        # First time guest - needs verification
+        await send_telegram_notification(
+            f"🆕🆕🆕 <b>NEW GUEST CHECK-IN</b> 🆕🆕🆕\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"⚠️ <b>FIRST TIME - PLEASE VERIFY</b>\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Name:</b> {guest_name}\n"
+            f"🆔 <b>Employee ID:</b> {input.employee_number}\n"
+            f"🚪 <b>Room:</b> {input.room_number}\n"
+            f"📅 <b>Date:</b> {input.check_in_date}\n"
+            f"🕐 <b>Time:</b> {input.check_in_time}\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"✅ Verify this person in Admin Dashboard"
+        )
+    else:
+        # Returning guest
+        await send_telegram_notification(
+            f"🟢 <b>CHECK-IN</b>\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Guest:</b> {guest_name}\n"
+            f"🆔 <b>ID:</b> {input.employee_number}\n"
+            f"🚪 <b>Room:</b> {input.room_number}\n"
+            f"📅 {input.check_in_date} @ {input.check_in_time}"
+        )
     
     return checkin
 
