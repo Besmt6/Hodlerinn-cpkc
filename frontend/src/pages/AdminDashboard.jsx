@@ -111,6 +111,10 @@ export default function AdminDashboard() {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [collectingEmployees, setCollectingEmployees] = useState(false);
   
+  // Guest management state (verification)
+  const [registeredGuests, setRegisteredGuests] = useState([]);
+  const [loadingGuests, setLoadingGuests] = useState(false);
+  
   // Portal Settings state
   const [portalSettings, setPortalSettings] = useState({
     api_global_username: "",
