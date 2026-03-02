@@ -218,48 +218,126 @@ class APIGlobalSyncAgent:
             
             # If a target date is provided, set it before clicking Load
             if target_date:
-                # Convert YYYY-MM-DD to MM/DD/YYYY if needed
+                # Convert YYYY-MM-DD to "DD Mon YYYY" format (e.g., "01 Mar 2026")
                 if '-' in target_date and len(target_date) == 10:
-                    parts = target_date.split('-')
-                    target_date = f"{parts[1]}/{parts[2]}/{parts[0]}"
+                    from datetime import datetime as dt
+                    date_obj = dt.strptime(target_date, "%Y-%m-%d")
+                    target_date = date_obj.strftime("%d %b %Y")  # e.g., "01 Mar 2026"
                 
                 logger.info(f"Setting date to: {target_date}")
                 
-                # Find the date input field
-                date_input = self.page.locator('input[type="text"][id*="date" i], input[type="text"][id*="Date" i], input.ui-inputfield[id*="date" i]').first
+                # Find the date input field - look for common patterns in JSF/PrimeFaces
+                date_selectors = [
+                    'input[id*="reservationDate"]',
+                    'input[id*="date"]',
+                    'input[class*="ui-inputfield"]',
+                    'input[type="text"][size="10"]',
+                    'input.hasDatepicker',
+                    'span.ui-calendar input'
+                ]
                 
-                try:
-                    # Clear and set the date
-                    await date_input.click()
-                    await date_input.fill('')
-                    await date_input.fill(target_date)
-                    await self.page.wait_for_timeout(500)
-                    # Press Tab to trigger any date validation
-                    await date_input.press('Tab')
-                    await self.page.wait_for_timeout(500)
-                    logger.info(f"Date set to {target_date}")
-                except Exception as date_err:
-                    logger.warning(f"Could not set date input: {date_err}")
-                    # Try alternative approach - look for calendar icon or different input
+                date_input = None
+                for selector in date_selectors:
                     try:
-                        date_input = self.page.locator('input[placeholder*="date" i], input[name*="date" i]').first
-                        await date_input.fill(target_date)
-                        logger.info(f"Date set via alternative selector")
+                        date_input = self.page.locator(selector).first
+                        if await date_input.count() > 0:
+                            logger.info(f"Found date input with selector: {selector}")
+                            break
                     except:
-                        logger.warning("Date selection failed, using default date")
+                        continue
+                
+                if date_input:
+                    try:
+                        # Clear and set the date with triple-click to select all
+                        await date_input.click(click_count=3)
+                        await self.page.wait_for_timeout(200)
+                        await date_input.fill(target_date)
+                        await self.page.wait_for_timeout(500)
+                        # Press Enter or Tab to confirm
+                        await date_input.press('Enter')
+                        await self.page.wait_for_timeout(500)
+                        logger.info(f"Date set to {target_date}")
+                    except Exception as date_err:
+                        logger.warning(f"Could not set date input: {date_err}")
+                else:
+                    logger.warning("Could not find date input field")
             
             # Click the Load button
+            logger.info(f"Current URL before Load: {self.page.url}")
             load_button = self.page.locator('input[type="submit"][value="Load"], button:has-text("Load")').first
-            await load_button.click()
+            
+            # Check if Load button exists
+            button_count = await load_button.count()
+            logger.info(f"Found {button_count} Load button(s)")
+            
+            if button_count > 0:
+                await load_button.click()
+                logger.info("Clicked Load button")
+            else:
+                logger.error("Load button not found!")
+                # Try alternative selectors
+                alt_load = self.page.locator('input[value="Load"], button:text("Load"), .ui-button:has-text("Load")').first
+                if await alt_load.count() > 0:
+                    await alt_load.click()
+                    logger.info("Clicked Load via alternative selector")
             
             # Wait for data to load
+            logger.info(f"Current URL after Load click: {self.page.url}")
             await self.page.wait_for_load_state("networkidle", timeout=20000)
-            await self.page.wait_for_timeout(3000)
+            await self.page.wait_for_timeout(5000)  # Extra wait for AJAX content
+            
+            # Debug: Take screenshot and log page content
+            try:
+                await self.page.screenshot(path="/tmp/sync_debug.png")
+                logger.info("Debug screenshot saved to /tmp/sync_debug.png")
+            except:
+                pass
+            
+            # Log what's visible on the page
+            page_text = await self.page.inner_text('body')
+            logger.info(f"Page text length: {len(page_text)}")
+            logger.info(f"Page text preview: {page_text[:500]}")
+            if 'Scheduled' in page_text:
+                logger.info("Found 'Scheduled' in page text")
+            if 'Arrivals' in page_text:
+                logger.info("Found 'Arrivals' in page text")
+            if 'No records' in page_text or 'no records' in page_text.lower():
+                logger.info("Page shows 'No records'")
+            if 'error' in page_text.lower():
+                logger.warning("Page might contain an error")
             
             # Check if "Scheduled Arrivals" section appeared
             try:
                 await self.page.wait_for_selector('text=Scheduled Arrivals', timeout=10000)
                 logger.info("Sign-in sheet data loaded successfully")
+                
+                # Scroll down to load all entries (lazy loading)
+                logger.info("Scrolling to load all entries...")
+                last_height = 0
+                scroll_attempts = 0
+                max_scrolls = 10
+                
+                while scroll_attempts < max_scrolls:
+                    # Scroll down
+                    await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                    await self.page.wait_for_timeout(1500)
+                    
+                    # Check new height
+                    new_height = await self.page.evaluate('document.body.scrollHeight')
+                    
+                    if new_height == last_height:
+                        # No more content to load
+                        logger.info(f"Finished scrolling after {scroll_attempts + 1} scrolls")
+                        break
+                    
+                    last_height = new_height
+                    scroll_attempts += 1
+                    logger.info(f"Scroll {scroll_attempts}: page height = {new_height}")
+                
+                # Scroll back to top
+                await self.page.evaluate('window.scrollTo(0, 0)')
+                await self.page.wait_for_timeout(1000)
+                
                 return True
             except:
                 logger.warning("Could not find Scheduled Arrivals - page may be empty or different structure")
@@ -276,110 +354,101 @@ class APIGlobalSyncAgent:
         try:
             logger.info("Extracting sign-in sheet entries...")
             
-            # The page structure shows multiple arrival blocks, each with a data table
-            # Each block has: Name, Employee ID input, No Show/No Bill checkboxes, Room Number input
+            # Debug: Print page content summary
+            page_text = await self.page.inner_text('body')
+            logger.info(f"Page contains 'Scheduled Arrivals': {'Scheduled Arrivals' in page_text}")
+            logger.info(f"Page contains 'BEARDEN': {'BEARDEN' in page_text}")
             
-            # Find all table rows that contain employee data
-            # Looking for rows with Name column and Employee ID input
+            # Find all table rows in the data tables
+            all_rows = await self.page.query_selector_all('tr')
+            logger.info(f"Found {len(all_rows)} total rows")
             
-            # Get all tables in the Scheduled Arrivals section
-            tables = await self.page.query_selector_all('table')
-            
-            for table in tables:
-                rows = await table.query_selector_all('tr')
-                for row in rows:
-                    try:
-                        # Look for rows that have a Name cell and Employee ID input
-                        cells = await row.query_selector_all('td')
-                        if len(cells) < 4:
+            for row in all_rows:
+                try:
+                    row_text = await row.inner_text()
+                    
+                    # Skip header rows and empty rows
+                    if not row_text or len(row_text.strip()) < 5:
+                        continue
+                    if 'Name' in row_text and 'Employee ID' in row_text and 'Room Number' in row_text:
+                        continue
+                    if 'Undo Change' in row_text or 'Select All' in row_text:
+                        continue
+                    if 'Reservation Date' in row_text and 'Billing Date' in row_text:
+                        continue
+                    
+                    # Look for name patterns:
+                    # 1. LASTNAME/FIRSTNAME format (e.g., BEARDEN/WILLIAM/OT I E)
+                    # 2. LASTNAME,(FIRSTNAME) format (e.g., HESS,(BERNARD) DT/2 E)
+                    # Both are uppercase and contain either "/" or "("
+                    
+                    cells = await row.query_selector_all('td')
+                    if len(cells) < 3:
+                        continue
+                    
+                    name_text = None
+                    
+                    for cell in cells:
+                        cell_text = await cell.inner_text()
+                        cell_text = cell_text.strip()
+                        
+                        if len(cell_text) < 5:
                             continue
                         
-                        # Try to find the name - it's usually in format LASTNAME/FIRSTNAME/SUFFIX
-                        name_text = None
-                        emp_input = None
-                        room_input = None
-                        no_bill_checkbox = None
+                        # Skip date patterns
+                        if any(month in cell_text for month in ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']):
+                            if len(cell_text) < 15:  # Short date strings
+                                continue
                         
-                        for cell in cells:
-                            cell_text = await cell.inner_text()
-                            cell_text = cell_text.strip()
-                            
-                            # Check if this looks like a name (contains /)
-                            if '/' in cell_text and len(cell_text) > 3:
-                                # This is likely the name column
+                        # Check for name patterns (uppercase with / or ()
+                        has_slash = '/' in cell_text
+                        has_paren = '(' in cell_text and ')' in cell_text
+                        is_mostly_upper = sum(1 for c in cell_text if c.isupper()) > len(cell_text) * 0.5
+                        
+                        if (has_slash or has_paren) and is_mostly_upper:
+                            # Additional check: not a date
+                            if not (cell_text[0:2].isdigit() or cell_text[-4:].isdigit()):
                                 name_text = cell_text
-                        
-                        # Find Employee ID input in this row
-                        emp_input = await row.query_selector('input[id*="employeeId"], input[id*="empId"], input[name*="employee"]')
-                        if not emp_input:
-                            # Try finding any text input that might be for employee ID
-                            inputs = await row.query_selector_all('input[type="text"]')
-                            for inp in inputs:
-                                placeholder = await inp.get_attribute('placeholder') or ''
-                                value = await inp.get_attribute('value') or ''
-                                inp_id = await inp.get_attribute('id') or ''
-                                if 'employee' in inp_id.lower() or 'emp' in inp_id.lower() or value == 'NO ID':
-                                    emp_input = inp
-                                    break
-                        
-                        # Find Room Number input
-                        room_input = await row.query_selector('input[id*="room"], input[name*="room"]')
-                        if not room_input:
-                            inputs = await row.query_selector_all('input[type="text"]')
-                            for inp in inputs:
-                                inp_id = await inp.get_attribute('id') or ''
-                                inp_name = await inp.get_attribute('name') or ''
-                                if 'room' in inp_id.lower() or 'room' in inp_name.lower():
-                                    room_input = inp
-                                    break
-                        
-                        # Find No Bill checkbox - look for checkbox near "No Bill" label text
-                        # The portal uses JSF so checkbox IDs may be dynamically generated
-                        no_bill_checkbox = await row.query_selector('input[type="checkbox"][id*="noBill"], input[type="checkbox"][name*="noBill"]')
-                        if not no_bill_checkbox:
-                            # Try finding by looking for cell with "No Bill" text and nearby checkbox
-                            for cell in cells:
-                                cell_text = await cell.inner_text()
-                                if 'no bill' in cell_text.lower():
-                                    # Found the No Bill cell, look for checkbox in this cell or nearby
-                                    no_bill_checkbox = await cell.query_selector('input[type="checkbox"]')
-                                    if no_bill_checkbox:
-                                        break
-                        
-                        if not no_bill_checkbox:
-                            # Try finding all checkboxes and match by position/context
-                            checkboxes = await row.query_selector_all('input[type="checkbox"]')
-                            # In the portal structure, "No Show" is first, "No Bill" is second checkbox
-                            if len(checkboxes) >= 2:
-                                no_bill_checkbox = checkboxes[1]  # Second checkbox is typically "No Bill"
-                            elif len(checkboxes) == 1:
-                                # If only one checkbox, check its ID/name
-                                cb_id = await checkboxes[0].get_attribute('id') or ''
-                                cb_name = await checkboxes[0].get_attribute('name') or ''
-                                if 'nobill' in cb_id.lower() or 'nobill' in cb_name.lower() or 'bill' in cb_id.lower():
-                                    no_bill_checkbox = checkboxes[0]
-                        
-                        if name_text:
-                            # Check if already verified (has employee ID filled in)
-                            emp_value = ""
-                            if emp_input:
-                                emp_value = await emp_input.get_attribute('value') or ''
-                            
-                            is_verified = emp_value and emp_value != 'NO ID' and len(emp_value) > 2
-                            
-                            entries.append({
-                                "name": name_text,
-                                "emp_input": emp_input,
-                                "room_input": room_input,
-                                "no_bill_checkbox": no_bill_checkbox,
-                                "row": row,
-                                "verified": is_verified,
-                                "current_emp_value": emp_value
-                            })
-                            logger.info(f"Found entry: {name_text} (verified: {is_verified})")
+                                break
+                            # Or if it's long enough to be a name
+                            if len(cell_text) > 12:
+                                name_text = cell_text
+                                break
                     
-                    except Exception as e:
+                    if not name_text:
                         continue
+                    
+                    logger.info(f"Found name: {name_text}")
+                    
+                    # Find inputs in this row
+                    text_inputs = await row.query_selector_all('input[type="text"]')
+                    checkboxes = await row.query_selector_all('input[type="checkbox"]')
+                    
+                    emp_input = text_inputs[0] if len(text_inputs) >= 1 else None
+                    room_input = text_inputs[1] if len(text_inputs) >= 2 else None
+                    no_bill_checkbox = checkboxes[1] if len(checkboxes) >= 2 else (checkboxes[0] if checkboxes else None)
+                    
+                    # Check if already verified
+                    emp_value = ""
+                    if emp_input:
+                        emp_value = await emp_input.get_attribute('value') or ''
+                    
+                    is_verified = emp_value and emp_value.strip() and len(emp_value.strip()) > 2
+                    
+                    entry = {
+                        "name": name_text,
+                        "emp_input": emp_input,
+                        "room_input": room_input,
+                        "no_bill_checkbox": no_bill_checkbox,
+                        "verified": is_verified,
+                        "current_emp_id": emp_value,
+                        "row": row
+                    }
+                    entries.append(entry)
+                    logger.info(f"Entry added: {name_text}, verified={is_verified}")
+                    
+                except Exception as row_err:
+                    continue
             
             logger.info(f"Found {len(entries)} sign-in sheet entries")
             return entries
@@ -420,16 +489,27 @@ class APIGlobalSyncAgent:
                 # Check if already checked
                 is_checked = await entry["no_bill_checkbox"].is_checked()
                 if not is_checked:
-                    # Try clicking the checkbox
-                    await entry["no_bill_checkbox"].click()
-                    await self.page.wait_for_timeout(500)
+                    # PrimeFaces checkboxes have overlay elements - use force click
+                    try:
+                        await entry["no_bill_checkbox"].click(force=True)
+                        await self.page.wait_for_timeout(500)
+                    except Exception:
+                        # Fallback: Use JavaScript to click
+                        try:
+                            await entry["no_bill_checkbox"].evaluate("el => el.click()")
+                            await self.page.wait_for_timeout(500)
+                        except:
+                            await entry["no_bill_checkbox"].dispatch_event("click")
+                            await self.page.wait_for_timeout(500)
                     
                     # Verify it was checked
                     is_now_checked = await entry["no_bill_checkbox"].is_checked()
                     if not is_now_checked:
-                        # Try using check() method as fallback
-                        await entry["no_bill_checkbox"].check()
-                        await self.page.wait_for_timeout(300)
+                        # Try check() method as fallback
+                        try:
+                            await entry["no_bill_checkbox"].check(force=True)
+                        except:
+                            pass
                         
                 logger.info(f"Marked No Bill: {entry['name']}")
                 return True
@@ -445,13 +525,19 @@ class APIGlobalSyncAgent:
                         no_bill_cb = checkboxes[1]
                         is_checked = await no_bill_cb.is_checked()
                         if not is_checked:
-                            await no_bill_cb.click()
+                            try:
+                                await no_bill_cb.click(force=True)
+                            except:
+                                await no_bill_cb.evaluate("el => el.click()")
                             await self.page.wait_for_timeout(500)
                         logger.info(f"Marked No Bill (fallback): {entry['name']}")
                         return True
                     elif len(checkboxes) == 1:
                         # Only one checkbox, try it
-                        await checkboxes[0].click()
+                        try:
+                            await checkboxes[0].click(force=True)
+                        except:
+                            await checkboxes[0].evaluate("el => el.click()")
                         await self.page.wait_for_timeout(500)
                         logger.info(f"Marked checkbox (single): {entry['name']}")
                         return True
