@@ -516,9 +516,27 @@ function CheckInForm({ setView, setSuccessMessage }) {
         // Check if employee ID is in admin's approved list
         try {
           const empResponse = await axios.get(`${API}/employees/verify/${employeeNumber}`);
-          setEmployeeName(empResponse.data.name);
-          setEmployeeStatus('new_guest');
+          const name = empResponse.data.name;
+          setEmployeeName(name);
+          
+          // Auto-register the employee since they're in the admin list
+          try {
+            await axios.post(`${API}/guests/register`, {
+              employee_number: employeeNumber,
+              name: name
+            });
+            // Successfully registered - show full form
+            setEmployeeStatus('found');
+            const timePeriod = getTimePeriod();
+            playVoiceMessage(`checkin_welcome_${timePeriod}`);
+            setTimeout(() => roomInputRef.current?.focus(), 300);
+          } catch (regError) {
+            // Registration failed - maybe already registered, still show form
+            setEmployeeStatus('found');
+            setTimeout(() => roomInputRef.current?.focus(), 300);
+          }
         } catch (empError) {
+          // Employee not in admin list - show request access form
           setEmployeeName("");
           setEmployeeStatus('not_found');
         }
@@ -530,24 +548,6 @@ function CheckInForm({ setView, setSuccessMessage }) {
     const timer = setTimeout(verifyEmployee, 500);
     return () => clearTimeout(timer);
   }, [employeeNumber]);
-
-  const handleRegisterAndContinue = async () => {
-    if (!employeeName.trim()) return;
-    setLoading(true);
-    try {
-      await axios.post(`${API}/guests/register`, {
-        employee_number: employeeNumber,
-        name: employeeName.trim()
-      });
-      setEmployeeStatus('found');
-      toast.success(`Welcome, ${employeeName}!`);
-      setTimeout(() => roomInputRef.current?.focus(), 300);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || "Registration failed");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleRequestAccess = async () => {
     if (!employeeName.trim()) {
@@ -702,21 +702,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
             {/* Status Messages */}
             {employeeStatus === 'found' && (
               <p className="text-emerald-400 text-sm mt-1 flex items-center gap-1">
-                <span>✓</span> Welcome back!
+                <span>✓</span> Welcome!
               </p>
-            )}
-            {employeeStatus === 'new_guest' && (
-              <div className="mt-2">
-                <p className="text-amber-400 text-sm mb-2">First time? Tap below to register:</p>
-                <Button
-                  onClick={handleRegisterAndContinue}
-                  disabled={loading}
-                  className="w-full bg-amber-600 hover:bg-amber-700 text-white h-10"
-                  data-testid="register-continue-btn"
-                >
-                  {loading ? "Registering..." : `Register as ${employeeName}`}
-                </Button>
-              </div>
             )}
             {employeeStatus === 'not_found' && (
               <div className="mt-2 bg-red-900/30 border border-red-600/50 rounded-lg p-3 space-y-3">
