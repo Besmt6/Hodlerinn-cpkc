@@ -519,47 +519,26 @@ class APIGlobalSyncAgent:
             text_inputs = await target_row.query_selector_all('input[type="text"]')
             
             if len(text_inputs) >= 1:
-                # First input is Employee ID
+                # First input is Employee ID - use fill (like paste)
                 emp_input = text_inputs[0]
-                # Click to focus
                 await emp_input.click()
-                await self.page.wait_for_timeout(200)
-                # Clear existing value
-                await emp_input.evaluate('el => el.value = ""')
-                # Type the value character by character to trigger events
-                await emp_input.type(str(employee_id), delay=50)
                 await self.page.wait_for_timeout(300)
-                # Trigger change event
-                await emp_input.evaluate('el => el.dispatchEvent(new Event("change", { bubbles: true }))')
-                await emp_input.evaluate('el => el.dispatchEvent(new Event("blur", { bubbles: true }))')
-                logger.info(f"Filled Employee ID: {employee_id}")
+                # Select all and paste
+                await emp_input.fill(str(employee_id))
+                logger.info(f"Pasted Employee ID: {employee_id}")
+                # Wait 5 seconds for auto-save
+                await self.page.wait_for_timeout(5000)
             
             if len(text_inputs) >= 2:
-                # Second input is Room Number
+                # Second input is Room Number - type it
                 room_input = text_inputs[1]
-                # Click to focus
                 await room_input.click()
-                await self.page.wait_for_timeout(200)
-                # Clear existing value
-                await room_input.evaluate('el => el.value = ""')
-                # Type the value character by character
-                await room_input.type(str(room_number), delay=50)
                 await self.page.wait_for_timeout(300)
-                # Trigger change event
-                await room_input.evaluate('el => el.dispatchEvent(new Event("change", { bubbles: true }))')
-                await room_input.evaluate('el => el.dispatchEvent(new Event("blur", { bubbles: true }))')
-                logger.info(f"Filled Room Number: {room_number}")
-            
-            # Click elsewhere to ensure all blur events fire
-            await self.page.click('body', position={"x": 10, "y": 10})
-            await self.page.wait_for_timeout(500)
-            
-            # Press Tab to move to next field (triggers form validation)
-            await self.page.keyboard.press("Tab")
-            
-            # Wait for auto-save (portal refreshes after 2-3 seconds)
-            logger.info("Waiting for auto-save...")
-            await self.page.wait_for_timeout(4000)
+                # Type room number
+                await room_input.type(str(room_number), delay=100)
+                logger.info(f"Typed Room Number: {room_number}")
+                # Wait 5 seconds for auto-save
+                await self.page.wait_for_timeout(5000)
             
             logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
             return True
