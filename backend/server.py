@@ -2057,51 +2057,59 @@ async def collect_employees_from_portal_endpoint():
     if not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
         raise HTTPException(status_code=400, detail="Portal credentials not configured")
     
-    from sync_agent import collect_employees_from_portal
-    
-    username = settings.get("api_global_username")
-    password = decrypt_data(settings.get("api_global_password_encrypted"))
-    
-    result = await collect_employees_from_portal(username, password)
-    
-    if result["success"] and result["employees"]:
-        # Import employees with their actual IDs from the portal
-        imported = 0
-        skipped = 0
+    try:
+        from sync_agent import collect_employees_from_portal
         
-        for emp in result["employees"]:
-            employee_number = emp.get("employee_number", "").strip()
-            name = emp.get("name", "").strip()
-            
-            if not employee_number or not name:
-                skipped += 1
-                continue
-            
-            # Check if already exists
-            existing = await db.employees.find_one({
-                "employee_number": employee_number
-            }, {"_id": 0})
-            
-            if existing:
-                skipped += 1
-                continue
-            
-            employee = {
-                "id": str(uuid.uuid4()),
-                "employee_number": employee_number,
-                "name": name,
-                "is_active": True,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "source": "portal_import"
-            }
-            await db.employees.insert_one(employee)
-            imported += 1
+        username = settings.get("api_global_username")
+        password = decrypt_data(settings.get("api_global_password_encrypted"))
         
-        result["imported"] = imported
-        result["skipped"] = skipped
-        result["message"] = f"Found {len(result['employees'])} employees. Imported {imported}, skipped {skipped} duplicates."
-    
-    return result
+        logging.info(f"Starting portal import for username: {username}")
+        result = await collect_employees_from_portal(username, password)
+        logging.info(f"Portal import result: success={result.get('success')}, employees={len(result.get('employees', []))}")
+        
+        if result["success"] and result["employees"]:
+            # Import employees with their actual IDs from the portal
+            imported = 0
+            skipped = 0
+            
+            for emp in result["employees"]:
+                employee_number = emp.get("employee_number", "").strip()
+                name = emp.get("name", "").strip()
+                
+                if not employee_number or not name:
+                    skipped += 1
+                    continue
+                
+                # Check if already exists
+                existing = await db.employees.find_one({
+                    "employee_number": employee_number
+                }, {"_id": 0})
+                
+                if existing:
+                    skipped += 1
+                    continue
+                
+                employee = {
+                    "id": str(uuid.uuid4()),
+                    "employee_number": employee_number,
+                    "name": name,
+                    "is_active": True,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "source": "portal_import"
+                }
+                await db.employees.insert_one(employee)
+                imported += 1
+            
+            result["imported"] = imported
+            result["skipped"] = skipped
+            result["message"] = f"Found {len(result['employees'])} employees. Imported {imported}, skipped {skipped} duplicates."
+        
+        return result
+    except Exception as e:
+        logging.error(f"Portal import error: {str(e)}")
+        import traceback
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to collect employees: {str(e)}")
 
 # ==================== PDF Export ====================
 
@@ -2315,6 +2323,25 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Ensure Playwright browsers are installed on startup
+@app.on_event("startup")
+async def ensure_playwright_browsers():
+    """Install Playwright browsers if not already installed"""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["playwright", "install", "chromium"],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        if result.returncode == 0:
+            logger.info("Playwright Chromium browser ready")
+        else:
+            logger.warning(f"Playwright install warning: {result.stderr}")
+    except Exception as e:
+        logger.warning(f"Could not install Playwright browsers: {e}")
 
 # Root-level health check (required by some deployment systems)
 @app.get("/health")

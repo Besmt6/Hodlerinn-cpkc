@@ -87,16 +87,20 @@ class APIGlobalSyncAgent:
     
     async def start(self):
         """Initialize browser."""
-        self.playwright = await async_playwright().start()
-        self.browser = await self.playwright.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-setuid-sandbox']
-        )
-        self.context = await self.browser.new_context(
-            viewport={'width': 1920, 'height': 1080}
-        )
-        self.page = await self.context.new_page()
-        logger.info("Browser started")
+        try:
+            self.playwright = await async_playwright().start()
+            self.browser = await self.playwright.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            )
+            self.context = await self.browser.new_context(
+                viewport={'width': 1920, 'height': 1080}
+            )
+            self.page = await self.context.new_page()
+            logger.info("Browser started successfully")
+        except Exception as e:
+            logger.error(f"Failed to start browser: {str(e)}")
+            raise Exception(f"Browser initialization failed: {str(e)}. Make sure Playwright browsers are installed.")
     
     async def stop(self):
         """Close browser."""
