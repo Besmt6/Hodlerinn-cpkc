@@ -990,7 +990,11 @@ async def get_all_records(
         if date_filter:
             query["check_in_date"] = date_filter
     
-    bookings = await db.bookings.find(query, {"_id": 0}).to_list(1000)
+    # Sort by check_in_date and check_in_time
+    bookings = await db.bookings.find(query, {"_id": 0}).sort([
+        ("check_in_date", 1),  # Ascending by date
+        ("check_in_time", 1)   # Then by time
+    ]).to_list(1000)
     
     # Batch fetch all guests to avoid N+1 query
     employee_numbers = [b['employee_number'] for b in bookings]
@@ -1052,7 +1056,7 @@ async def get_dashboard_stats():
 # Admin - Export to Excel (Sign-In Sheet Format)
 @api_router.get("/admin/export")
 async def export_to_excel():
-    bookings = await db.bookings.find({}, {"_id": 0}).to_list(1000)
+    bookings = await db.bookings.find({}, {"_id": 0}).sort([("check_in_date", 1), ("check_in_time", 1)]).to_list(1000)
     
     # Batch fetch all guests to avoid N+1 query
     employee_numbers = [b['employee_number'] for b in bookings]
@@ -1915,7 +1919,7 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
             target = now.strftime("%Y-%m-%d")
         query = {"check_in_date": target}
     
-    bookings = await db.bookings.find(query, {"_id": 0}).to_list(1000)
+    bookings = await db.bookings.find(query, {"_id": 0}).sort([("check_in_date", 1), ("check_in_time", 1)]).to_list(1000)
     
     # Get guest names
     employee_numbers = [b['employee_number'] for b in bookings]
@@ -2129,7 +2133,7 @@ async def export_signin_pdf(
         if date_filter:
             query["check_in_date"] = date_filter
     
-    bookings = await db.bookings.find(query, {"_id": 0}).to_list(1000)
+    bookings = await db.bookings.find(query, {"_id": 0}).sort([("check_in_date", 1), ("check_in_time", 1)]).to_list(1000)
     
     employee_numbers = [b['employee_number'] for b in bookings]
     guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
@@ -2235,7 +2239,7 @@ async def export_billing_pdf(
         if date_filter:
             query["check_in_date"] = date_filter
     
-    bookings = await db.bookings.find(query, {"_id": 0}).to_list(1000)
+    bookings = await db.bookings.find(query, {"_id": 0}).sort([("check_in_date", 1), ("check_in_time", 1)]).to_list(1000)
     
     employee_numbers = [b['employee_number'] for b in bookings]
     guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
