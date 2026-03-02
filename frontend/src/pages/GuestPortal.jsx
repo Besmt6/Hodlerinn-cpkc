@@ -556,6 +556,12 @@ function CheckInForm({ setView, setSuccessMessage }) {
       toast.error("Please enter your name");
       return;
     }
+    
+    // Verify company name (case insensitive)
+    if (companyName.trim().toUpperCase() !== "CPKC") {
+      toast.error("Invalid company name. Please enter your railroad company.");
+      return;
+    }
 
     setRegistering(true);
     try {
