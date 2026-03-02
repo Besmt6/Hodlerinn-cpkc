@@ -1742,6 +1742,167 @@ export default function AdminDashboard() {
             </>
           )}
 
+          {/* Guest Verification View */}
+          {activeView === 'guests' && (
+            <>
+              {/* Header */}
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Guest Verification</h1>
+                  <p className="text-vault-text-secondary font-manrope mt-1">Review and verify registered guests</p>
+                </div>
+                <Button
+                  onClick={fetchRegisteredGuests}
+                  className="bg-vault-surface border border-vault-border hover:bg-vault-surface-highlight text-vault-text"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <Card className="bg-vault-surface border-vault-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-vault-gold/20 rounded-lg">
+                        <Users className="w-5 h-5 text-vault-gold" />
+                      </div>
+                      <div>
+                        <p className="text-vault-text-secondary text-sm">Total Guests</p>
+                        <p className="text-2xl font-bold text-vault-text font-mono">{registeredGuests.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-vault-surface border-vault-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-500/20 rounded-lg">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      </div>
+                      <div>
+                        <p className="text-vault-text-secondary text-sm">Verified</p>
+                        <p className="text-2xl font-bold text-green-500 font-mono">{registeredGuests.filter(g => g.is_verified).length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-vault-surface border-vault-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-500/20 rounded-lg">
+                        <AlertCircle className="w-5 h-5 text-amber-500" />
+                      </div>
+                      <div>
+                        <p className="text-vault-text-secondary text-sm">Pending</p>
+                        <p className="text-2xl font-bold text-amber-500 font-mono">{registeredGuests.filter(g => !g.is_verified).length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Guest Table */}
+              <Card className="bg-vault-surface border-vault-border">
+                <CardHeader className="border-b border-vault-border">
+                  <CardTitle className="font-outfit text-xl text-vault-text flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-vault-gold" />
+                    Registered Guests
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[400px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="table-header border-vault-border hover:bg-transparent">
+                          <TableHead className="text-vault-gold">Status</TableHead>
+                          <TableHead className="text-vault-gold">Name</TableHead>
+                          <TableHead className="text-vault-gold">Employee ID</TableHead>
+                          <TableHead className="text-vault-gold">Check-ins</TableHead>
+                          <TableHead className="text-vault-gold">Registered</TableHead>
+                          <TableHead className="text-vault-gold">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {loadingGuests ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-vault-text-secondary py-8">
+                              Loading guests...
+                            </TableCell>
+                          </TableRow>
+                        ) : registeredGuests.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-vault-text-secondary py-8">
+                              No registered guests yet.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          registeredGuests.map((guest) => (
+                            <TableRow key={guest.id} className={`table-row border-vault-border ${guest.is_flagged ? 'bg-red-900/20' : !guest.is_verified ? 'bg-amber-900/20' : ''}`}>
+                              <TableCell>
+                                {guest.is_flagged ? (
+                                  <span className="flex items-center gap-1 text-red-400">
+                                    <Flag className="w-4 h-4" />
+                                    Flagged
+                                  </span>
+                                ) : guest.is_verified ? (
+                                  <span className="flex items-center gap-1 text-green-400">
+                                    <CheckCircle className="w-4 h-4" />
+                                    Verified
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-1 text-amber-400">
+                                    <AlertCircle className="w-4 h-4" />
+                                    Pending
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-vault-text font-medium">{guest.name}</TableCell>
+                              <TableCell className="font-mono text-vault-gold">{guest.employee_number}</TableCell>
+                              <TableCell className="text-vault-text">{guest.check_in_count || 0}</TableCell>
+                              <TableCell className="text-vault-text-secondary text-sm">
+                                {new Date(guest.created_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  {!guest.is_verified && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="text-green-400 hover:text-green-300 hover:bg-green-500/20 h-8 px-2"
+                                      onClick={() => handleVerifyGuest(guest.employee_number)}
+                                      title="Verify guest"
+                                    >
+                                      <CheckCircle className="w-4 h-4 mr-1" />
+                                      Verify
+                                    </Button>
+                                  )}
+                                  {!guest.is_flagged && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="text-red-400 hover:text-red-300 hover:bg-red-500/20 h-8 px-2"
+                                      onClick={() => handleFlagGuest(guest.employee_number)}
+                                      title="Flag guest"
+                                    >
+                                      <Flag className="w-4 h-4 mr-1" />
+                                      Flag
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
           {/* Settings View */}
           {activeView === 'settings' && (
             <>
