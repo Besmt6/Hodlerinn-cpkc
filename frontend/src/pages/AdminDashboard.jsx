@@ -623,6 +623,14 @@ export default function AdminDashboard() {
             <span className="font-manrope text-sm">Room Management</span>
           </div>
           <div 
+            className={`admin-nav-item cursor-pointer ${activeView === 'employees' ? 'active' : ''}`}
+            onClick={() => setActiveView('employees')}
+            data-testid="nav-employees-view-btn"
+          >
+            <Users className="w-4 h-4" />
+            <span className="font-manrope text-sm">Employee List</span>
+          </div>
+          <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveView('settings')}
             data-testid="nav-settings-view-btn"
