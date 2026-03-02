@@ -550,16 +550,22 @@ function CheckInForm({ setView, setSuccessMessage }) {
   };
 
   const handleRequestAccess = async () => {
+    if (!employeeName.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
     setRequestingAccess(true);
     try {
-      // Send request to admin via API (which will send Telegram notification)
       await axios.post(`${API}/request-employee-access`, {
-        employee_number: employeeNumber
+        employee_number: employeeNumber,
+        name: employeeName.trim()
       });
-      toast.success("Access request sent to admin. Please wait for approval.");
+      toast.success("Access request sent! Admin will approve shortly.");
+      setEmployeeStatus(null);
+      setEmployeeNumber("");
+      setEmployeeName("");
     } catch (error) {
-      // If endpoint doesn't exist, show manual message
-      toast.info("Please contact admin to add your Employee ID to the system.");
+      toast.error(error.response?.data?.detail || "Failed to send request. Please contact admin.");
     } finally {
       setRequestingAccess(false);
     }
@@ -713,20 +719,29 @@ function CheckInForm({ setView, setSuccessMessage }) {
               </div>
             )}
             {employeeStatus === 'not_found' && (
-              <div className="mt-2 bg-red-900/30 border border-red-600/50 rounded-lg p-3">
-                <p className="text-red-400 text-sm mb-2">
-                  Employee ID not found in system.
+              <div className="mt-2 bg-red-900/30 border border-red-600/50 rounded-lg p-3 space-y-3">
+                <p className="text-red-400 text-sm">
+                  Employee ID not found in system. Enter your name to request access:
                 </p>
+                <div>
+                  <Input
+                    value={employeeName}
+                    onChange={(e) => setEmployeeName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="vault-input text-lg border-red-500/50"
+                    data-testid="request-name-input"
+                  />
+                </div>
                 <Button
                   onClick={handleRequestAccess}
-                  disabled={requestingAccess}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white h-10"
+                  disabled={requestingAccess || !employeeName.trim()}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white h-10 disabled:opacity-50"
                   data-testid="request-access-btn"
                 >
                   {requestingAccess ? "Sending Request..." : "Request Access from Admin"}
                 </Button>
-                <p className="text-red-300 text-xs mt-2 text-center">
-                  Admin will be notified via Telegram
+                <p className="text-red-300 text-xs text-center">
+                  Admin will receive notification and can approve instantly
                 </p>
               </div>
             )}

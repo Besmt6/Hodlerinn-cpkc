@@ -242,16 +242,23 @@ Build a two-part application for a hotel named "Hodler Inn":
 - **Visual Status Indicators:**
   - Green border: Employee found, "Welcome back!" message
   - Amber border: New guest (in admin list, not registered), "Register as [Name]" button
-  - Red border: Employee not found, "Request Access from Admin" button
-- **Request Access Feature:** Unknown employees can request admin approval via Telegram
+  - Red border: Employee not found, name input + "Request Access from Admin" button
+- **Telegram Approval System:** Unknown employees can request access with inline Approve/Reject buttons
 - **Removed Friction:** No separate "Verify" or "Continue" buttons needed
 
-### User Experience Flow:
-1. Enter Employee Number → Name auto-appears
-2. If new guest → Tap "Register as [Name]" (one-time)
-3. If not found → Tap "Request Access" (admin notified)
-4. Enter Room Number, Date/Time auto-filled
-5. Sign and submit
+### Telegram Approval Flow:
+1. Employee enters ID (not found) → Enters their name → Taps "Request Access"
+2. Admin receives Telegram notification with:
+   - Employee Name
+   - Employee ID
+   - **✅ Approve** and **❌ Reject** buttons
+3. Admin taps **Approve** → Employee automatically added to system
+4. Employee can now check in immediately!
+
+### API Endpoints:
+- `POST /api/request-employee-access` - Submit access request (name + ID)
+- `POST /api/telegram-webhook` - Handle Telegram button clicks
+- `GET /api/pending-access-requests` - View pending requests (for admin)
 
 ## Employee Collection AI Agent (March 2026)
 **Status:** ✅ FULLY FUNCTIONAL!

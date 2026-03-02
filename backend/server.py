@@ -486,14 +486,18 @@ async def get_guest(employee_number: str):
     return guest
 
 
-# Request employee access - sends Telegram notification to admin
+# Request employee access - sends Telegram notification to admin with approval buttons
 class AccessRequest(BaseModel):
     employee_number: str
+    name: str
+
+# Store pending access requests temporarily
+pending_access_requests = {}
 
 @api_router.post("/request-employee-access")
 async def request_employee_access(request: AccessRequest):
     """Guest requests access when their Employee ID is not in the system.
-    Sends a Telegram notification to admin for approval."""
+    Sends a Telegram notification to admin with Approve/Reject buttons."""
     
     # Check if already in system
     existing_employee = await db.employees.find_one({"employee_number": request.employee_number})
@@ -504,28 +508,127 @@ async def request_employee_access(request: AccessRequest):
     if existing_guest:
         raise HTTPException(status_code=400, detail="Guest already registered")
     
-    # Send Telegram notification to admin
+    # Store the request for later approval
+    request_id = str(uuid.uuid4())[:8]
+    pending_access_requests[request_id] = {
+        "employee_number": request.employee_number,
+        "name": request.name,
+        "requested_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Send Telegram notification with inline buttons
     if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
         try:
             message = (
                 f"🆕 *NEW ACCESS REQUEST*\n\n"
+                f"👤 Name: *{request.name}*\n"
                 f"📋 Employee ID: `{request.employee_number}`\n"
                 f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-                f"This employee is not in the system.\n"
-                f"Please add them to the Employee List if approved."
+                f"Tap below to approve or reject:"
             )
             
+            # Inline keyboard with Approve and Reject buttons
+            inline_keyboard = {
+                "inline_keyboard": [[
+                    {"text": "✅ Approve", "callback_data": f"approve_{request_id}"},
+                    {"text": "❌ Reject", "callback_data": f"reject_{request_id}"}
+                ]]
+            }
+            
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-            async with httpx.AsyncClient() as client:
-                await client.post(url, json={
+            async with httpx.AsyncClient() as http_client:
+                await http_client.post(url, json={
                     "chat_id": TELEGRAM_CHAT_ID,
                     "text": message,
-                    "parse_mode": "Markdown"
+                    "parse_mode": "Markdown",
+                    "reply_markup": inline_keyboard
                 })
         except Exception as e:
             logging.error(f"Failed to send Telegram notification: {e}")
     
     return {"message": "Access request sent to admin", "employee_number": request.employee_number}
+
+
+@api_router.post("/telegram-webhook")
+async def telegram_webhook(request_data: dict):
+    """Handle Telegram callback queries (button clicks) for access approvals."""
+    
+    if "callback_query" not in request_data:
+        return {"ok": True}
+    
+    callback = request_data["callback_query"]
+    callback_id = callback.get("id")
+    data = callback.get("data", "")
+    message = callback.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+    message_id = message.get("message_id")
+    
+    # Parse the callback data
+    if data.startswith("approve_"):
+        request_id = data.replace("approve_", "")
+        request_info = pending_access_requests.get(request_id)
+        
+        if request_info:
+            # Add employee to the system
+            employee_doc = {
+                "id": str(uuid.uuid4()),
+                "employee_number": request_info["employee_number"],
+                "name": request_info["name"],
+                "source": "telegram_approval",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "is_active": True
+            }
+            await db.employees.insert_one(employee_doc)
+            
+            # Remove from pending
+            del pending_access_requests[request_id]
+            
+            response_text = f"✅ *APPROVED*\n\n{request_info['name']} ({request_info['employee_number']}) has been added to the system."
+        else:
+            response_text = "⚠️ Request expired or already processed."
+            
+    elif data.startswith("reject_"):
+        request_id = data.replace("reject_", "")
+        request_info = pending_access_requests.get(request_id)
+        
+        if request_info:
+            del pending_access_requests[request_id]
+            response_text = f"❌ *REJECTED*\n\n{request_info['name']} ({request_info['employee_number']}) was not added."
+        else:
+            response_text = "⚠️ Request expired or already processed."
+    else:
+        response_text = "Unknown action"
+    
+    # Answer the callback query
+    if TELEGRAM_BOT_TOKEN:
+        try:
+            # Answer callback to remove loading state
+            answer_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
+            async with httpx.AsyncClient() as http_client:
+                await http_client.post(answer_url, json={
+                    "callback_query_id": callback_id,
+                    "text": "Processed!"
+                })
+                
+                # Edit the message to show result
+                edit_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText"
+                await http_client.post(edit_url, json={
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": response_text,
+                    "parse_mode": "Markdown"
+                })
+        except Exception as e:
+            logging.error(f"Failed to respond to Telegram callback: {e}")
+    
+    return {"ok": True}
+
+
+@api_router.get("/pending-access-requests")
+async def get_pending_requests():
+    """Get all pending access requests (for admin dashboard)."""
+    return list(pending_access_requests.items())
+
 
 
 # Admin: Get all registered guests with verification status
