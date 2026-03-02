@@ -687,6 +687,19 @@ export default function AdminDashboard() {
             <span className="font-manrope text-sm">Employee List</span>
           </div>
           <div 
+            className={`admin-nav-item cursor-pointer ${activeView === 'guests' ? 'active' : ''}`}
+            onClick={() => setActiveView('guests')}
+            data-testid="nav-guests-view-btn"
+          >
+            <UserCheck className="w-4 h-4" />
+            <span className="font-manrope text-sm">Guest Verification</span>
+            {registeredGuests.filter(g => !g.is_verified).length > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                {registeredGuests.filter(g => !g.is_verified).length}
+              </span>
+            )}
+          </div>
+          <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveView('settings')}
             data-testid="nav-settings-view-btn"
