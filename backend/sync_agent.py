@@ -500,71 +500,109 @@ class APIGlobalSyncAgent:
             
             logger.info(f"Verifying {name}, searching for row with: {search_name}")
             
-            # Find the row containing this name
-            all_rows = await self.page.query_selector_all('tr')
-            target_row = None
+            # Find the specific cell containing this name
+            name_cells = await self.page.query_selector_all(f'td:has-text("{search_name}")')
             
-            for row in all_rows:
-                try:
-                    row_text = await row.inner_text()
-                    if search_name in row_text:
-                        # Verify this is a data row (has inputs)
-                        inputs = await row.query_selector_all('input[type="text"]')
+            target_row = None
+            for cell in name_cells:
+                cell_text = await cell.inner_text()
+                # Make sure it's the actual name cell, not just any cell mentioning the name
+                if search_name in cell_text and ',' in cell_text:
+                    # Get parent row
+                    target_row = await cell.evaluate_handle('el => el.closest("tr")')
+                    if target_row:
+                        # Verify this row has input fields
+                        inputs = await target_row.query_selector_all('input[type="text"]')
                         if len(inputs) >= 2:
-                            target_row = row
+                            logger.info(f"Found correct row for {search_name} with {len(inputs)} text inputs")
                             break
-                except:
-                    continue
+                        else:
+                            target_row = None
+            
+            if not target_row:
+                # Fallback: search all rows
+                all_rows = await self.page.query_selector_all('tr')
+                for row in all_rows:
+                    try:
+                        row_text = await row.inner_text()
+                        if search_name in row_text and ',' in row_text:
+                            inputs = await row.query_selector_all('input[type="text"]')
+                            if len(inputs) >= 2:
+                                target_row = row
+                                logger.info(f"Found row via fallback for {search_name}")
+                                break
+                    except:
+                        continue
             
             if not target_row:
                 logger.warning(f"Could not find row for: {name}")
                 return False
             
-            # Find text inputs in this row
+            # Find all text inputs in this specific row
             text_inputs = await target_row.query_selector_all('input[type="text"]')
+            logger.info(f"Found {len(text_inputs)} text inputs in row")
             
-            if len(text_inputs) >= 1:
-                # First input is Employee ID - use fill (like paste)
-                emp_input = text_inputs[0]
-                await emp_input.click()
-                await self.page.wait_for_timeout(300)
-                await emp_input.fill(str(employee_id))
-                logger.info(f"Pasted Employee ID: {employee_id}")
-                await self.page.wait_for_timeout(1000)
+            # Log what we're working with
+            for i, inp in enumerate(text_inputs):
+                val = await inp.get_attribute('value') or ''
+                inp_id = await inp.get_attribute('id') or 'no-id'
+                logger.info(f"  Input {i}: value='{val}', id='{inp_id}'")
             
-            if len(text_inputs) >= 2:
-                # Second input is Room Number - type character by character
-                room_input = text_inputs[1]
-                await room_input.click()
-                await self.page.wait_for_timeout(500)
-                # Clear any existing value
-                await room_input.evaluate('el => el.value = ""')
-                await self.page.wait_for_timeout(200)
-                # Type room number character by character
-                for char in str(room_number):
-                    await room_input.type(char, delay=150)
-                logger.info(f"Typed Room Number: {room_number}")
-                await self.page.wait_for_timeout(1000)
+            # Employee ID is typically the FIRST text input that's not already filled with a long value
+            emp_filled = False
+            for i, inp in enumerate(text_inputs[:3]):  # Check first 3 inputs
+                val = await inp.get_attribute('value') or ''
+                if not val or val == 'NO ID' or len(val) < 4:
+                    # This input is empty or has placeholder - fill it with Employee ID
+                    await inp.click()
+                    await self.page.wait_for_timeout(300)
+                    # Select all and clear
+                    await inp.evaluate('el => el.select()')
+                    await self.page.wait_for_timeout(100)
+                    # Type the employee ID
+                    await self.page.keyboard.type(str(employee_id))
+                    logger.info(f"Typed Employee ID {employee_id} in input {i}")
+                    await self.page.wait_for_timeout(500)
+                    emp_filled = True
+                    break
             
-            # Click on empty space near "Heavener" or "HEAVENER-OK" to trigger save
+            # Room Number - find an empty input after the employee ID one
+            room_filled = False
+            for i, inp in enumerate(text_inputs):
+                val = await inp.get_attribute('value') or ''
+                # Skip if this is our just-filled employee ID
+                if val == str(employee_id):
+                    continue
+                if not val or len(val) < 2:
+                    # This looks like the room number field
+                    await inp.click()
+                    await self.page.wait_for_timeout(300)
+                    await inp.evaluate('el => el.select()')
+                    await self.page.wait_for_timeout(100)
+                    await self.page.keyboard.type(str(room_number))
+                    logger.info(f"Typed Room Number {room_number} in input {i}")
+                    await self.page.wait_for_timeout(500)
+                    room_filled = True
+                    break
+            
+            # Click elsewhere to trigger save
             try:
-                heavener_elem = await self.page.query_selector('text=HEAVENER')
-                if heavener_elem:
-                    await heavener_elem.click()
-                    logger.info("Clicked near HEAVENER to trigger save")
-                else:
-                    await self.page.click('body', position={"x": 300, "y": 150})
-                    logger.info("Clicked on header area to trigger save")
+                await self.page.click('text=HEAVENER', force=True)
+                logger.info("Clicked HEAVENER to trigger save")
             except:
-                await self.page.click('body', position={"x": 300, "y": 150})
-                logger.info("Clicked on page to trigger save")
+                await self.page.click('body', position={"x": 300, "y": 100})
+                logger.info("Clicked body to trigger save")
             
-            # Wait 5 seconds for auto-save to complete
+            # Wait for auto-save
             logger.info("Waiting 5 seconds for auto-save...")
             await self.page.wait_for_timeout(5000)
             
-            logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
-            return True
+            if emp_filled and room_filled:
+                logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
+                return True
+            else:
+                logger.warning(f"Could not fill all fields for {name}: emp={emp_filled}, room={room_filled}")
+                return False
             
         except Exception as e:
             logger.error(f"Error verifying entry {entry.get('name', 'unknown')}: {str(e)}")
