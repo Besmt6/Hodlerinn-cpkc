@@ -1806,7 +1806,7 @@ async def get_sync_history():
 
 @api_router.post("/admin/collect-employees")
 async def collect_employees_from_portal_endpoint():
-    """Use AI agent to collect employee names from the railroad portal sign-in sheets."""
+    """Use AI agent to collect employee names and IDs from the railroad portal Sign-in Report."""
     settings = await db.settings.find_one({}, {"_id": 0}) or {}
     
     if not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
@@ -1820,21 +1820,21 @@ async def collect_employees_from_portal_endpoint():
     result = await collect_employees_from_portal(username, password)
     
     if result["success"] and result["employees"]:
-        # Auto-import unique employees to the employee list
+        # Import employees with their actual IDs from the portal
         imported = 0
         skipped = 0
         
         for emp in result["employees"]:
-            # Generate an employee number from the name (can be updated by admin later)
-            # For now, use the original portal name as a temporary ID
-            temp_id = emp["original_name"].replace("/", "_").replace(" ", "_").upper()[:20]
+            employee_number = emp.get("employee_number", "").strip()
+            name = emp.get("name", "").strip()
             
-            # Check if already exists (by name or temp ID)
+            if not employee_number or not name:
+                skipped += 1
+                continue
+            
+            # Check if already exists
             existing = await db.employees.find_one({
-                "$or": [
-                    {"employee_number": temp_id},
-                    {"name": emp["name"]}
-                ]
+                "employee_number": employee_number
             }, {"_id": 0})
             
             if existing:
@@ -1843,8 +1843,8 @@ async def collect_employees_from_portal_endpoint():
             
             employee = {
                 "id": str(uuid.uuid4()),
-                "employee_number": temp_id,
-                "name": emp["name"],
+                "employee_number": employee_number,
+                "name": name,
                 "is_active": True,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "source": "portal_import"
