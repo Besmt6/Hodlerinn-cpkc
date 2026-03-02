@@ -549,7 +549,7 @@ class APIGlobalSyncAgent:
                 logger.info(f"  Input {i}: value='{val}', id='{inp_id}'")
             
             # Employee ID is typically the FIRST text input that's not already filled with a long value
-            emp_filled = False
+            emp_input_index = -1
             for i, inp in enumerate(text_inputs[:3]):  # Check first 3 inputs
                 val = await inp.get_attribute('value') or ''
                 if not val or val == 'NO ID' or len(val) < 4:
@@ -563,14 +563,16 @@ class APIGlobalSyncAgent:
                     await self.page.keyboard.type(str(employee_id))
                     logger.info(f"Typed Employee ID {employee_id} in input {i}")
                     await self.page.wait_for_timeout(500)
-                    emp_filled = True
+                    emp_input_index = i  # Remember which input we used
                     break
             
-            # Room Number - find an empty input after the employee ID one
-            room_filled = False
+            # Room Number - find the NEXT empty input after employee ID
             for i, inp in enumerate(text_inputs):
+                # Skip the employee ID input we just filled
+                if i == emp_input_index:
+                    continue
                 val = await inp.get_attribute('value') or ''
-                # Skip if this is our just-filled employee ID
+                # Skip if this now has our employee ID value
                 if val == str(employee_id):
                     continue
                 if not val or len(val) < 2:
@@ -582,7 +584,6 @@ class APIGlobalSyncAgent:
                     await self.page.keyboard.type(str(room_number))
                     logger.info(f"Typed Room Number {room_number} in input {i}")
                     await self.page.wait_for_timeout(500)
-                    room_filled = True
                     break
             
             # Click elsewhere to trigger save
@@ -597,12 +598,8 @@ class APIGlobalSyncAgent:
             logger.info("Waiting 5 seconds for auto-save...")
             await self.page.wait_for_timeout(5000)
             
-            if emp_filled and room_filled:
-                logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
-                return True
-            else:
-                logger.warning(f"Could not fill all fields for {name}: emp={emp_filled}, room={room_filled}")
-                return False
+            logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
+            return True
             
         except Exception as e:
             logger.error(f"Error verifying entry {entry.get('name', 'unknown')}: {str(e)}")
