@@ -546,8 +546,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
       }
     };
 
-    // Wait 800ms after user stops typing before verifying
-    const timer = setTimeout(verifyEmployee, 800);
+    // Wait 1.5 seconds after user stops typing before verifying
+    const timer = setTimeout(verifyEmployee, 1500);
     return () => clearTimeout(timer);
   }, [employeeNumber]);
 
