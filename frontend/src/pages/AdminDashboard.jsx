@@ -141,7 +141,20 @@ export default function AdminDashboard() {
     fetchRooms();
     fetchSettings();
     fetchEmployees();
+    fetchRegisteredGuests();
   }, [navigate]);
+
+  const fetchRegisteredGuests = async () => {
+    setLoadingGuests(true);
+    try {
+      const response = await axios.get(`${API}/admin/guests`);
+      setRegisteredGuests(response.data);
+    } catch (error) {
+      console.error("Failed to load registered guests");
+    } finally {
+      setLoadingGuests(false);
+    }
+  };
 
   const fetchEmployees = async () => {
     try {
