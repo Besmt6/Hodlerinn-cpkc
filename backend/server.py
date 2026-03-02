@@ -1699,6 +1699,60 @@ async def get_sync_history():
     history = await db.sync_history.find({}, {"_id": 0}).sort("timestamp", -1).to_list(20)
     return history
 
+@api_router.post("/admin/collect-employees")
+async def collect_employees_from_portal_endpoint():
+    """Use AI agent to collect employee names from the railroad portal sign-in sheets."""
+    settings = await db.settings.find_one({}, {"_id": 0}) or {}
+    
+    if not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
+        raise HTTPException(status_code=400, detail="Portal credentials not configured")
+    
+    from sync_agent import collect_employees_from_portal
+    
+    username = settings.get("api_global_username")
+    password = decrypt_data(settings.get("api_global_password_encrypted"))
+    
+    result = await collect_employees_from_portal(username, password)
+    
+    if result["success"] and result["employees"]:
+        # Auto-import unique employees to the employee list
+        imported = 0
+        skipped = 0
+        
+        for emp in result["employees"]:
+            # Generate an employee number from the name (can be updated by admin later)
+            # For now, use the original portal name as a temporary ID
+            temp_id = emp["original_name"].replace("/", "_").replace(" ", "_").upper()[:20]
+            
+            # Check if already exists (by name or temp ID)
+            existing = await db.employees.find_one({
+                "$or": [
+                    {"employee_number": temp_id},
+                    {"name": emp["name"]}
+                ]
+            }, {"_id": 0})
+            
+            if existing:
+                skipped += 1
+                continue
+            
+            employee = {
+                "id": str(uuid.uuid4()),
+                "employee_number": temp_id,
+                "name": emp["name"],
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "source": "portal_import"
+            }
+            await db.employees.insert_one(employee)
+            imported += 1
+        
+        result["imported"] = imported
+        result["skipped"] = skipped
+        result["message"] = f"Found {len(result['employees'])} employees. Imported {imported}, skipped {skipped} duplicates."
+    
+    return result
+
 # ==================== PDF Export ====================
 
 @api_router.get("/admin/export-pdf")
