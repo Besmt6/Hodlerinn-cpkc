@@ -538,16 +538,19 @@ async def test_connection(username: str, password: str) -> dict:
 
 async def collect_employees_from_portal(username: str, password: str) -> dict:
     """
-    Collect all employee names and IDs from the sign-in sheet portal.
-    This can be used to build the employee list from historical data.
+    Collect all employee names and IDs from the Sign-in Report.
+    Goes to Sign-in Sheets → Sign-in Report → View Details for each day.
+    Extracts Crew Id and Crew Name from the detailed reports.
     """
     agent = APIGlobalSyncAgent(username, password)
     employees = []
+    seen_ids = set()
     
     try:
         await agent.start()
         
         # Step 1: Login
+        logger.info("Step 1: Logging in...")
         if not await agent.login():
             return {
                 "success": False,
@@ -555,51 +558,154 @@ async def collect_employees_from_portal(username: str, password: str) -> dict:
                 "employees": []
             }
         
-        # Step 2: Navigate to Sign-in Sheets
-        if not await agent.navigate_to_signin_sheets():
+        # Step 2: Navigate to Sign-in Report (not Online Sign-in Sheets)
+        logger.info("Step 2: Navigating to Sign-in Report...")
+        try:
+            # Click Sign-in Sheets menu to expand
+            signin_menu = agent.page.locator("text=Sign-in Sheets").first
+            await signin_menu.click()
+            await agent.page.wait_for_timeout(1000)
+            
+            # Click Sign-in Report
+            signin_report = agent.page.locator("text=Sign-in Report").first
+            await signin_report.click()
+            await agent.page.wait_for_timeout(2000)
+            logger.info("Clicked on Sign-in Report")
+        except Exception as e:
+            logger.error(f"Failed to navigate to Sign-in Report: {e}")
             return {
                 "success": False,
-                "message": "Failed to navigate to sign-in sheets",
+                "message": "Failed to navigate to Sign-in Report",
                 "employees": []
             }
         
-        # Step 3: Load the data
-        if not await agent.load_signin_sheet():
-            return {
-                "success": False,
-                "message": "Failed to load sign-in sheet",
-                "employees": []
-            }
+        # Step 3: Select Billing Period (should have a dropdown)
+        logger.info("Step 3: Selecting billing period...")
+        try:
+            # The billing period dropdown should already be there
+            billing_dropdown = agent.page.locator("select").filter(has_text="Select").first
+            if await billing_dropdown.count() > 0:
+                # Select the first available period (last month)
+                options = await billing_dropdown.locator("option").all()
+                if len(options) > 1:
+                    # Select the second option (first is usually "-Select-")
+                    await options[1].click()
+                    await agent.page.wait_for_timeout(500)
+            else:
+                # Try clicking on the dropdown differently
+                billing_field = agent.page.locator("[id*='billingPeriod'], [name*='billingPeriod'], select").first
+                if await billing_field.count() > 0:
+                    await billing_field.click()
+                    await agent.page.wait_for_timeout(500)
+                    # Select first available option
+                    await agent.page.keyboard.press("ArrowDown")
+                    await agent.page.keyboard.press("Enter")
+                    await agent.page.wait_for_timeout(500)
+        except Exception as e:
+            logger.warning(f"Could not select billing period automatically: {e}")
         
-        # Step 4: Extract employee data from all entries
-        entries = await agent.get_signin_sheet_entries()
+        # Step 4: Click Create button
+        logger.info("Step 4: Clicking Create button...")
+        try:
+            create_btn = agent.page.locator("input[value='Create'], button:has-text('Create'), a:has-text('Create')").first
+            if await create_btn.count() > 0:
+                await create_btn.click()
+                await agent.page.wait_for_timeout(3000)
+                logger.info("Clicked Create button")
+            else:
+                logger.warning("Create button not found")
+        except Exception as e:
+            logger.warning(f"Could not click Create: {e}")
         
-        # Process entries to extract unique employees
-        seen_names = set()
-        for entry in entries:
-            name = entry.get("name", "").strip()
-            if name and name not in seen_names:
-                seen_names.add(name)
-                
-                # Try to parse name format: LASTNAME/FIRSTNAME/SUFFIX or LASTNAME/FIRSTNAME
-                parts = name.split('/')
-                if len(parts) >= 2:
-                    last_name = parts[0].strip().title()
-                    first_name = parts[1].strip().title()
-                    formatted_name = f"{first_name} {last_name}"
-                else:
-                    formatted_name = name.title()
-                
-                employees.append({
-                    "name": formatted_name,
-                    "original_name": name
-                })
+        # Step 5: Find all "View Details" links and process each day
+        logger.info("Step 5: Processing View Details for each day...")
+        try:
+            view_details_links = agent.page.locator("a:has-text('View Details'), td:has-text('View Details')")
+            link_count = await view_details_links.count()
+            logger.info(f"Found {link_count} View Details links")
+            
+            # Process up to 31 days (one month)
+            for i in range(min(link_count, 31)):
+                try:
+                    # Re-find the links (page may have changed)
+                    view_details_links = agent.page.locator("a:has-text('View Details')")
+                    if await view_details_links.count() <= i:
+                        break
+                    
+                    # Click on View Details
+                    await view_details_links.nth(i).click()
+                    await agent.page.wait_for_timeout(2000)
+                    
+                    # Extract Crew Id and Crew Name from the details table
+                    rows = agent.page.locator("table tr")
+                    row_count = await rows.count()
+                    
+                    for j in range(1, row_count):  # Skip header row
+                        try:
+                            row = rows.nth(j)
+                            cells = row.locator("td")
+                            
+                            if await cells.count() >= 2:
+                                crew_id = (await cells.nth(0).inner_text()).strip()
+                                crew_name = (await cells.nth(1).inner_text()).strip()
+                                
+                                # Skip if no ID or already seen
+                                if not crew_id or crew_id == "NO ID" or crew_id in seen_ids:
+                                    continue
+                                
+                                if not crew_name:
+                                    continue
+                                
+                                seen_ids.add(crew_id)
+                                
+                                # Parse name format: LASTNAME,(FIRSTNAME)SUFFIX
+                                # Example: ABERNATHY,(JOHN)HBW E
+                                name_match = re.match(r'([A-Z]+),\(([A-Z]+)\)', crew_name)
+                                if name_match:
+                                    last_name = name_match.group(1).title()
+                                    first_name = name_match.group(2).title()
+                                    formatted_name = f"{first_name} {last_name}"
+                                else:
+                                    # Try simpler format: LASTNAME/FIRSTNAME
+                                    parts = crew_name.replace(',', '/').split('/')
+                                    if len(parts) >= 2:
+                                        last_name = parts[0].strip().title()
+                                        first_name = re.sub(r'[^A-Za-z\s].*', '', parts[1]).strip().title()
+                                        formatted_name = f"{first_name} {last_name}"
+                                    else:
+                                        formatted_name = crew_name.title()
+                                
+                                employees.append({
+                                    "employee_number": crew_id,
+                                    "name": formatted_name,
+                                    "original_name": crew_name
+                                })
+                                
+                        except Exception as row_err:
+                            continue
+                    
+                    # Go back to the main report
+                    await agent.page.go_back()
+                    await agent.page.wait_for_timeout(1500)
+                    
+                except Exception as day_err:
+                    logger.warning(f"Error processing day {i}: {day_err}")
+                    # Try to go back
+                    try:
+                        await agent.page.go_back()
+                        await agent.page.wait_for_timeout(1000)
+                    except:
+                        pass
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Error processing View Details: {e}")
         
         logger.info(f"Collected {len(employees)} unique employees from portal")
         
         return {
             "success": True,
-            "message": f"Found {len(employees)} employees",
+            "message": f"Found {len(employees)} unique employees",
             "employees": employees
         }
         
