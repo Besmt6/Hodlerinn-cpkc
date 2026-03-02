@@ -255,20 +255,29 @@ async def shutdown_scheduler():
 
 # ==================== Telegram Notification ====================
 
+async def get_telegram_chat_id():
+    """Get Telegram Chat ID from database settings, fallback to environment variable"""
+    settings = await db.settings.find_one({}, {"_id": 0})
+    if settings and settings.get("telegram_chat_id"):
+        return settings.get("telegram_chat_id")
+    return TELEGRAM_CHAT_ID
+
 async def send_telegram_notification(message: str):
     """Send notification to Telegram (supports multiple chat IDs separated by comma)"""
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    chat_id = await get_telegram_chat_id()
+    
+    if not TELEGRAM_BOT_TOKEN or not chat_id:
         return
     
     # Support multiple chat IDs separated by comma
-    chat_ids = [cid.strip() for cid in TELEGRAM_CHAT_ID.split(',') if cid.strip()]
+    chat_ids = [cid.strip() for cid in chat_id.split(',') if cid.strip()]
     
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         async with httpx.AsyncClient() as client:
-            for chat_id in chat_ids:
+            for cid in chat_ids:
                 await client.post(url, json={
-                    "chat_id": chat_id,
+                    "chat_id": cid,
                     "text": message,
                     "parse_mode": "HTML"
                 })
@@ -392,6 +401,7 @@ class PortalSettingsUpdate(BaseModel):
     auto_sync_start_date: Optional[str] = None  # Format: YYYY-MM-DD
     voice_enabled: Optional[bool] = None  # Enable/disable voice messages
     voice_volume: Optional[float] = None  # Voice volume 0.0 to 1.0
+    telegram_chat_id: Optional[str] = None  # Telegram group/chat ID for notifications
 
 # ==================== Helper Functions ====================
 
@@ -515,7 +525,8 @@ async def request_employee_access(request: AccessRequest):
     await db.pending_access_requests.insert_one(request_doc)
     
     # Send Telegram notification with inline buttons
-    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+    chat_id = await get_telegram_chat_id()
+    if TELEGRAM_BOT_TOKEN and chat_id:
         try:
             message = (
                 f"🆕 *NEW ACCESS REQUEST*\n\n"
@@ -536,7 +547,7 @@ async def request_employee_access(request: AccessRequest):
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
             async with httpx.AsyncClient() as http_client:
                 await http_client.post(url, json={
-                    "chat_id": TELEGRAM_CHAT_ID,
+                    "chat_id": chat_id,
                     "text": message,
                     "parse_mode": "Markdown",
                     "reply_markup": inline_keyboard
@@ -1766,7 +1777,8 @@ async def get_portal_settings():
             "auto_sync_enabled": False,
             "auto_sync_start_date": None,
             "voice_enabled": True,
-            "voice_volume": 1.0
+            "voice_volume": 1.0,
+            "telegram_chat_id": TELEGRAM_CHAT_ID or ""
         }
     
     # Mask password - only indicate if it's set
@@ -1778,7 +1790,8 @@ async def get_portal_settings():
         "auto_sync_enabled": settings.get("auto_sync_enabled", False),
         "auto_sync_start_date": settings.get("auto_sync_start_date"),
         "voice_enabled": settings.get("voice_enabled", True),
-        "voice_volume": settings.get("voice_volume", 1.0)
+        "voice_volume": settings.get("voice_volume", 1.0),
+        "telegram_chat_id": settings.get("telegram_chat_id", "") or TELEGRAM_CHAT_ID or ""
     }
 
 @api_router.post("/admin/settings")
@@ -1810,6 +1823,9 @@ async def update_portal_settings(input: PortalSettingsUpdate):
     
     if input.voice_volume is not None:
         update_data["voice_volume"] = max(0.0, min(1.0, input.voice_volume))  # Clamp 0-1
+    
+    if input.telegram_chat_id is not None:
+        update_data["telegram_chat_id"] = input.telegram_chat_id
     
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     

@@ -127,7 +127,8 @@ export default function AdminDashboard() {
     auto_sync_enabled: false,
     api_global_password_set: false,
     voice_enabled: true,
-    voice_volume: 1.0
+    voice_volume: 1.0,
+    telegram_chat_id: ""
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ running: false, progress: "", last_results: null });
@@ -341,7 +342,8 @@ export default function AdminDashboard() {
         auto_sync_enabled: settingsRes.data.auto_sync_enabled || false,
         api_global_password_set: settingsRes.data.api_global_password_set || false,
         voice_enabled: settingsRes.data.voice_enabled !== false,
-        voice_volume: settingsRes.data.voice_volume || 1.0
+        voice_volume: settingsRes.data.voice_volume || 1.0,
+        telegram_chat_id: settingsRes.data.telegram_chat_id || ""
       });
       setSyncStatus(syncStatusRes.data);
     } catch (error) {
@@ -356,7 +358,8 @@ export default function AdminDashboard() {
         api_global_username: portalSettings.api_global_username,
         api_global_password: portalSettings.api_global_password || null,
         alert_email: portalSettings.alert_email,
-        auto_sync_enabled: portalSettings.auto_sync_enabled
+        auto_sync_enabled: portalSettings.auto_sync_enabled,
+        telegram_chat_id: portalSettings.telegram_chat_id
       });
       toast.success("Settings saved successfully");
       fetchSettings();
@@ -1993,6 +1996,29 @@ export default function AdminDashboard() {
                     </div>
                     <p className="text-vault-text-secondary text-xs mt-1">
                       Receive notifications for missing records and sync status.
+                    </p>
+                  </div>
+
+                  {/* Telegram Chat ID */}
+                  <div>
+                    <label className="text-xs text-vault-gold uppercase tracking-wider mb-2 block font-medium">
+                      Telegram Chat ID (Group)
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                      <Input
+                        type="text"
+                        value={portalSettings.telegram_chat_id}
+                        onChange={(e) => setPortalSettings({...portalSettings, telegram_chat_id: e.target.value})}
+                        placeholder="e.g. -1001234567890"
+                        className="bg-black/50 border-vault-border text-vault-text pl-10"
+                        data-testid="telegram-chat-id-input"
+                      />
+                    </div>
+                    <p className="text-vault-text-secondary text-xs mt-1">
+                      All check-in/check-out alerts will be sent to this Telegram group.
+                      <br />
+                      <span className="text-vault-gold">Your group ID: -1003798795772</span>
                     </p>
                   </div>
 
