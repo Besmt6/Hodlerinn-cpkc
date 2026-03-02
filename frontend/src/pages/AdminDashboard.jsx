@@ -1442,6 +1442,15 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex gap-2">
                   <Button
+                    onClick={handleCollectFromPortal}
+                    disabled={collectingEmployees}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    data-testid="collect-from-portal-btn"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    {collectingEmployees ? "Collecting..." : "Import from Portal"}
+                  </Button>
+                  <Button
                     onClick={() => setShowBulkImport(true)}
                     className="bg-vault-surface border border-vault-border hover:bg-vault-surface-highlight text-vault-text"
                     data-testid="bulk-import-employees-btn"
