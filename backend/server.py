@@ -485,6 +485,79 @@ async def get_guest(employee_number: str):
     
     return guest
 
+# Admin: Get all registered guests with verification status
+@api_router.get("/admin/guests")
+async def get_all_guests():
+    """Get all registered guests for admin review"""
+    guests = await db.guests.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    
+    # Decrypt names and add check-in count
+    for guest in guests:
+        if 'name_encrypted' in guest:
+            guest['name'] = decrypt_data(guest['name_encrypted'])
+            del guest['name_encrypted']
+        
+        # Get check-in count for this guest
+        check_in_count = await db.bookings.count_documents({"employee_number": guest["employee_number"]})
+        guest['check_in_count'] = check_in_count
+    
+    return guests
+
+# Admin: Verify a guest
+@api_router.post("/admin/guests/{employee_number}/verify")
+async def verify_guest(employee_number: str):
+    """Mark a guest as verified by admin"""
+    guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
+    if not guest:
+        raise HTTPException(status_code=404, detail="Guest not found")
+    
+    await db.guests.update_one(
+        {"employee_number": employee_number},
+        {"$set": {
+            "is_verified": True,
+            "verified_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Decrypt name for notification
+    name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown')))
+    
+    await send_telegram_notification(
+        f"✅ <b>GUEST VERIFIED</b>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"👤 {name}\n"
+        f"🆔 {employee_number}\n"
+        f"━━━━━━━━━━━━━━━"
+    )
+    
+    return {"message": f"Guest {name} verified successfully"}
+
+# Admin: Flag a guest (unverify/block)
+@api_router.post("/admin/guests/{employee_number}/flag")
+async def flag_guest(employee_number: str):
+    """Flag a guest for review (unverify)"""
+    guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
+    if not guest:
+        raise HTTPException(status_code=404, detail="Guest not found")
+    
+    await db.guests.update_one(
+        {"employee_number": employee_number},
+        {"$set": {"is_verified": False, "is_flagged": True}}
+    )
+    
+    name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown')))
+    
+    await send_telegram_notification(
+        f"🚩 <b>GUEST FLAGGED</b>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"👤 {name}\n"
+        f"🆔 {employee_number}\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"⚠️ Please review in Admin Dashboard"
+    )
+    
+    return {"message": f"Guest {name} flagged for review"}
+
 # Check-In (signature captured here)
 @api_router.post("/checkin", response_model=CheckIn)
 async def check_in(input: CheckInCreate):
