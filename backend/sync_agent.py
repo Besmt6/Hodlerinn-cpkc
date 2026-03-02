@@ -763,29 +763,37 @@ async def extract_employees_from_report_table(page, seen_ids: set) -> list:
                         
                         crew_id = (await cells[crew_id_col].inner_text()).strip()
                         
-                        # Skip invalid IDs
-                        if not crew_id or crew_id == "NO ID" or crew_id in seen_ids:
+                        # Skip if ID is empty or invalid
+                        if not crew_id or crew_id == "" or crew_id == "NO ID":
+                            continue
+                        if crew_id in seen_ids:
                             continue
                         if ":" in crew_id or len(crew_id) > 15:
                             continue
                         if not crew_id.replace('-', '').replace(' ', '').replace('.', '').isalnum():
                             continue
                         
+                        # Get crew name
                         crew_name = ""
                         if crew_name_col >= 0 and len(cells) > crew_name_col:
                             crew_name = (await cells[crew_name_col].inner_text()).strip()
                         elif len(cells) > 1:
                             crew_name = (await cells[1].inner_text()).strip()
                         
-                        if crew_name:
-                            seen_ids.add(crew_id)
-                            formatted_name = format_crew_name(crew_name)
-                            employees.append({
-                                "employee_number": crew_id,
-                                "name": formatted_name,
-                                "original_name": crew_name
-                            })
-                            logger.info(f"  Employee: ID={crew_id}, Name={formatted_name}")
+                        # Skip if name is empty or too short
+                        if not crew_name or crew_name == "" or len(crew_name) < 2:
+                            logger.info(f"  Skipping row {row_idx}: ID={crew_id} has no valid name")
+                            continue
+                        
+                        # Valid employee found
+                        seen_ids.add(crew_id)
+                        formatted_name = format_crew_name(crew_name)
+                        employees.append({
+                            "employee_number": crew_id,
+                            "name": formatted_name,
+                            "original_name": crew_name
+                        })
+                        logger.info(f"  Employee: ID={crew_id}, Name={formatted_name}")
                             
                     except Exception as row_err:
                         continue
@@ -886,13 +894,22 @@ async def extract_from_detail_page(page, seen_ids: set) -> list:
                             
                             # Usually first column is ID, second is name
                             if len(cell_texts) >= 2:
-                                potential_id = cell_texts[0]
-                                potential_name = cell_texts[1]
+                                potential_id = cell_texts[0].strip()
+                                potential_name = cell_texts[1].strip()
                                 
-                                # Validate ID
-                                if potential_id and len(potential_id) <= 15 and potential_id != "NO ID":
-                                    if potential_id.replace('-', '').replace('.', '').replace(' ', '').isalnum():
-                                        if potential_id not in seen_ids and ":" not in potential_id:
+                                # Skip if both are empty
+                                if not potential_id and not potential_name:
+                                    continue
+                                
+                                # Skip if ID is empty or invalid
+                                if not potential_id or potential_id == "NO ID" or potential_id == "":
+                                    continue
+                                    
+                                # Validate ID format (alphanumeric, reasonable length)
+                                if len(potential_id) <= 15 and potential_id.replace('-', '').replace('.', '').replace(' ', '').isalnum():
+                                    if potential_id not in seen_ids and ":" not in potential_id:
+                                        # Only add if we have a valid name too
+                                        if potential_name and potential_name != "" and len(potential_name) > 1:
                                             crew_id = potential_id
                                             crew_name = potential_name
                             
