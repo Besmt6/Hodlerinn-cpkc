@@ -318,17 +318,6 @@ function MainMenu({ setView }) {
         <CardContent className="space-y-4">
           <Button
             onClick={() => {
-              playVoiceMessage("register_welcome");
-              setView("register");
-            }}
-            className="w-full h-14 text-lg flex items-center justify-center gap-3 vault-btn-primary uppercase tracking-wide"
-            data-testid="register-btn"
-          >
-            <UserPlus className="w-5 h-5" />
-            Register (First Time Only)
-          </Button>
-          <Button
-            onClick={() => {
               const timePeriod = getTimePeriod();
               playVoiceMessage(`checkin_welcome_${timePeriod}`);
               setView("checkin");
