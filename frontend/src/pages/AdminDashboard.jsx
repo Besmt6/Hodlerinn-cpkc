@@ -66,7 +66,11 @@ import {
   Flag,
   RefreshCw,
   AlertCircle,
-  Search
+  Search,
+  Copy,
+  CheckCheck,
+  Link,
+  Shield
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -2116,26 +2120,48 @@ export default function AdminDashboard() {
 
                   {/* Public API Section */}
                   <div className="pt-4 border-t border-vault-border">
-                    <h4 className="text-vault-gold font-medium mb-4">Public API Access</h4>
+                    <h4 className="text-vault-gold font-medium mb-4 flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
+                      Public API Access
+                    </h4>
                     
                     {/* API Key */}
                     <div className="mb-4">
                       <label className="text-xs text-vault-gold uppercase tracking-wider mb-2 block font-medium">
                         API Key
                       </label>
-                      <div className="relative">
-                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
-                        <Input
-                          type="text"
-                          value={portalSettings.public_api_key}
-                          onChange={(e) => setPortalSettings({...portalSettings, public_api_key: e.target.value})}
-                          placeholder="Enter API key for external access"
-                          className="bg-black/50 border-vault-border text-vault-text pl-10 font-mono text-sm"
-                          data-testid="public-api-key-input"
-                        />
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                          <Input
+                            type="text"
+                            value={portalSettings.public_api_key}
+                            onChange={(e) => setPortalSettings({...portalSettings, public_api_key: e.target.value})}
+                            placeholder="Enter API key for external access"
+                            className="bg-black/50 border-vault-border text-vault-text pl-10 font-mono text-sm"
+                            data-testid="public-api-key-input"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                            let key = 'hinn_';
+                            for (let i = 0; i < 32; i++) {
+                              key += chars.charAt(Math.floor(Math.random() * chars.length));
+                            }
+                            setPortalSettings({...portalSettings, public_api_key: key});
+                            toast.success("New secure API key generated! Click Save Settings to apply.");
+                          }}
+                          className="bg-vault-gold/20 text-vault-gold hover:bg-vault-gold/30 border border-vault-gold/50"
+                          data-testid="generate-api-key-btn"
+                        >
+                          <RefreshCw className="w-4 h-4 mr-1" />
+                          Generate
+                        </Button>
                       </div>
                       <p className="text-vault-text-secondary text-xs mt-1">
-                        Share this key with authorized systems to access Sign-in Sheets and Billing Reports.
+                        Share this key with authorized systems. Click Generate for a secure random key.
                       </p>
                     </div>
 
@@ -2157,22 +2183,199 @@ export default function AdminDashboard() {
                       </p>
                     </div>
 
-                    {/* API Endpoints Info */}
+                    {/* API Documentation Panel */}
                     {portalSettings.public_api_key && (
-                      <div className="bg-black/70 rounded-lg p-3 mt-4">
-                        <p className="text-vault-gold text-xs font-medium mb-2">Public API Endpoints:</p>
-                        <div className="space-y-2 text-xs font-mono">
-                          <div>
-                            <span className="text-green-400">GET</span>
-                            <span className="text-vault-text-secondary ml-2">/api/public/signin-sheets?api_key=YOUR_KEY</span>
-                          </div>
-                          <div>
-                            <span className="text-green-400">GET</span>
-                            <span className="text-vault-text-secondary ml-2">/api/public/billing-report?api_key=YOUR_KEY</span>
-                          </div>
-                          <p className="text-vault-text-secondary mt-2">
-                            Optional params: start_date, end_date, format (json/csv)
+                      <div className="bg-black/70 rounded-lg p-4 mt-4 border border-vault-border">
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-vault-gold text-sm font-medium flex items-center gap-2">
+                            <Link className="w-4 h-4" />
+                            API Documentation
                           </p>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const baseUrl = window.location.origin;
+                              const docText = `HODLER INN API DOCUMENTATION
+
+BASE URL: ${baseUrl}
+
+API KEY: ${portalSettings.public_api_key}
+
+ENDPOINTS:
+
+1. Sign-in Sheets
+   ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}
+
+2. Billing Report
+   ${baseUrl}/api/public/billing-report?api_key=${portalSettings.public_api_key}
+
+OPTIONAL PARAMETERS:
+- format=csv (default: json)
+- start_date=YYYY-MM-DD
+- end_date=YYYY-MM-DD
+
+EXAMPLES:
+
+All records (JSON):
+${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}
+
+Billing as CSV:
+${baseUrl}/api/public/billing-report?api_key=${portalSettings.public_api_key}&format=csv
+
+Date filtered:
+${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&start_date=2026-03-01&end_date=2026-03-31`;
+                              navigator.clipboard.writeText(docText);
+                              toast.success("Full API documentation copied to clipboard!");
+                            }}
+                            className="bg-vault-gold/20 text-vault-gold hover:bg-vault-gold/30 text-xs"
+                            data-testid="copy-all-docs-btn"
+                          >
+                            <Copy className="w-3 h-3 mr-1" />
+                            Copy All
+                          </Button>
+                        </div>
+
+                        {/* Base URL */}
+                        <div className="mb-3">
+                          <label className="text-vault-text-secondary text-xs mb-1 block">Base URL</label>
+                          <div className="flex items-center gap-2 bg-black/50 rounded px-3 py-2">
+                            <code className="text-green-400 text-sm flex-1 break-all">{window.location.origin}</code>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                navigator.clipboard.writeText(window.location.origin);
+                                toast.success("Base URL copied!");
+                              }}
+                              className="h-6 w-6 p-0 text-vault-text-secondary hover:text-vault-gold"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* API Key Display */}
+                        <div className="mb-3">
+                          <label className="text-vault-text-secondary text-xs mb-1 block">Your API Key</label>
+                          <div className="flex items-center gap-2 bg-black/50 rounded px-3 py-2">
+                            <code className="text-amber-400 text-sm flex-1 font-mono">{portalSettings.public_api_key}</code>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                navigator.clipboard.writeText(portalSettings.public_api_key);
+                                toast.success("API Key copied!");
+                              }}
+                              className="h-6 w-6 p-0 text-vault-text-secondary hover:text-vault-gold"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Endpoints */}
+                        <div className="space-y-3">
+                          <label className="text-vault-text-secondary text-xs block">Endpoints (Click to copy full URL)</label>
+                          
+                          {/* Sign-in Sheets Endpoint */}
+                          <div 
+                            className="bg-black/50 rounded px-3 py-2 cursor-pointer hover:bg-black/70 transition-colors group"
+                            onClick={() => {
+                              const url = `${window.location.origin}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}`;
+                              navigator.clipboard.writeText(url);
+                              toast.success("Sign-in Sheets URL copied!");
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded mr-2">GET</span>
+                                <span className="text-vault-text text-sm">Sign-in Sheets</span>
+                              </div>
+                              <Copy className="w-3 h-3 text-vault-text-secondary group-hover:text-vault-gold" />
+                            </div>
+                            <code className="text-vault-text-secondary text-xs mt-1 block break-all">
+                              /api/public/signin-sheets?api_key=...
+                            </code>
+                          </div>
+
+                          {/* Billing Report Endpoint */}
+                          <div 
+                            className="bg-black/50 rounded px-3 py-2 cursor-pointer hover:bg-black/70 transition-colors group"
+                            onClick={() => {
+                              const url = `${window.location.origin}/api/public/billing-report?api_key=${portalSettings.public_api_key}`;
+                              navigator.clipboard.writeText(url);
+                              toast.success("Billing Report URL copied!");
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded mr-2">GET</span>
+                                <span className="text-vault-text text-sm">Billing Report</span>
+                              </div>
+                              <Copy className="w-3 h-3 text-vault-text-secondary group-hover:text-vault-gold" />
+                            </div>
+                            <code className="text-vault-text-secondary text-xs mt-1 block break-all">
+                              /api/public/billing-report?api_key=...
+                            </code>
+                          </div>
+                        </div>
+
+                        {/* Parameters Table */}
+                        <div className="mt-4 pt-3 border-t border-vault-border">
+                          <label className="text-vault-text-secondary text-xs mb-2 block">Optional Parameters</label>
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div className="bg-black/50 rounded p-2">
+                              <code className="text-blue-400">format</code>
+                              <p className="text-vault-text-secondary mt-1">json / csv</p>
+                            </div>
+                            <div className="bg-black/50 rounded p-2">
+                              <code className="text-blue-400">start_date</code>
+                              <p className="text-vault-text-secondary mt-1">YYYY-MM-DD</p>
+                            </div>
+                            <div className="bg-black/50 rounded p-2">
+                              <code className="text-blue-400">end_date</code>
+                              <p className="text-vault-text-secondary mt-1">YYYY-MM-DD</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Quick Links */}
+                        <div className="mt-4 pt-3 border-t border-vault-border">
+                          <label className="text-vault-text-secondary text-xs mb-2 block">Quick Test Links</label>
+                          <div className="flex flex-wrap gap-2">
+                            <a
+                              href={`${window.location.origin}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs bg-vault-gold/20 text-vault-gold px-3 py-1.5 rounded hover:bg-vault-gold/30 transition-colors"
+                            >
+                              Open Sign-in (JSON)
+                            </a>
+                            <a
+                              href={`${window.location.origin}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&format=csv`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs bg-vault-gold/20 text-vault-gold px-3 py-1.5 rounded hover:bg-vault-gold/30 transition-colors"
+                            >
+                              Download Sign-in (CSV)
+                            </a>
+                            <a
+                              href={`${window.location.origin}/api/public/billing-report?api_key=${portalSettings.public_api_key}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs bg-vault-gold/20 text-vault-gold px-3 py-1.5 rounded hover:bg-vault-gold/30 transition-colors"
+                            >
+                              Open Billing (JSON)
+                            </a>
+                            <a
+                              href={`${window.location.origin}/api/public/billing-report?api_key=${portalSettings.public_api_key}&format=csv`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs bg-vault-gold/20 text-vault-gold px-3 py-1.5 rounded hover:bg-vault-gold/30 transition-colors"
+                            >
+                              Download Billing (CSV)
+                            </a>
+                          </div>
                         </div>
                       </div>
                     )}

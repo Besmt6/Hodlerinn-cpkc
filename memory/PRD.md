@@ -295,6 +295,15 @@ Build a two-part application for a hotel named "Hodler Inn":
 - **Billing Report Endpoint:** `GET /api/public/billing-report?api_key=YOUR_KEY`
 - **Date Range Filtering:** Optional `start_date` and `end_date` query parameters
 - **Multiple Formats:** JSON (default) or CSV (`format=csv`)
+- **Generate Secure Key Button:** Creates random 32-character keys with `hinn_` prefix
+- **API Documentation Panel:** Shows full URLs, copy buttons, and quick test links in Admin Dashboard
+
+### Admin Dashboard Features:
+- API Key field with "Generate" button for secure random keys
+- "Copy All" button - copies complete API documentation text
+- Clickable endpoints - copies full URL with API key
+- Quick Test Links - opens JSON/CSV directly in browser
+- Copy buttons for Base URL and API Key
 
 ### API Usage Examples:
 ```bash
@@ -313,6 +322,7 @@ curl "https://your-domain/api/public/billing-report?api_key=YOUR_KEY&start_date=
 - API key stored in settings, manageable from Admin Dashboard
 - Invalid/missing API key returns 401/403 errors
 - All endpoints require valid API key
+- Generated keys use cryptographically secure random characters
 
 ## Next Tasks
 1. ~~**AI Verification Agent Selector Fix**~~ ✅ Completed - Updated CSS selector logic
