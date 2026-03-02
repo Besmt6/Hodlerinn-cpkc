@@ -277,6 +277,24 @@ async def send_telegram_notification(message: str):
 
 # ==================== Models ====================
 
+class Employee(BaseModel):
+    """Pre-registered employee - only these IDs can check in"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    employee_number: str
+    name: str
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class EmployeeCreate(BaseModel):
+    employee_number: str
+    name: str
+
+class EmployeeUpdate(BaseModel):
+    employee_number: Optional[str] = None
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
+
 class GuestRegistration(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
