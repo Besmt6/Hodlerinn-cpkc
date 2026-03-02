@@ -521,22 +521,45 @@ class APIGlobalSyncAgent:
             if len(text_inputs) >= 1:
                 # First input is Employee ID
                 emp_input = text_inputs[0]
-                await emp_input.click(click_count=3)  # Select all
-                await emp_input.fill(str(employee_id))
+                # Click to focus
+                await emp_input.click()
+                await self.page.wait_for_timeout(200)
+                # Clear existing value
+                await emp_input.evaluate('el => el.value = ""')
+                # Type the value character by character to trigger events
+                await emp_input.type(str(employee_id), delay=50)
                 await self.page.wait_for_timeout(300)
+                # Trigger change event
+                await emp_input.evaluate('el => el.dispatchEvent(new Event("change", { bubbles: true }))')
+                await emp_input.evaluate('el => el.dispatchEvent(new Event("blur", { bubbles: true }))')
                 logger.info(f"Filled Employee ID: {employee_id}")
             
             if len(text_inputs) >= 2:
                 # Second input is Room Number
                 room_input = text_inputs[1]
-                await room_input.click(click_count=3)  # Select all
-                await room_input.fill(str(room_number))
+                # Click to focus
+                await room_input.click()
+                await self.page.wait_for_timeout(200)
+                # Clear existing value
+                await room_input.evaluate('el => el.value = ""')
+                # Type the value character by character
+                await room_input.type(str(room_number), delay=50)
                 await self.page.wait_for_timeout(300)
+                # Trigger change event
+                await room_input.evaluate('el => el.dispatchEvent(new Event("change", { bubbles: true }))')
+                await room_input.evaluate('el => el.dispatchEvent(new Event("blur", { bubbles: true }))')
                 logger.info(f"Filled Room Number: {room_number}")
             
-            # Tab out to trigger validation/auto-save
+            # Click elsewhere to ensure all blur events fire
+            await self.page.click('body', position={"x": 10, "y": 10})
+            await self.page.wait_for_timeout(500)
+            
+            # Press Tab to move to next field (triggers form validation)
             await self.page.keyboard.press("Tab")
-            await self.page.wait_for_timeout(3500)  # Wait for auto-save
+            
+            # Wait for auto-save (portal refreshes after 2-3 seconds)
+            logger.info("Waiting for auto-save...")
+            await self.page.wait_for_timeout(4000)
             
             logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
             return True
