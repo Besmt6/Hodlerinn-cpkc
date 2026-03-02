@@ -528,16 +528,55 @@ function CheckInForm({ setView, setSuccessMessage }) {
     try {
       const response = await axios.get(`${API}/guests/${employeeNumber}`);
       setVerifiedEmployee(response.data);
-      toast.success(`Employee found: ${response.data.name}`);
+      setIsNewGuest(false);
+      toast.success(`Welcome back, ${response.data.name}!`);
       // Auto-focus on room input after successful verification
       setTimeout(() => {
         roomInputRef.current?.focus();
       }, 300);
     } catch (error) {
-      toast.error("Employee not found. Please register first.");
+      // Employee not found - show registration form inline
+      setIsNewGuest(true);
       setVerifiedEmployee(null);
+      playVoiceMessage("register_welcome");
+      toast.info("New guest! Please enter your name to register.");
+      // Auto-focus on name input
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 300);
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleRegisterAndContinue = async () => {
+    if (!guestName.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+
+    setRegistering(true);
+    try {
+      const response = await axios.post(`${API}/guests/register`, {
+        employee_number: employeeNumber,
+        name: guestName.trim()
+      });
+      
+      setVerifiedEmployee({
+        employee_number: employeeNumber,
+        name: guestName.trim()
+      });
+      setIsNewGuest(false);
+      toast.success(`Registration successful! Welcome, ${guestName}!`);
+      
+      // Auto-focus on room input after registration
+      setTimeout(() => {
+        roomInputRef.current?.focus();
+      }, 300);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Registration failed");
+    } finally {
+      setRegistering(false);
     }
   };
 
