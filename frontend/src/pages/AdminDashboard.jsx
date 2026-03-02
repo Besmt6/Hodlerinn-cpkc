@@ -156,6 +156,26 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleVerifyGuest = async (employeeNumber) => {
+    try {
+      await axios.post(`${API}/admin/guests/${employeeNumber}/verify`);
+      toast.success("Guest verified!");
+      fetchRegisteredGuests();
+    } catch (error) {
+      toast.error("Failed to verify guest");
+    }
+  };
+
+  const handleFlagGuest = async (employeeNumber) => {
+    try {
+      await axios.post(`${API}/admin/guests/${employeeNumber}/flag`);
+      toast.warning("Guest flagged for review");
+      fetchRegisteredGuests();
+    } catch (error) {
+      toast.error("Failed to flag guest");
+    }
+  };
+
   const fetchEmployees = async () => {
     try {
       const response = await axios.get(`${API}/admin/employees`);
