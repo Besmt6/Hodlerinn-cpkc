@@ -588,6 +588,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
     setRoomReminderSpoken(false);
     setIsNewGuest(false);
     setGuestName("");
+    setCompanyName("");
   };
 
   // Voice reminder for room selection
