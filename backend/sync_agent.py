@@ -450,12 +450,17 @@ class APIGlobalSyncAgent:
                     room_input = text_inputs[1] if len(text_inputs) >= 2 else None
                     no_bill_checkbox = checkboxes[1] if len(checkboxes) >= 2 else (checkboxes[0] if checkboxes else None)
                     
-                    # Check if already verified
+                    # Check if already verified - needs non-empty Employee ID with actual digits
                     emp_value = ""
                     if emp_input:
                         emp_value = await emp_input.get_attribute('value') or ''
+                        emp_value = emp_value.strip()
                     
-                    is_verified = emp_value and emp_value.strip() and len(emp_value.strip()) > 2
+                    # Log the value for debugging
+                    logger.info(f"Employee ID field value for {name_text}: '{emp_value}' (len={len(emp_value)})")
+                    
+                    # Only consider verified if it has actual numbers (employee IDs are numeric)
+                    is_verified = emp_value and len(emp_value) >= 4 and any(c.isdigit() for c in emp_value)
                     
                     entry = {
                         "name": name_text,
