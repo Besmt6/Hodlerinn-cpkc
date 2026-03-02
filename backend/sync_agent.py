@@ -487,50 +487,75 @@ class APIGlobalSyncAgent:
         try:
             name = entry.get("name", "")
             
-            # Re-find the row by name since element handles may be stale
-            # Look for the cell containing this name
-            name_cell = await self.page.query_selector(f'td:has-text("{name}")')
+            # Extract just the last name for searching (more reliable)
+            # Names are like "OLDHAM,(DWIGHT)BHW RC" or "BEARDEN/WILLIAM/OT I E"
+            if ',' in name:
+                search_name = name.split(',')[0]  # Get "OLDHAM"
+            elif '/' in name:
+                search_name = name.split('/')[0]  # Get "BEARDEN"
+            else:
+                search_name = name.split()[0] if ' ' in name else name
             
-            if not name_cell:
-                # Try partial match
-                name_parts = name.split(',')[0] if ',' in name else name.split('/')[0]
-                name_cell = await self.page.query_selector(f'td:has-text("{name_parts}")')
+            logger.info(f"Searching for row with name containing: {search_name}")
             
-            if not name_cell:
-                logger.warning(f"Could not find row for: {name}")
-                return False
+            # Find all rows and search for the one containing this name
+            all_rows = await self.page.query_selector_all('tr')
+            target_row = None
             
-            # Get the parent row
-            row = await name_cell.evaluate_handle("el => el.closest('tr')")
-            if not row:
-                logger.warning(f"Could not find parent row for: {name}")
+            for row in all_rows:
+                try:
+                    row_text = await row.inner_text()
+                    if search_name in row_text:
+                        # Verify this is a data row (has checkboxes)
+                        checkboxes = await row.query_selector_all('.ui-chkbox, input[type="checkbox"]')
+                        if len(checkboxes) > 0:
+                            target_row = row
+                            logger.info(f"Found row for {search_name}")
+                            break
+                except:
+                    continue
+            
+            if not target_row:
+                logger.warning(f"Could not find row for: {name} (searched: {search_name})")
                 return False
             
             # Find checkboxes in this row - No Bill is typically the second checkbox
-            checkboxes = await row.query_selector_all('input[type="checkbox"]')
+            # PrimeFaces checkboxes have a wrapper div
+            checkbox_wrappers = await target_row.query_selector_all('.ui-chkbox')
             
-            if len(checkboxes) >= 2:
-                no_bill_cb = checkboxes[1]
-            elif len(checkboxes) == 1:
-                no_bill_cb = checkboxes[0]
+            if len(checkbox_wrappers) >= 2:
+                # Second checkbox wrapper is "No Bill"
+                no_bill_wrapper = checkbox_wrappers[1]
+                # Click the wrapper box (the visible clickable element)
+                no_bill_box = await no_bill_wrapper.query_selector('.ui-chkbox-box')
+                if no_bill_box:
+                    await no_bill_box.click()
+                    logger.info(f"Clicked No Bill checkbox for: {name}")
+                else:
+                    await no_bill_wrapper.click()
+                    logger.info(f"Clicked No Bill wrapper for: {name}")
+            elif len(checkbox_wrappers) == 1:
+                no_bill_box = await checkbox_wrappers[0].query_selector('.ui-chkbox-box')
+                if no_bill_box:
+                    await no_bill_box.click()
+                else:
+                    await checkbox_wrappers[0].click()
+                logger.info(f"Clicked single checkbox for: {name}")
             else:
-                logger.warning(f"No checkboxes found for: {name}")
-                return False
+                # Fallback: try finding input checkboxes directly
+                checkboxes = await target_row.query_selector_all('input[type="checkbox"]')
+                if len(checkboxes) >= 2:
+                    await checkboxes[1].click(force=True)
+                    logger.info(f"Clicked checkbox input for: {name}")
+                elif len(checkboxes) == 1:
+                    await checkboxes[0].click(force=True)
+                    logger.info(f"Clicked single checkbox input for: {name}")
+                else:
+                    logger.warning(f"No checkboxes found for: {name}")
+                    return False
             
-            # Check if already checked
-            is_checked = await no_bill_cb.is_checked()
-            if not is_checked:
-                # Use force click for PrimeFaces overlay elements
-                try:
-                    await no_bill_cb.click(force=True)
-                    await self.page.wait_for_timeout(300)
-                except Exception:
-                    try:
-                        await no_bill_cb.evaluate("el => el.click()")
-                        await self.page.wait_for_timeout(300)
-                    except:
-                        await no_bill_cb.dispatch_event("click")
-                        await self.page.wait_for_timeout(300)
+            # Wait for auto-save to trigger (portal auto-refreshes after 2-3 seconds)
+            await self.page.wait_for_timeout(3500)
             
             logger.info(f"Marked No Bill: {name}")
             return True
@@ -682,10 +707,9 @@ class APIGlobalSyncAgent:
                         "note": "Guest checked in at Hodler Inn but not listed in API Global portal"
                     })
             
-            # IMPORTANT: Click Save button to persist all changes
-            if self.results["no_bill"] or self.results["verified"]:
-                logger.info("Saving changes to portal...")
-                await self.save_changes()
+            # Portal auto-saves when checkboxes are clicked - no Save button needed
+            # Wait a moment for any final auto-saves to complete
+            await self.page.wait_for_timeout(2000)
             
             logger.info(f"Sync completed. Verified: {len(self.results['verified'])}, No Bill: {len(self.results['no_bill'])}")
             return self.results
