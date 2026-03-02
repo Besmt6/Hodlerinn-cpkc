@@ -453,11 +453,24 @@ async def register_guest(input: GuestRegistrationCreate):
     )
     doc = guest.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
+    doc['is_verified'] = False  # New guests need verification
+    doc['verified_at'] = None
     
     # Encrypt sensitive data before storing
     doc['name_encrypted'] = encrypt_data(doc['name'])
     
     await db.guests.insert_one(doc)
+    
+    # Send Telegram notification about new registration
+    await send_telegram_notification(
+        f"📝 <b>NEW REGISTRATION</b>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Name:</b> {valid_employee['name']}\n"
+        f"🆔 <b>Employee ID:</b> {input.employee_number}\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"ℹ️ Guest will need room assignment at check-in"
+    )
+    
     return guest
 
 @api_router.get("/guests/{employee_number}")
