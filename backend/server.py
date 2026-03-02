@@ -148,7 +148,13 @@ async def auto_sync_task():
         for booking in bookings:
             guest = guests_dict.get(booking['employee_number'])
             if guest:
-                decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+                # Handle both encrypted and non-encrypted names
+                name_encrypted = guest.get('name_encrypted')
+                if name_encrypted:
+                    decrypted_name = decrypt_data(name_encrypted)
+                else:
+                    decrypted_name = guest.get('name', '')
+                    
                 hodler_records.append({
                     "employee_name": decrypted_name,
                     "employee_number": booking['employee_number'],
@@ -1948,7 +1954,13 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
     for booking in bookings:
         guest = guests_dict.get(booking['employee_number'])
         if guest:
-            decrypted_name = decrypt_data(guest.get('name_encrypted', guest.get('name', '')))
+            # Handle both encrypted and non-encrypted names
+            name_encrypted = guest.get('name_encrypted')
+            if name_encrypted:
+                decrypted_name = decrypt_data(name_encrypted)
+            else:
+                decrypted_name = guest.get('name', '')
+            
             hodler_records.append({
                 "employee_name": decrypted_name,
                 "employee_number": booking['employee_number'],

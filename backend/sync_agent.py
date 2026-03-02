@@ -19,10 +19,23 @@ def normalize_name(name: str) -> str:
     """Normalize name for matching - remove suffixes, lowercase, etc."""
     if not name:
         return ""
-    # Remove common suffixes like BMR, HBW, MBW, HUB R E, etc.
+    
+    # Remove common suffixes like BMR, HBW, MBW, HUB R E, *, etc.
     name = re.sub(r'[/*][A-Z\s]{2,10}\s*$', '', name.strip())
     name = re.sub(r'/[A-Z]{2,4}\s*$', '', name.strip())
-    # Convert LASTNAME/FIRSTNAME format to "firstname lastname"
+    name = re.sub(r'\s+[A-Z]{1,2}\s*$', '', name.strip())  # Remove single letter suffixes like " E"
+    
+    # Handle LASTNAME,(FIRSTNAME) format with parentheses
+    paren_match = re.match(r'^([A-Z]+),\s*\(([^)]+)\)', name, re.IGNORECASE)
+    if paren_match:
+        lastname = paren_match.group(1).strip()
+        firstname = paren_match.group(2).strip()
+        # Remove any suffixes from firstname
+        firstname = re.sub(r'[/*].*$', '', firstname).strip()
+        firstname = re.sub(r'\s+[A-Z]+$', '', firstname).strip()
+        return f"{firstname} {lastname}".lower()
+    
+    # Handle LASTNAME/FIRSTNAME format with slash
     parts = name.split('/')
     if len(parts) >= 2:
         # Format: LASTNAME/FIRSTNAME or LASTNAME/FIRSTNAME/SUFFIX
@@ -31,6 +44,8 @@ def normalize_name(name: str) -> str:
         # Remove any remaining suffix from firstname
         firstname = re.sub(r'[/*].*$', '', firstname).strip()
         return f"{firstname} {lastname}".lower()
+    
+    # Handle "Firstname Lastname" format (already normal)
     return name.lower().strip()
 
 
@@ -39,29 +54,36 @@ def match_names(api_name: str, hodler_name: str, threshold: float = 0.6) -> bool
     norm_api = normalize_name(api_name)
     norm_hodler = normalize_name(hodler_name)
     
+    logger.info(f"Normalized: '{api_name}' -> '{norm_api}' | '{hodler_name}' -> '{norm_hodler}'")
+    
     if not norm_api or not norm_hodler:
         return False
     
     # Exact match
     if norm_api == norm_hodler:
+        logger.info(f"EXACT MATCH: {norm_api}")
         return True
     
     # Check if one contains the other
     if norm_api in norm_hodler or norm_hodler in norm_api:
+        logger.info(f"CONTAINS MATCH: {norm_api} / {norm_hodler}")
         return True
     
     # Check individual name parts
     api_parts = set(norm_api.split())
     hodler_parts = set(norm_hodler.split())
     if api_parts and hodler_parts:
+        common_parts = api_parts & hodler_parts
         # If both first and last name match (in any order)
-        if len(api_parts & hodler_parts) >= 2:
+        if len(common_parts) >= 2:
+            logger.info(f"PARTS MATCH (2+): {common_parts} for {norm_api} / {norm_hodler}")
             return True
         # If at least one significant name part matches
-        if len(api_parts & hodler_parts) >= 1:
+        if len(common_parts) >= 1:
             # Use fuzzy match for additional confirmation
             ratio = SequenceMatcher(None, norm_api, norm_hodler).ratio()
             if ratio >= 0.5:
+                logger.info(f"FUZZY MATCH: ratio={ratio} for {norm_api} / {norm_hodler}")
                 return True
     
     # Fuzzy match using sequence matcher
@@ -461,25 +483,66 @@ class APIGlobalSyncAgent:
     async def verify_entry(self, entry: dict, employee_id: str, room_number: str) -> bool:
         """Fill in employee ID and room number for an entry."""
         try:
-            if entry["emp_input"]:
-                await entry["emp_input"].clear()
-                await entry["emp_input"].fill(str(employee_id))
-                await self.page.wait_for_timeout(300)
+            name = entry.get("name", "")
             
-            if entry["room_input"]:
-                await entry["room_input"].clear()
-                await entry["room_input"].fill(str(room_number))
-                await self.page.wait_for_timeout(300)
+            # Extract just the last name for searching (more reliable)
+            if ',' in name:
+                search_name = name.split(',')[0]
+            elif '/' in name:
+                search_name = name.split('/')[0]
+            else:
+                search_name = name.split()[0] if ' ' in name else name
             
-            # Tab out to trigger any validation
+            logger.info(f"Verifying {name}, searching for row with: {search_name}")
+            
+            # Find the row containing this name
+            all_rows = await self.page.query_selector_all('tr')
+            target_row = None
+            
+            for row in all_rows:
+                try:
+                    row_text = await row.inner_text()
+                    if search_name in row_text:
+                        # Verify this is a data row (has inputs)
+                        inputs = await row.query_selector_all('input[type="text"]')
+                        if len(inputs) >= 2:
+                            target_row = row
+                            break
+                except:
+                    continue
+            
+            if not target_row:
+                logger.warning(f"Could not find row for: {name}")
+                return False
+            
+            # Find text inputs in this row
+            text_inputs = await target_row.query_selector_all('input[type="text"]')
+            
+            if len(text_inputs) >= 1:
+                # First input is Employee ID
+                emp_input = text_inputs[0]
+                await emp_input.click(click_count=3)  # Select all
+                await emp_input.fill(str(employee_id))
+                await self.page.wait_for_timeout(300)
+                logger.info(f"Filled Employee ID: {employee_id}")
+            
+            if len(text_inputs) >= 2:
+                # Second input is Room Number
+                room_input = text_inputs[1]
+                await room_input.click(click_count=3)  # Select all
+                await room_input.fill(str(room_number))
+                await self.page.wait_for_timeout(300)
+                logger.info(f"Filled Room Number: {room_number}")
+            
+            # Tab out to trigger validation/auto-save
             await self.page.keyboard.press("Tab")
-            await self.page.wait_for_timeout(500)
+            await self.page.wait_for_timeout(3500)  # Wait for auto-save
             
-            logger.info(f"Verified: {entry['name']} -> EmpID: {employee_id}, Room: {room_number}")
+            logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
             return True
             
         except Exception as e:
-            logger.error(f"Error verifying entry {entry['name']}: {str(e)}")
+            logger.error(f"Error verifying entry {entry.get('name', 'unknown')}: {str(e)}")
             return False
     
     async def mark_no_bill(self, entry: dict) -> bool:
@@ -669,6 +732,7 @@ class APIGlobalSyncAgent:
                 # Try to match with Hodler Inn records
                 for record in hodler_records:
                     hodler_name = record.get("employee_name", "")
+                    logger.info(f"Comparing: '{api_name}' with '{hodler_name}'")
                     if match_names(api_name, hodler_name):
                         # Found a match - fill in the details
                         logger.info(f"Match found: {api_name} <-> {hodler_name}")
