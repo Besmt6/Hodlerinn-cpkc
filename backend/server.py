@@ -1973,7 +1973,7 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
             from sync_agent import APIGlobalSyncAgent
             
             agent = APIGlobalSyncAgent(sync_params["username"], sync_params["password"])
-            results = await agent.run_sync(sync_params["hodler_records"])
+            results = await agent.run_sync(sync_params["hodler_records"], sync_params["target"])
             
             sync_status["last_results"] = results
             sync_status["last_run"] = datetime.now(timezone.utc).isoformat()

@@ -199,8 +199,13 @@ class APIGlobalSyncAgent:
             self.results["errors"].append(f"Navigation failed: {str(e)}")
             return False
     
-    async def load_signin_sheet(self) -> bool:
-        """Click Load button to load the sign-in sheet data."""
+    async def load_signin_sheet(self, target_date: str = None) -> bool:
+        """Click Load button to load the sign-in sheet data.
+        
+        Args:
+            target_date: Optional date in format 'MM/DD/YYYY' or 'YYYY-MM-DD'. 
+                        If not provided, uses the portal's default (previous day).
+        """
         try:
             logger.info("Loading sign-in sheet data...")
             
@@ -211,7 +216,39 @@ class APIGlobalSyncAgent:
             # - Reservation Date: [date] (auto-set to previous day)
             # - Load button
             
-            # Just click the Load button - date should already be correct (previous day before 3pm)
+            # If a target date is provided, set it before clicking Load
+            if target_date:
+                # Convert YYYY-MM-DD to MM/DD/YYYY if needed
+                if '-' in target_date and len(target_date) == 10:
+                    parts = target_date.split('-')
+                    target_date = f"{parts[1]}/{parts[2]}/{parts[0]}"
+                
+                logger.info(f"Setting date to: {target_date}")
+                
+                # Find the date input field
+                date_input = self.page.locator('input[type="text"][id*="date" i], input[type="text"][id*="Date" i], input.ui-inputfield[id*="date" i]').first
+                
+                try:
+                    # Clear and set the date
+                    await date_input.click()
+                    await date_input.fill('')
+                    await date_input.fill(target_date)
+                    await self.page.wait_for_timeout(500)
+                    # Press Tab to trigger any date validation
+                    await date_input.press('Tab')
+                    await self.page.wait_for_timeout(500)
+                    logger.info(f"Date set to {target_date}")
+                except Exception as date_err:
+                    logger.warning(f"Could not set date input: {date_err}")
+                    # Try alternative approach - look for calendar icon or different input
+                    try:
+                        date_input = self.page.locator('input[placeholder*="date" i], input[name*="date" i]').first
+                        await date_input.fill(target_date)
+                        logger.info(f"Date set via alternative selector")
+                    except:
+                        logger.warning("Date selection failed, using default date")
+            
+            # Click the Load button
             load_button = self.page.locator('input[type="submit"][value="Load"], button:has-text("Load")').first
             await load_button.click()
             
@@ -426,12 +463,13 @@ class APIGlobalSyncAgent:
             logger.error(f"Error marking no bill for {entry['name']}: {str(e)}")
             return False
     
-    async def run_sync(self, hodler_records: list) -> dict:
+    async def run_sync(self, hodler_records: list, target_date: str = None) -> dict:
         """
         Run the full sync process.
         
         Args:
             hodler_records: List of dicts with 'employee_name', 'employee_number', 'room_number'
+            target_date: Optional date in format 'YYYY-MM-DD' to sync for a specific date
         
         Returns:
             Results dict with verified, no_bill, missing entries
@@ -447,8 +485,8 @@ class APIGlobalSyncAgent:
             if not await self.navigate_to_signin_sheets():
                 return self.results
             
-            # Step 3: Click Load to get the data
-            if not await self.load_signin_sheet():
+            # Step 3: Click Load to get the data (with optional date)
+            if not await self.load_signin_sheet(target_date):
                 return self.results
             
             # Step 4: Get all entries from the table
