@@ -65,7 +65,8 @@ import {
   UserCheck,
   Flag,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Search
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -104,6 +105,9 @@ export default function AdminDashboard() {
   
   // Employee management state
   const [employees, setEmployees] = useState([]);
+  const [employeeSortBy, setEmployeeSortBy] = useState('name'); // 'name', 'id', 'date'
+  const [employeeSortOrder, setEmployeeSortOrder] = useState('asc'); // 'asc', 'desc'
+  const [employeeSearch, setEmployeeSearch] = useState('');
   const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [employeeForm, setEmployeeForm] = useState({
@@ -1593,10 +1597,61 @@ export default function AdminDashboard() {
               {/* Employee Table */}
               <Card className="bg-vault-surface border-vault-border">
                 <CardHeader className="border-b border-vault-border">
-                  <CardTitle className="font-outfit text-xl text-vault-text flex items-center gap-2">
-                    <Users className="w-5 h-5 text-vault-gold" />
-                    All Employees
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="font-outfit text-xl text-vault-text flex items-center gap-2">
+                      <Users className="w-5 h-5 text-vault-gold" />
+                      All Employees
+                    </CardTitle>
+                    <div className="flex items-center gap-3">
+                      {/* Search */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                        <Input
+                          placeholder="Search by name or ID..."
+                          value={employeeSearch}
+                          onChange={(e) => setEmployeeSearch(e.target.value)}
+                          className="pl-9 w-48 bg-black/50 border-vault-border text-vault-text text-sm"
+                          data-testid="employee-search-input"
+                        />
+                      </div>
+                      {/* Sort Options */}
+                      <div className="flex items-center gap-1 text-sm">
+                        <span className="text-vault-text-secondary">Sort:</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (employeeSortBy === 'name') {
+                              setEmployeeSortOrder(employeeSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setEmployeeSortBy('name');
+                              setEmployeeSortOrder('asc');
+                            }
+                          }}
+                          className={`text-xs px-2 ${employeeSortBy === 'name' ? 'text-vault-gold' : 'text-vault-text-secondary'}`}
+                          data-testid="sort-by-name-btn"
+                        >
+                          A-Z {employeeSortBy === 'name' && (employeeSortOrder === 'asc' ? '↑' : '↓')}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (employeeSortBy === 'id') {
+                              setEmployeeSortOrder(employeeSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setEmployeeSortBy('id');
+                              setEmployeeSortOrder('asc');
+                            }
+                          }}
+                          className={`text-xs px-2 ${employeeSortBy === 'id' ? 'text-vault-gold' : 'text-vault-text-secondary'}`}
+                          data-testid="sort-by-id-btn"
+                        >
+                          ID {employeeSortBy === 'id' && (employeeSortOrder === 'asc' ? '↑' : '↓')}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[400px]">
@@ -1610,22 +1665,53 @@ export default function AdminDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {employees.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center text-vault-text-secondary py-8">
-                              No employees added yet. Click "Add Employee" or "Bulk Import" to get started.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          employees.map((employee) => (
-                            <TableRow key={employee.id} className="table-row border-vault-border" data-testid={`employee-row-${employee.id}`}>
-                              <TableCell className="font-mono text-vault-gold font-bold">{employee.employee_number}</TableCell>
-                              <TableCell className="text-vault-text">{employee.name}</TableCell>
+                        {(() => {
+                          // Filter employees
+                          let filteredEmployees = employees.filter(emp => {
+                            if (!employeeSearch) return true;
+                            const search = employeeSearch.toLowerCase();
+                            return (
+                              (emp.name || '').toLowerCase().includes(search) ||
+                              (emp.employee_number || '').toLowerCase().includes(search)
+                            );
+                          });
+                          
+                          // Sort employees
+                          filteredEmployees = [...filteredEmployees].sort((a, b) => {
+                            let aVal, bVal;
+                            if (employeeSortBy === 'name') {
+                              aVal = (a.name || '').toLowerCase();
+                              bVal = (b.name || '').toLowerCase();
+                            } else {
+                              aVal = (a.employee_number || '').toLowerCase();
+                              bVal = (b.employee_number || '').toLowerCase();
+                            }
+                            if (employeeSortOrder === 'asc') {
+                              return aVal.localeCompare(bVal);
+                            } else {
+                              return bVal.localeCompare(aVal);
+                            }
+                          });
+                          
+                          if (filteredEmployees.length === 0) {
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={4} className="text-center text-vault-text-secondary py-8">
+                                  {employeeSearch ? `No employees matching "${employeeSearch}"` : 'No employees added yet. Click "Add Employee" or "Bulk Import" to get started.'}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }
+                          
+                          return filteredEmployees.map((emp) => (
+                            <TableRow key={emp.id} className="table-row border-vault-border" data-testid={`employee-row-${emp.id}`}>
+                              <TableCell className="font-mono text-vault-gold font-bold">{emp.employee_number}</TableCell>
+                              <TableCell className="text-vault-text">{emp.name}</TableCell>
                               <TableCell>
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                  employee.is_active !== false ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                                  emp.is_active !== false ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                                 }`}>
-                                  {employee.is_active !== false ? 'Active' : 'Inactive'}
+                                  {emp.is_active !== false ? 'Active' : 'Inactive'}
                                 </span>
                               </TableCell>
                               <TableCell>
@@ -1634,8 +1720,8 @@ export default function AdminDashboard() {
                                     variant="ghost" 
                                     size="sm"
                                     className="text-vault-text-secondary hover:text-vault-gold h-8 w-8 p-0"
-                                    onClick={() => handleEditEmployee(employee)}
-                                    data-testid={`edit-employee-${employee.id}`}
+                                    onClick={() => handleEditEmployee(emp)}
+                                    data-testid={`edit-employee-${emp.id}`}
                                   >
                                     <Pencil className="w-4 h-4" />
                                   </Button>
@@ -1643,16 +1729,16 @@ export default function AdminDashboard() {
                                     variant="ghost" 
                                     size="sm"
                                     className="text-vault-text-secondary hover:text-red-500 h-8 w-8 p-0"
-                                    onClick={() => setDeleteEmployeeConfirm(employee)}
-                                    data-testid={`delete-employee-${employee.id}`}
+                                    onClick={() => setDeleteEmployeeConfirm(emp)}
+                                    data-testid={`delete-employee-${emp.id}`}
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
                                 </div>
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
+                          ));
+                        })()}
                       </TableBody>
                     </Table>
                   </ScrollArea>

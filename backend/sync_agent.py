@@ -645,53 +645,54 @@ async def collect_employees_from_portal(username: str, password: str) -> dict:
                     billing_periods.append((opt_value, opt_text))
                     logger.info(f"  Period {idx}: {opt_text}")
             
-            # Process up to 6 months of data (to get comprehensive employee list)
-            max_periods = min(len(billing_periods), 6)
+            # Process up to 12 months of data (to get comprehensive employee list)
+            max_periods = min(len(billing_periods), 12)
             logger.info(f"Will process {max_periods} billing periods")
             
             for period_idx, (period_value, period_text) in enumerate(billing_periods[:max_periods]):
                 logger.info(f"\n--- Processing period {period_idx + 1}/{max_periods}: {period_text} ---")
                 
                 try:
-                    # First, make sure we're on the Sign-in Report page
-                    # Check if billing dropdown is available
-                    current_url = agent.page.url
-                    if "viewSignInReport" not in current_url:
-                        logger.info("Navigating back to Sign-in Report page...")
-                        # Navigate to Sign-in Report page again
-                        signin_menu = agent.page.locator("a:has-text('Sign-in Sheets')").first
-                        if await signin_menu.count() > 0:
-                            await signin_menu.click()
-                            await agent.page.wait_for_timeout(1000)
-                        signin_report = agent.page.locator("a:has-text('Sign-in Report')").first
-                        if await signin_report.count() > 0:
-                            await signin_report.click()
-                            await agent.page.wait_for_load_state("networkidle", timeout=30000)
-                            await agent.page.wait_for_timeout(1500)
+                    # ALWAYS navigate fresh to Sign-in Report page for each period
+                    # This ensures the dropdown and form are in a clean state
+                    logger.info("Navigating to Sign-in Report page...")
                     
-                    # Re-find the billing dropdown after potential navigation
-                    billing_dropdown = agent.page.locator("select[id*='billingPeriod'], select[name*='billingPeriod']").first
+                    # Click Sign-in Sheets menu
+                    signin_menu = agent.page.locator("a:has-text('Sign-in Sheets')").first
+                    if await signin_menu.count() > 0:
+                        await signin_menu.click()
+                        await agent.page.wait_for_timeout(1000)
+                    
+                    # Click Sign-in Report
+                    signin_report = agent.page.locator("a:has-text('Sign-in Report')").first
+                    if await signin_report.count() > 0:
+                        await signin_report.click()
+                        await agent.page.wait_for_load_state("networkidle", timeout=30000)
+                        await agent.page.wait_for_timeout(1500)
+                    
+                    # Find the billing dropdown
+                    billing_dropdown = agent.page.locator("select").nth(1)  # Second dropdown is billing period
                     if await billing_dropdown.count() == 0:
-                        selects = agent.page.locator("select")
-                        if await selects.count() > 1:
-                            billing_dropdown = selects.nth(1)
-                        elif await selects.count() > 0:
-                            billing_dropdown = selects.first
-                        else:
-                            logger.warning(f"Could not find billing dropdown for period {period_text}")
-                            continue
+                        billing_dropdown = agent.page.locator("select").first
+                    
+                    if await billing_dropdown.count() == 0:
+                        logger.warning(f"Could not find billing dropdown for period {period_text}")
+                        continue
                     
                     # Select the billing period
                     await billing_dropdown.select_option(value=period_value, timeout=10000)
                     await agent.page.wait_for_timeout(500)
                     
                     # Click Create button
-                    create_btn = agent.page.locator("button:has-text('Create'), input[value='Create']").first
+                    create_btn = agent.page.locator("input[value='Create'], button:has-text('Create')").first
                     if await create_btn.count() > 0:
                         await create_btn.click()
                         await agent.page.wait_for_load_state("networkidle", timeout=60000)
                         await agent.page.wait_for_timeout(2000)
                         logger.info(f"Report loaded for {period_text}")
+                    else:
+                        logger.warning(f"Create button not found for {period_text}")
+                        continue
                     
                     # Extract employees from this period's report
                     period_employees = await extract_employees_from_report_table(agent.page, seen_ids)
