@@ -98,6 +98,18 @@ export default function AdminDashboard() {
   });
   const [deleteRoomConfirm, setDeleteRoomConfirm] = useState(null);
   
+  // Employee management state
+  const [employees, setEmployees] = useState([]);
+  const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [employeeForm, setEmployeeForm] = useState({
+    employee_number: "",
+    name: ""
+  });
+  const [deleteEmployeeConfirm, setDeleteEmployeeConfirm] = useState(null);
+  const [bulkImportText, setBulkImportText] = useState("");
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  
   // Portal Settings state
   const [portalSettings, setPortalSettings] = useState({
     api_global_username: "",
