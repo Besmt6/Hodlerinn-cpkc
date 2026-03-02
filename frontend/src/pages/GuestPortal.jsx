@@ -724,46 +724,34 @@ function CheckInForm({ setView, setSuccessMessage }) {
               </Button>
             </div>
           ) : isNewGuest && !verifiedEmployee ? (
-            /* New Guest Registration - With Company Verification */
+            /* New Guest Registration - Employee ID verified from admin list */
             <div className="space-y-4">
-              <div className="bg-amber-900/40 border-2 border-amber-500 rounded-lg p-4">
-                <p className="text-amber-400 text-lg font-bold uppercase tracking-wide mb-2">📝 New Guest Registration</p>
-                <p className="text-vault-text font-mono text-lg">Employee ID: {employeeNumber}</p>
-                <p className="text-vault-text-secondary mt-2">Please complete registration to check in.</p>
+              <div className="bg-green-900/40 border-2 border-green-500 rounded-lg p-4">
+                <p className="text-green-400 text-lg font-bold uppercase tracking-wide mb-2">✓ Employee ID Verified</p>
+                <p className="text-vault-text font-mono text-lg">ID: {employeeNumber}</p>
+                <p className="text-vault-text mt-1">Name: <span className="text-vault-gold">{guestName}</span></p>
+                <p className="text-vault-text-secondary mt-2">First time? Confirm your name to register.</p>
                 <button
                   onClick={handleClearVerification}
                   className="text-vault-text-secondary hover:text-vault-gold text-sm underline mt-3"
                 >
-                  ← Try different Employee Number
+                  ← Wrong person? Try different ID
                 </button>
               </div>
               <div>
-                <label className="vault-label">Your Full Name</label>
+                <label className="vault-label">Confirm Your Name</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
                   <Input
                     ref={nameInputRef}
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
-                    placeholder="⬇️ TAP HERE to enter name"
-                    className="vault-input pl-10 input-highlight text-lg"
+                    className="vault-input pl-10 text-lg"
                     data-testid="register-name-input"
+                    readOnly
                   />
                 </div>
-              </div>
-              <div>
-                <label className="vault-label">Company Name (Railroad)</label>
-                <div className="relative">
-                  <Input
-                    ref={companyInputRef}
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value.toUpperCase())}
-                    placeholder="⬇️ Enter company (e.g. CPKC)"
-                    className="vault-input pl-4 text-lg uppercase"
-                    data-testid="register-company-input"
-                    maxLength={10}
-                  />
-                </div>
+                <p className="text-xs text-vault-text-secondary mt-1">Name is from admin records</p>
               </div>
               <Button
                 onClick={handleRegisterAndContinue}
@@ -771,7 +759,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 className="w-full vault-btn-primary h-12"
                 data-testid="register-continue-btn"
               >
-                {registering ? "Registering..." : "Register & Continue Check-In"}
+                {registering ? "Registering..." : "Confirm & Continue Check-In"}
               </Button>
             </div>
           ) : (
