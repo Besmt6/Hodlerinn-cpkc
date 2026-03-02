@@ -534,3 +534,81 @@ async def test_connection(username: str, password: str) -> dict:
         }
     finally:
         await agent.stop()
+
+
+async def collect_employees_from_portal(username: str, password: str) -> dict:
+    """
+    Collect all employee names and IDs from the sign-in sheet portal.
+    This can be used to build the employee list from historical data.
+    """
+    agent = APIGlobalSyncAgent(username, password)
+    employees = []
+    
+    try:
+        await agent.start()
+        
+        # Step 1: Login
+        if not await agent.login():
+            return {
+                "success": False,
+                "message": "Login failed",
+                "employees": []
+            }
+        
+        # Step 2: Navigate to Sign-in Sheets
+        if not await agent.navigate_to_signin_sheets():
+            return {
+                "success": False,
+                "message": "Failed to navigate to sign-in sheets",
+                "employees": []
+            }
+        
+        # Step 3: Load the data
+        if not await agent.load_signin_sheet():
+            return {
+                "success": False,
+                "message": "Failed to load sign-in sheet",
+                "employees": []
+            }
+        
+        # Step 4: Extract employee data from all entries
+        entries = await agent.get_signin_sheet_entries()
+        
+        # Process entries to extract unique employees
+        seen_names = set()
+        for entry in entries:
+            name = entry.get("name", "").strip()
+            if name and name not in seen_names:
+                seen_names.add(name)
+                
+                # Try to parse name format: LASTNAME/FIRSTNAME/SUFFIX or LASTNAME/FIRSTNAME
+                parts = name.split('/')
+                if len(parts) >= 2:
+                    last_name = parts[0].strip().title()
+                    first_name = parts[1].strip().title()
+                    formatted_name = f"{first_name} {last_name}"
+                else:
+                    formatted_name = name.title()
+                
+                employees.append({
+                    "name": formatted_name,
+                    "original_name": name
+                })
+        
+        logger.info(f"Collected {len(employees)} unique employees from portal")
+        
+        return {
+            "success": True,
+            "message": f"Found {len(employees)} employees",
+            "employees": employees
+        }
+        
+    except Exception as e:
+        logger.error(f"Error collecting employees: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Error: {str(e)}",
+            "employees": []
+        }
+    finally:
+        await agent.stop()
