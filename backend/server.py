@@ -1381,6 +1381,93 @@ async def delete_room(room_id: str):
     await db.rooms.delete_one({"id": room_id})
     return {"message": "Room deleted successfully"}
 
+# ==================== Employee Management ====================
+
+@api_router.get("/admin/employees")
+async def get_employees():
+    """Get all pre-registered employees"""
+    employees = await db.employees.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
+    return employees
+
+@api_router.post("/admin/employees")
+async def create_employee(input: EmployeeCreate):
+    """Add a new employee to the allowed list"""
+    # Check if employee number already exists
+    existing = await db.employees.find_one({"employee_number": input.employee_number}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Employee number already exists")
+    
+    employee = Employee(
+        employee_number=input.employee_number,
+        name=input.name
+    )
+    doc = employee.model_dump()
+    await db.employees.insert_one(doc)
+    doc.pop('_id', None)
+    return {"message": "Employee added successfully", "employee": doc}
+
+@api_router.post("/admin/employees/bulk")
+async def bulk_import_employees(employees: List[EmployeeCreate]):
+    """Bulk import employees"""
+    added = 0
+    skipped = 0
+    
+    for emp in employees:
+        existing = await db.employees.find_one({"employee_number": emp.employee_number}, {"_id": 0})
+        if existing:
+            skipped += 1
+            continue
+        
+        employee = Employee(
+            employee_number=emp.employee_number,
+            name=emp.name
+        )
+        await db.employees.insert_one(employee.model_dump())
+        added += 1
+    
+    return {"message": f"Imported {added} employees, skipped {skipped} duplicates"}
+
+@api_router.put("/admin/employees/{employee_id}")
+async def update_employee(employee_id: str, input: EmployeeUpdate):
+    """Update an employee"""
+    employee = await db.employees.find_one({"id": employee_id}, {"_id": 0})
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    
+    update_data = {k: v for k, v in input.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No data to update")
+    
+    # If updating employee_number, check for duplicates
+    if "employee_number" in update_data:
+        existing = await db.employees.find_one({
+            "employee_number": update_data["employee_number"],
+            "id": {"$ne": employee_id}
+        }, {"_id": 0})
+        if existing:
+            raise HTTPException(status_code=400, detail="Employee number already exists")
+    
+    await db.employees.update_one({"id": employee_id}, {"$set": update_data})
+    return {"message": "Employee updated successfully"}
+
+@api_router.delete("/admin/employees/{employee_id}")
+async def delete_employee(employee_id: str):
+    """Delete an employee"""
+    employee = await db.employees.find_one({"id": employee_id}, {"_id": 0})
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    
+    await db.employees.delete_one({"id": employee_id})
+    return {"message": "Employee deleted successfully"}
+
+@api_router.get("/employees/verify/{employee_number}")
+async def verify_employee_exists(employee_number: str):
+    """Check if an employee number is in the allowed list (public endpoint for check-in)"""
+    employee = await db.employees.find_one({"employee_number": employee_number, "is_active": True}, {"_id": 0})
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee ID not found in system. Please contact admin.")
+    return {"valid": True, "name": employee["name"], "employee_number": employee["employee_number"]}
+
 # ==================== Portal Settings ====================
 
 @api_router.get("/admin/settings")
