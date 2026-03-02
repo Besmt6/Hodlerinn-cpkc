@@ -798,19 +798,24 @@ class APIGlobalSyncAgent:
                     logger.info(f"Comparing: '{api_name}' with '{hodler_name}'")
                     if match_names(api_name, hodler_name):
                         # Found a match - fill in the details
-                        logger.info(f"Match found: {api_name} <-> {hodler_name}")
-                        success = await self.verify_entry(
-                            entry,
-                            record.get("employee_number", ""),
-                            record.get("room_number", "")
-                        )
-                        if success:
-                            self.results["verified"].append({
-                                "api_name": api_name,
-                                "hodler_name": hodler_name,
-                                "employee_id": record.get("employee_number"),
-                                "room": record.get("room_number")
-                            })
+                        logger.info(f"*** MATCH FOUND: {api_name} <-> {hodler_name} ***")
+                        logger.info(f"Will fill: EmpID={record.get('employee_number')}, Room={record.get('room_number')}")
+                        try:
+                            success = await self.verify_entry(
+                                entry,
+                                record.get("employee_number", ""),
+                                record.get("room_number", "")
+                            )
+                            logger.info(f"verify_entry returned: {success}")
+                            if success:
+                                self.results["verified"].append({
+                                    "api_name": api_name,
+                                    "hodler_name": hodler_name,
+                                    "employee_id": record.get("employee_number"),
+                                    "room": record.get("room_number")
+                                })
+                        except Exception as ve:
+                            logger.error(f"Error in verify_entry: {str(ve)}")
                         matched = True
                         break
                 
