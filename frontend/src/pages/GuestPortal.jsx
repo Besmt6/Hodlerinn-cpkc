@@ -474,12 +474,14 @@ function CheckInForm({ setView, setSuccessMessage }) {
   const [roomReminderSpoken, setRoomReminderSpoken] = useState(false);
   const [isNewGuest, setIsNewGuest] = useState(false);
   const [guestName, setGuestName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [registering, setRegistering] = useState(false);
   const sigRef = useRef(null);
   const roomInputRef = useRef(null);
   const timeInputRef = useRef(null);
   const signatureContainerRef = useRef(null);
   const nameInputRef = useRef(null);
+  const companyInputRef = useRef(null);
   
   // Auto-update time every minute to keep it current
   useEffect(() => {
