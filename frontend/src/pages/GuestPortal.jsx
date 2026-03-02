@@ -563,13 +563,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
 
   const handleRegisterAndContinue = async () => {
     if (!guestName.trim()) {
-      toast.error("Please enter your name");
-      return;
-    }
-    
-    // Verify company name (case insensitive)
-    if (companyName.trim().toUpperCase() !== "CPKC") {
-      toast.error("Invalid company name. Please enter your railroad company.");
+      toast.error("Please confirm your name");
       return;
     }
 
