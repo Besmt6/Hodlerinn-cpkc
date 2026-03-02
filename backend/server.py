@@ -429,27 +429,14 @@ async def root():
 # Guest Registration (no signature - signature is captured at check-in)
 @api_router.post("/guests/register", response_model=GuestRegistration)
 async def register_guest(input: GuestRegistrationCreate):
-    # First, check if employee ID is in the allowed employee list
-    valid_employee = await db.employees.find_one({
-        "employee_number": input.employee_number,
-        "is_active": True
-    }, {"_id": 0})
-    
-    if not valid_employee:
-        raise HTTPException(
-            status_code=400, 
-            detail="Employee ID not found in system. Please contact admin to add your employee ID."
-        )
-    
     # Check if employee already registered as guest
     existing = await db.guests.find_one({"employee_number": input.employee_number}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Employee already registered")
     
-    # Use the name from the employee list (not user input) for consistency
     guest = GuestRegistration(
         employee_number=input.employee_number,
-        name=valid_employee["name"]  # Use admin-approved name
+        name=input.name
     )
     doc = guest.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
