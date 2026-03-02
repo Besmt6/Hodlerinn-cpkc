@@ -334,7 +334,7 @@ class APIGlobalSyncAgent:
                     scroll_attempts += 1
                     logger.info(f"Scroll {scroll_attempts}: page height = {new_height}")
                 
-                # Scroll back to top
+                # Scroll back to top to reset view
                 await self.page.evaluate('window.scrollTo(0, 0)')
                 await self.page.wait_for_timeout(1000)
                 
@@ -485,68 +485,58 @@ class APIGlobalSyncAgent:
     async def mark_no_bill(self, entry: dict) -> bool:
         """Mark an entry as No Bill (guest didn't stay)."""
         try:
-            if entry["no_bill_checkbox"]:
-                # Check if already checked
-                is_checked = await entry["no_bill_checkbox"].is_checked()
-                if not is_checked:
-                    # PrimeFaces checkboxes have overlay elements - use force click
-                    try:
-                        await entry["no_bill_checkbox"].click(force=True)
-                        await self.page.wait_for_timeout(500)
-                    except Exception:
-                        # Fallback: Use JavaScript to click
-                        try:
-                            await entry["no_bill_checkbox"].evaluate("el => el.click()")
-                            await self.page.wait_for_timeout(500)
-                        except:
-                            await entry["no_bill_checkbox"].dispatch_event("click")
-                            await self.page.wait_for_timeout(500)
-                    
-                    # Verify it was checked
-                    is_now_checked = await entry["no_bill_checkbox"].is_checked()
-                    if not is_now_checked:
-                        # Try check() method as fallback
-                        try:
-                            await entry["no_bill_checkbox"].check(force=True)
-                        except:
-                            pass
-                        
-                logger.info(f"Marked No Bill: {entry['name']}")
-                return True
-            else:
-                # Try to find the checkbox in the row again
-                logger.warning(f"No Bill checkbox not found for: {entry['name']}, attempting re-search...")
-                
-                if entry.get("row"):
-                    # Look for any checkbox that might be the "No Bill" one
-                    checkboxes = await entry["row"].query_selector_all('input[type="checkbox"]')
-                    if len(checkboxes) >= 2:
-                        # Second checkbox is typically "No Bill" in this portal
-                        no_bill_cb = checkboxes[1]
-                        is_checked = await no_bill_cb.is_checked()
-                        if not is_checked:
-                            try:
-                                await no_bill_cb.click(force=True)
-                            except:
-                                await no_bill_cb.evaluate("el => el.click()")
-                            await self.page.wait_for_timeout(500)
-                        logger.info(f"Marked No Bill (fallback): {entry['name']}")
-                        return True
-                    elif len(checkboxes) == 1:
-                        # Only one checkbox, try it
-                        try:
-                            await checkboxes[0].click(force=True)
-                        except:
-                            await checkboxes[0].evaluate("el => el.click()")
-                        await self.page.wait_for_timeout(500)
-                        logger.info(f"Marked checkbox (single): {entry['name']}")
-                        return True
-                
-                logger.warning(f"Could not find No Bill checkbox for: {entry['name']}")
+            name = entry.get("name", "")
+            
+            # Re-find the row by name since element handles may be stale
+            # Look for the cell containing this name
+            name_cell = await self.page.query_selector(f'td:has-text("{name}")')
+            
+            if not name_cell:
+                # Try partial match
+                name_parts = name.split(',')[0] if ',' in name else name.split('/')[0]
+                name_cell = await self.page.query_selector(f'td:has-text("{name_parts}")')
+            
+            if not name_cell:
+                logger.warning(f"Could not find row for: {name}")
                 return False
             
+            # Get the parent row
+            row = await name_cell.evaluate_handle("el => el.closest('tr')")
+            if not row:
+                logger.warning(f"Could not find parent row for: {name}")
+                return False
+            
+            # Find checkboxes in this row - No Bill is typically the second checkbox
+            checkboxes = await row.query_selector_all('input[type="checkbox"]')
+            
+            if len(checkboxes) >= 2:
+                no_bill_cb = checkboxes[1]
+            elif len(checkboxes) == 1:
+                no_bill_cb = checkboxes[0]
+            else:
+                logger.warning(f"No checkboxes found for: {name}")
+                return False
+            
+            # Check if already checked
+            is_checked = await no_bill_cb.is_checked()
+            if not is_checked:
+                # Use force click for PrimeFaces overlay elements
+                try:
+                    await no_bill_cb.click(force=True)
+                    await self.page.wait_for_timeout(300)
+                except Exception:
+                    try:
+                        await no_bill_cb.evaluate("el => el.click()")
+                        await self.page.wait_for_timeout(300)
+                    except:
+                        await no_bill_cb.dispatch_event("click")
+                        await self.page.wait_for_timeout(300)
+            
+            logger.info(f"Marked No Bill: {name}")
+            return True
+            
         except Exception as e:
-            logger.error(f"Error marking no bill for {entry['name']}: {str(e)}")
+            logger.error(f"Error marking no bill for {entry.get('name', 'unknown')}: {str(e)}")
             return False
     
     async def run_sync(self, hodler_records: list, target_date: str = None) -> dict:
