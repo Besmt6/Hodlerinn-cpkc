@@ -1970,26 +1970,47 @@ async def get_sync_history():
 @api_router.post("/admin/import-from-guests")
 async def import_employees_from_guests():
     """Import employees from existing Hodler Inn guest records into the Employee List."""
-    # Get all guests from bookings
-    bookings = await db.bookings.find({}, {"_id": 0, "employee_number": 1, "employee_name": 1}).to_list(1000)
+    # Get all unique employee numbers from bookings
+    bookings = await db.bookings.find({}).to_list(1000)
+    
+    logging.info(f"Import from guests: Found {len(bookings)} bookings")
     
     imported = 0
     skipped = 0
     
     seen_ids = set()
     for booking in bookings:
-        employee_number = booking.get("employee_number", "").strip()
-        name = booking.get("employee_name", "").strip()
+        employee_number = str(booking.get("employee_number", "")).strip()
         
-        if not employee_number or not name or employee_number in seen_ids:
+        if not employee_number or employee_number in seen_ids:
             continue
         
         seen_ids.add(employee_number)
         
         # Check if already exists in employee list
-        existing = await db.employees.find_one({"employee_number": employee_number}, {"_id": 0})
+        existing = await db.employees.find_one({"employee_number": employee_number})
         if existing:
             skipped += 1
+            continue
+        
+        # Get name from the booking's employee_name field first
+        name = str(booking.get("employee_name", "")).strip()
+        
+        # If no name in booking, look up from guests collection
+        if not name:
+            guest = await db.guests.find_one({"employee_number": employee_number})
+            if guest:
+                # Try to get decrypted name
+                if guest.get('name_encrypted'):
+                    try:
+                        name = decrypt_data(guest['name_encrypted'])
+                    except:
+                        name = guest.get('name', '')
+                else:
+                    name = guest.get('name', '')
+        
+        if not name:
+            logging.warning(f"No name found for employee {employee_number}, skipping")
             continue
         
         # Add to employee list
@@ -2003,6 +2024,7 @@ async def import_employees_from_guests():
         }
         await db.employees.insert_one(employee)
         imported += 1
+        logging.info(f"Imported employee: {employee_number} - {name}")
     
     return {
         "success": True,
