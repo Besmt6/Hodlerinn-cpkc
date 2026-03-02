@@ -685,7 +685,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Employee Verification Section */}
-          {!verifiedEmployee ? (
+          {!verifiedEmployee && !isNewGuest ? (
             <div className="space-y-4">
               <div>
                 <label className="vault-label">Employee Number</label>
@@ -707,7 +707,43 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 className="w-full vault-btn-primary h-12"
                 data-testid="verify-employee-btn"
               >
-                {verifying ? "Verifying..." : "Verify Employee"}
+                {verifying ? "Verifying..." : "Continue"}
+              </Button>
+            </div>
+          ) : isNewGuest && !verifiedEmployee ? (
+            /* New Guest Registration - Inline */
+            <div className="space-y-4">
+              <div className="bg-amber-900/30 border border-amber-600/50 rounded-lg p-4">
+                <p className="text-amber-400 text-xs uppercase tracking-wide mb-1">New Guest</p>
+                <p className="text-vault-text font-mono">Employee ID: {employeeNumber}</p>
+                <button
+                  onClick={handleClearVerification}
+                  className="text-vault-text-secondary hover:text-vault-gold text-xs underline mt-2"
+                >
+                  Change Employee Number
+                </button>
+              </div>
+              <div>
+                <label className="vault-label">Your Full Name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
+                  <Input
+                    ref={nameInputRef}
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="⬇️ TAP HERE to enter name"
+                    className="vault-input pl-10 input-highlight text-lg"
+                    data-testid="register-name-input"
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleRegisterAndContinue}
+                disabled={registering}
+                className="w-full vault-btn-primary h-12"
+                data-testid="register-continue-btn"
+              >
+                {registering ? "Registering..." : "Register & Continue"}
               </Button>
             </div>
           ) : (
