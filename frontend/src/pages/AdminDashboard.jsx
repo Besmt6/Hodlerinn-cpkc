@@ -135,7 +135,17 @@ export default function AdminDashboard() {
     fetchData();
     fetchRooms();
     fetchSettings();
+    fetchEmployees();
   }, [navigate]);
+
+  const fetchEmployees = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/employees`);
+      setEmployees(response.data);
+    } catch (error) {
+      console.error("Failed to load employees");
+    }
+  };
 
   const fetchData = async (filterStart = null, filterEnd = null) => {
     try {
