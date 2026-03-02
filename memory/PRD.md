@@ -233,6 +233,26 @@ Build a two-part application for a hotel named "Hodler Inn":
 - Uses `useRef` hooks for smooth focus transitions
 - Enhances kiosk experience with minimal user effort
 
+## Simplified Check-In Flow (March 2, 2026)
+**Status:** ✅ IMPLEMENTED!
+
+### Changes Made:
+- **Single Page Check-In:** All fields visible on one page (no separate verify step)
+- **Auto-Verify:** Name auto-populates as user types employee number (500ms debounce)
+- **Visual Status Indicators:**
+  - Green border: Employee found, "Welcome back!" message
+  - Amber border: New guest (in admin list, not registered), "Register as [Name]" button
+  - Red border: Employee not found, "Request Access from Admin" button
+- **Request Access Feature:** Unknown employees can request admin approval via Telegram
+- **Removed Friction:** No separate "Verify" or "Continue" buttons needed
+
+### User Experience Flow:
+1. Enter Employee Number → Name auto-appears
+2. If new guest → Tap "Register as [Name]" (one-time)
+3. If not found → Tap "Request Access" (admin notified)
+4. Enter Room Number, Date/Time auto-filled
+5. Sign and submit
+
 ## Employee Collection AI Agent (March 2026)
 **Status:** ✅ FULLY FUNCTIONAL!
 
