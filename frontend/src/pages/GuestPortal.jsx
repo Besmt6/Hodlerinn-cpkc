@@ -536,24 +536,14 @@ function CheckInForm({ setView, setSuccessMessage }) {
         roomInputRef.current?.focus();
       }, 300);
     } catch (error) {
-      // Guest not registered - check if employee ID is valid
-      try {
-        const empResponse = await axios.get(`${API}/employees/verify/${employeeNumber}`);
-        // Employee ID is valid but not registered as guest yet
-        setIsNewGuest(true);
-        setGuestName(empResponse.data.name); // Pre-fill name from employee list
-        setVerifiedEmployee(null);
-        playVoiceMessage("register_welcome");
-        toast.info(`Welcome ${empResponse.data.name}! Please confirm your name to register.`);
-        setTimeout(() => {
-          nameInputRef.current?.focus();
-        }, 300);
-      } catch (empError) {
-        // Employee ID not in the system at all
-        setIsNewGuest(false);
-        setVerifiedEmployee(null);
-        toast.error("Employee ID not found. Please contact admin to add your ID.");
-      }
+      // Guest not registered - show registration form with company verification
+      setIsNewGuest(true);
+      setVerifiedEmployee(null);
+      playVoiceMessage("register_welcome");
+      toast.info("New guest! Please complete registration to continue.");
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 300);
     } finally {
       setVerifying(false);
     }
