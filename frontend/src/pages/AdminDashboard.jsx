@@ -254,6 +254,24 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleCollectFromPortal = async () => {
+    setCollectingEmployees(true);
+    try {
+      toast.info("AI Agent is collecting employees from portal... This may take a minute.");
+      const response = await axios.post(`${API}/admin/collect-employees`);
+      if (response.data.success) {
+        toast.success(response.data.message);
+        fetchEmployees();
+      } else {
+        toast.error(response.data.message || "Failed to collect employees");
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to collect employees from portal");
+    } finally {
+      setCollectingEmployees(false);
+    }
+  };
+
   const fetchSettings = async () => {
     try {
       const [settingsRes, syncStatusRes] = await Promise.all([
