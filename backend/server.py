@@ -453,23 +453,16 @@ async def register_guest(input: GuestRegistrationCreate):
     )
     doc = guest.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
-    doc['is_verified'] = False  # New guests need verification
-    doc['verified_at'] = None
+    doc['is_verified'] = True  # Auto-verified since they're in admin employee list
+    doc['verified_at'] = datetime.now(timezone.utc).isoformat()
     
     # Encrypt sensitive data before storing
     doc['name_encrypted'] = encrypt_data(doc['name'])
     
     await db.guests.insert_one(doc)
     
-    # Send Telegram notification about new registration
-    await send_telegram_notification(
-        f"📝 <b>NEW REGISTRATION</b>\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"👤 <b>Name:</b> {valid_employee['name']}\n"
-        f"🆔 <b>Employee ID:</b> {input.employee_number}\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"ℹ️ Guest will need room assignment at check-in"
-    )
+    # No notification needed - employee was pre-approved by being in admin list
+    # Silent registration since admin already added them
     
     return guest
 
@@ -762,13 +755,17 @@ async def check_in(input: CheckInCreate):
     
     await db.bookings.insert_one(doc)
     
-    # Check if this is a first-time check-in (new registration)
+    # Check if this is a first-time check-in
     check_in_count = await db.bookings.count_documents({"employee_number": input.employee_number})
     is_first_time = check_in_count == 1
     
+    # Check if employee is in admin's pre-approved list
+    employee_in_list = await db.employees.find_one({"employee_number": input.employee_number})
+    is_pre_approved = employee_in_list is not None
+    
     # Send Telegram notification for check-in
-    if is_first_time:
-        # First time guest - needs verification
+    if is_first_time and not is_pre_approved:
+        # First time guest NOT in admin list - needs verification
         await send_telegram_notification(
             f"🆕🆕🆕 <b>NEW GUEST CHECK-IN</b> 🆕🆕🆕\n"
             f"━━━━━━━━━━━━━━━\n"
@@ -783,7 +780,7 @@ async def check_in(input: CheckInCreate):
             f"✅ Verify this person in Admin Dashboard"
         )
     else:
-        # Returning guest
+        # Pre-approved employee or returning guest - simple notification
         await send_telegram_notification(
             f"🟢 <b>CHECK-IN</b>\n"
             f"━━━━━━━━━━━━━━━\n"
