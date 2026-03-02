@@ -491,9 +491,6 @@ class AccessRequest(BaseModel):
     employee_number: str
     name: str
 
-# Store pending access requests temporarily
-pending_access_requests = {}
-
 @api_router.post("/request-employee-access")
 async def request_employee_access(request: AccessRequest):
     """Guest requests access when their Employee ID is not in the system.
@@ -508,13 +505,21 @@ async def request_employee_access(request: AccessRequest):
     if existing_guest:
         raise HTTPException(status_code=400, detail="Guest already registered")
     
-    # Store the request for later approval
+    # Check if there's already a pending request for this employee
+    existing_request = await db.pending_access_requests.find_one({"employee_number": request.employee_number})
+    if existing_request:
+        raise HTTPException(status_code=400, detail="Access request already pending for this employee")
+    
+    # Store the request in MongoDB
     request_id = str(uuid.uuid4())[:8]
-    pending_access_requests[request_id] = {
+    request_doc = {
+        "request_id": request_id,
         "employee_number": request.employee_number,
         "name": request.name,
+        "status": "pending",
         "requested_at": datetime.now(timezone.utc).isoformat()
     }
+    await db.pending_access_requests.insert_one(request_doc)
     
     # Send Telegram notification with inline buttons
     if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
@@ -566,7 +571,9 @@ async def telegram_webhook(request_data: dict):
     # Parse the callback data
     if data.startswith("approve_"):
         request_id = data.replace("approve_", "")
-        request_info = pending_access_requests.get(request_id)
+        
+        # Find the pending request in MongoDB
+        request_info = await db.pending_access_requests.find_one({"request_id": request_id, "status": "pending"})
         
         if request_info:
             # Add employee to the system
@@ -580,8 +587,11 @@ async def telegram_webhook(request_data: dict):
             }
             await db.employees.insert_one(employee_doc)
             
-            # Remove from pending
-            del pending_access_requests[request_id]
+            # Update request status in MongoDB
+            await db.pending_access_requests.update_one(
+                {"request_id": request_id},
+                {"$set": {"status": "approved", "processed_at": datetime.now(timezone.utc).isoformat()}}
+            )
             
             response_text = f"✅ *APPROVED*\n\n{request_info['name']} ({request_info['employee_number']}) has been added to the system."
         else:
@@ -589,10 +599,16 @@ async def telegram_webhook(request_data: dict):
             
     elif data.startswith("reject_"):
         request_id = data.replace("reject_", "")
-        request_info = pending_access_requests.get(request_id)
+        
+        # Find the pending request in MongoDB
+        request_info = await db.pending_access_requests.find_one({"request_id": request_id, "status": "pending"})
         
         if request_info:
-            del pending_access_requests[request_id]
+            # Update request status to rejected
+            await db.pending_access_requests.update_one(
+                {"request_id": request_id},
+                {"$set": {"status": "rejected", "processed_at": datetime.now(timezone.utc).isoformat()}}
+            )
             response_text = f"❌ *REJECTED*\n\n{request_info['name']} ({request_info['employee_number']}) was not added."
         else:
             response_text = "⚠️ Request expired or already processed."
@@ -627,7 +643,11 @@ async def telegram_webhook(request_data: dict):
 @api_router.get("/pending-access-requests")
 async def get_pending_requests():
     """Get all pending access requests (for admin dashboard)."""
-    return list(pending_access_requests.items())
+    requests = await db.pending_access_requests.find(
+        {"status": "pending"}, 
+        {"_id": 0}
+    ).sort("requested_at", -1).to_list(100)
+    return requests
 
 
 
