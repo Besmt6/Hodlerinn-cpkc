@@ -217,17 +217,19 @@ def update_auto_sync_schedule(enabled: bool, start_date: str = None):
             if start_date:
                 trigger_start = datetime.strptime(start_date, "%Y-%m-%d").replace(hour=15, minute=0)
             
-            # Schedule for 3 PM (15:00) every day, starting from start_date
+            # Schedule for 3 PM Central Time (America/Chicago) every day
+            from pytz import timezone
+            central_tz = timezone('America/Chicago')
             scheduler.add_job(
                 lambda: asyncio.create_task(auto_sync_task()),
-                CronTrigger(hour=15, minute=0, start_date=trigger_start),
+                CronTrigger(hour=15, minute=0, start_date=trigger_start, timezone=central_tz),
                 id=AUTO_SYNC_JOB_ID,
                 replace_existing=True
             )
             if start_date:
-                logging.info(f"Auto-sync scheduled for 3 PM daily, starting from {start_date}")
+                logging.info(f"Auto-sync scheduled for 3 PM Central Time daily, starting from {start_date}")
             else:
-                logging.info("Auto-sync scheduled for 3 PM daily")
+                logging.info("Auto-sync scheduled for 3 PM Central Time daily")
         else:
             logging.info("Auto-sync disabled")
     except Exception as e:
