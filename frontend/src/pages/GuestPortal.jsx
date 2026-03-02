@@ -713,14 +713,15 @@ function CheckInForm({ setView, setSuccessMessage }) {
           ) : isNewGuest && !verifiedEmployee ? (
             /* New Guest Registration - Inline */
             <div className="space-y-4">
-              <div className="bg-amber-900/30 border border-amber-600/50 rounded-lg p-4">
-                <p className="text-amber-400 text-xs uppercase tracking-wide mb-1">New Guest</p>
-                <p className="text-vault-text font-mono">Employee ID: {employeeNumber}</p>
+              <div className="bg-red-900/40 border-2 border-red-500 rounded-lg p-4 animate-pulse">
+                <p className="text-red-400 text-lg font-bold uppercase tracking-wide mb-2">⚠️ Employee ID Not Found</p>
+                <p className="text-vault-text font-mono text-lg">ID: {employeeNumber}</p>
+                <p className="text-vault-text-secondary mt-2">Please enter your name below to register</p>
                 <button
                   onClick={handleClearVerification}
-                  className="text-vault-text-secondary hover:text-vault-gold text-xs underline mt-2"
+                  className="text-vault-text-secondary hover:text-vault-gold text-sm underline mt-3"
                 >
-                  Change Employee Number
+                  ← Try different Employee Number
                 </button>
               </div>
               <div>
@@ -743,7 +744,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 className="w-full vault-btn-primary h-12"
                 data-testid="register-continue-btn"
               >
-                {registering ? "Registering..." : "Register & Continue"}
+                {registering ? "Registering..." : "Register & Continue Check-In"}
               </Button>
             </div>
           ) : (
