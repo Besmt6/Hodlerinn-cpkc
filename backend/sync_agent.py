@@ -528,12 +528,12 @@ class APIGlobalSyncAgent:
                 await self.page.wait_for_timeout(1000)
             
             if len(text_inputs) >= 2:
-                # Second input is Room Number - type it
+                # Second input is Room Number - use fill (like paste)
                 room_input = text_inputs[1]
                 await room_input.click()
                 await self.page.wait_for_timeout(300)
-                await room_input.type(str(room_number), delay=100)
-                logger.info(f"Typed Room Number: {room_number}")
+                await room_input.fill(str(room_number))
+                logger.info(f"Pasted Room Number: {room_number}")
                 await self.page.wait_for_timeout(1000)
             
             # Click on empty space near "Heavener" or "HEAVENER-OK" to trigger save
