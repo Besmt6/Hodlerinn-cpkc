@@ -496,7 +496,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
 
   // Auto-verify employee when number changes (debounced)
   useEffect(() => {
-    if (employeeNumber.length < 4) {
+    // Require at least 5 characters and stop typing for 800ms before verifying
+    if (employeeNumber.length < 5) {
       setEmployeeStatus(null);
       setEmployeeName("");
       return;
@@ -545,7 +546,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
       }
     };
 
-    const timer = setTimeout(verifyEmployee, 500);
+    // Wait 800ms after user stops typing before verifying
+    const timer = setTimeout(verifyEmployee, 800);
     return () => clearTimeout(timer);
   }, [employeeNumber]);
 
@@ -706,7 +708,12 @@ function CheckInForm({ setView, setSuccessMessage }) {
               </p>
             )}
             {employeeStatus === 'not_found' && (
-              <div className="mt-2 bg-red-900/30 border border-red-600/50 rounded-lg p-3 space-y-3">
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="mt-2 bg-red-900/30 border border-red-600/50 rounded-lg p-3 space-y-3"
+              >
                 <p className="text-red-400 text-sm">
                   Employee ID not found in system. Enter your name to request access:
                 </p>
@@ -730,7 +737,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 <p className="text-red-300 text-xs text-center">
                   Admin will receive notification and can approve instantly
                 </p>
-              </div>
+              </motion.div>
             )}
           </div>
 
