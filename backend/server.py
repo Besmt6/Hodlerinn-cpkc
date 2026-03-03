@@ -430,6 +430,7 @@ class PortalSettingsUpdate(BaseModel):
     auto_sync_start_date: Optional[str] = None  # Format: YYYY-MM-DD
     voice_enabled: Optional[bool] = None  # Enable/disable voice messages
     voice_volume: Optional[float] = None  # Voice volume 0.0 to 1.0
+    voice_speed: Optional[float] = None  # Voice speed 0.5 to 1.5
     telegram_chat_id: Optional[str] = None  # Telegram group/chat ID for notifications
     public_api_key: Optional[str] = None  # API key for public endpoints
     nightly_rate: Optional[float] = None  # Nightly room rate for billing
@@ -1689,7 +1690,8 @@ async def get_voice_settings():
     settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
     return {
         "voice_enabled": settings.get("voice_enabled", True) if settings else True,
-        "voice_volume": settings.get("voice_volume", 1.0) if settings else 1.0
+        "voice_volume": settings.get("voice_volume", 1.0) if settings else 1.0,
+        "voice_speed": settings.get("voice_speed", 0.85) if settings else 0.85
     }
 
 # Pre-defined voice messages
@@ -1944,6 +1946,7 @@ async def get_portal_settings():
             "auto_sync_start_date": None,
             "voice_enabled": True,
             "voice_volume": 1.0,
+            "voice_speed": 0.85,
             "telegram_chat_id": TELEGRAM_CHAT_ID or "",
             "public_api_key": "",
             "public_api_key_set": False,
@@ -1960,6 +1963,7 @@ async def get_portal_settings():
         "auto_sync_start_date": settings.get("auto_sync_start_date"),
         "voice_enabled": settings.get("voice_enabled", True),
         "voice_volume": settings.get("voice_volume", 1.0),
+        "voice_speed": settings.get("voice_speed", 0.85),
         "telegram_chat_id": settings.get("telegram_chat_id", "") or TELEGRAM_CHAT_ID or "",
         "public_api_key": settings.get("public_api_key", ""),
         "public_api_key_set": bool(settings.get("public_api_key")),
@@ -1995,6 +1999,9 @@ async def update_portal_settings(input: PortalSettingsUpdate):
     
     if input.voice_volume is not None:
         update_data["voice_volume"] = max(0.0, min(1.0, input.voice_volume))  # Clamp 0-1
+    
+    if input.voice_speed is not None:
+        update_data["voice_speed"] = max(0.5, min(1.5, input.voice_speed))  # Clamp 0.5-1.5
     
     if input.telegram_chat_id is not None:
         update_data["telegram_chat_id"] = input.telegram_chat_id

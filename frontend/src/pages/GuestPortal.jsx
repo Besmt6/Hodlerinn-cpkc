@@ -40,7 +40,7 @@ import { useNavigate } from "react-router-dom";
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // Voice settings cache
-let voiceSettings = { enabled: true, volume: 1.0 };
+let voiceSettings = { enabled: true, volume: 1.0, speed: 0.85 };
 
 // Fetch voice settings from server
 const fetchVoiceSettings = async () => {
@@ -48,7 +48,8 @@ const fetchVoiceSettings = async () => {
     const response = await axios.get(`${API}/voice-settings`);
     voiceSettings = {
       enabled: response.data.voice_enabled,
-      volume: response.data.voice_volume
+      volume: response.data.voice_volume,
+      speed: response.data.voice_speed || 0.85
     };
   } catch (error) {
     console.error("Failed to fetch voice settings:", error);
@@ -107,7 +108,10 @@ const playVoiceMessage = (messageId) => {
 };
 
 // Legacy speakMessage function (now uses audio files)
-const speakMessage = (message, rate = 0.9) => {
+const speakMessage = (message, rate = null) => {
+  // Use speed from settings if rate not explicitly provided
+  const speechRate = rate !== null ? rate : voiceSettings.speed;
+  
   // Map common messages to pre-generated audio
   const messageMap = {
     "Please sign your full name legibly": "signature_reminder",
@@ -129,7 +133,7 @@ const speakMessage = (message, rate = 0.9) => {
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(message);
-    utterance.rate = rate;
+    utterance.rate = speechRate;
     utterance.volume = voiceSettings.volume;
     window.speechSynthesis.speak(utterance);
   }
@@ -513,7 +517,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
         setEmployeeName(response.data.name);
         setEmployeeStatus('found');
         const greeting = getTimeBasedGreeting();
-        speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`, 0.85);
+        speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
         setTimeout(() => roomInputRef.current?.focus(), 300);
       } catch (error) {
         // Check if employee ID is in admin's approved list
@@ -531,13 +535,13 @@ function CheckInForm({ setView, setSuccessMessage }) {
             // Successfully registered - show full form
             setEmployeeStatus('found');
             const greeting = getTimeBasedGreeting();
-            speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`, 0.85);
+            speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           } catch (regError) {
             // Registration failed - maybe already registered, still show form
             setEmployeeStatus('found');
             const greeting = getTimeBasedGreeting();
-            speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`, 0.85);
+            speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           }
         } catch (empError) {
@@ -545,7 +549,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
           setEmployeeName("");
           setEmployeeStatus('not_found');
           // Voice instruction for new employee
-          speakMessage("Please enter your full name and company name, then click Continue to Check-In.", 0.85);
+          speakMessage("Please enter your full name and company name, then click Continue to Check-In.");
         }
       } finally {
         setVerifying(false);
@@ -590,7 +594,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
       
       if (newAttempts >= 2) {
         toast.error("Invalid company name. Please call Help Phone from outside office.");
-        speakMessage("Please call Help Phone from outside office phone so we know someone need help.", 0.85);
+        speakMessage("Please call Help Phone from outside office phone so we know someone need help.");
       } else {
         toast.error("Invalid company name. Please try again.");
       }
@@ -608,7 +612,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
       setEmployeeStatus('found');
       setWrongAttempts(0); // Reset attempts on success
       const greeting = getTimeBasedGreeting();
-      speakMessage(`${greeting}. Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`, 0.85);
+      speakMessage(`${greeting}. Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
       toast.success("Welcome! Please continue with check-in.");
       setTimeout(() => roomInputRef.current?.focus(), 300);
     } catch (error) {
@@ -620,7 +624,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
 
   const speakSignatureReminder = () => {
     if (!signatureReminderSpoken) {
-      speakMessage("Please sign your full name legibly.", 0.9);
+      speakMessage("Please sign your full name legibly.");
       setSignatureReminderSpoken(true);
     }
   };
@@ -1462,32 +1466,6 @@ function HelpView({ setView }) {
             <p className="text-vault-text-secondary text-sm">
               Need assistance? Please contact front desk staff.
             </p>
-          </div>
-
-          {/* Voice Speed Test */}
-          <div className="bg-vault-surface border border-vault-gold/50 rounded-lg p-4 mt-4">
-            <h3 className="font-outfit text-sm font-bold text-vault-gold mb-3 text-center">TEST VOICE SPEED</h3>
-            <p className="text-vault-text-secondary text-xs text-center mb-3">Tap to hear different speeds:</p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => speakMessage("Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.", 0.7)}
-                className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium"
-              >
-                Slow (0.7)
-              </button>
-              <button
-                onClick={() => speakMessage("Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.", 0.85)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-3 rounded-lg text-sm font-medium"
-              >
-                Normal (0.85)
-              </button>
-              <button
-                onClick={() => speakMessage("Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.", 1.0)}
-                className="bg-amber-600 hover:bg-amber-700 text-white py-2 px-3 rounded-lg text-sm font-medium"
-              >
-                Fast (1.0)
-              </button>
-            </div>
           </div>
         </CardContent>
       </Card>

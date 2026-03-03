@@ -136,6 +136,7 @@ export default function AdminDashboard() {
     api_global_password_set: false,
     voice_enabled: true,
     voice_volume: 1.0,
+    voice_speed: 0.85,
     telegram_chat_id: "",
     public_api_key: "",
     nightly_rate: 75.0
@@ -370,6 +371,7 @@ export default function AdminDashboard() {
         api_global_password_set: settingsRes.data.api_global_password_set || false,
         voice_enabled: settingsRes.data.voice_enabled !== false,
         voice_volume: settingsRes.data.voice_volume || 1.0,
+        voice_speed: settingsRes.data.voice_speed || 0.85,
         telegram_chat_id: settingsRes.data.telegram_chat_id || "",
         public_api_key: settingsRes.data.public_api_key || "",
         nightly_rate: settingsRes.data.nightly_rate || 75.0
@@ -2640,15 +2642,65 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       </div>
                     </div>
                   )}
+
+                  {/* Voice Speed Control */}
+                  {portalSettings.voice_enabled && (
+                    <div className="bg-black/50 border border-vault-border rounded-lg p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-vault-text font-medium">Voice Speed</h4>
+                          <span className="text-vault-gold font-mono text-sm">
+                            {portalSettings.voice_speed <= 0.7 ? 'Slow' : portalSettings.voice_speed >= 1.0 ? 'Fast' : 'Normal'} ({portalSettings.voice_speed})
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="50"
+                          max="120"
+                          step="5"
+                          value={portalSettings.voice_speed * 100}
+                          onChange={async (e) => {
+                            const newSpeed = parseInt(e.target.value) / 100;
+                            setPortalSettings({...portalSettings, voice_speed: newSpeed});
+                          }}
+                          onMouseUp={async (e) => {
+                            const newSpeed = parseInt(e.target.value) / 100;
+                            try {
+                              await axios.post(`${API}/admin/settings`, { voice_speed: newSpeed });
+                              toast.success(`Voice speed set to ${newSpeed}`);
+                            } catch (error) {
+                              toast.error("Failed to update voice speed");
+                            }
+                          }}
+                          onTouchEnd={async (e) => {
+                            const newSpeed = portalSettings.voice_speed;
+                            try {
+                              await axios.post(`${API}/admin/settings`, { voice_speed: newSpeed });
+                              toast.success(`Voice speed set to ${newSpeed}`);
+                            } catch (error) {
+                              toast.error("Failed to update voice speed");
+                            }
+                          }}
+                          className="w-full h-2 bg-vault-border rounded-lg appearance-none cursor-pointer accent-vault-gold"
+                          data-testid="voice-speed-slider"
+                        />
+                        <div className="flex justify-between text-vault-text-secondary text-xs">
+                          <span>Slow (0.5)</span>
+                          <span>Normal (0.85)</span>
+                          <span>Fast (1.2)</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Test Voice Button */}
                   <Button
                     onClick={() => {
                       if ('speechSynthesis' in window) {
                         window.speechSynthesis.cancel();
-                        const utterance = new SpeechSynthesisUtterance("Good afternoon! Welcome to Hodler Inn. Have a good rest.");
+                        const utterance = new SpeechSynthesisUtterance("Good afternoon! Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.");
                         utterance.volume = portalSettings.voice_volume;
-                        utterance.rate = 0.9;
+                        utterance.rate = portalSettings.voice_speed;
                         window.speechSynthesis.speak(utterance);
                         toast.success("Playing test message...");
                       } else {
