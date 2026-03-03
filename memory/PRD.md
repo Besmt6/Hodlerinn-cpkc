@@ -28,12 +28,14 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 ### Core Guest Portal (Completed)
 - [x] Check-in flow with employee verification
 - [x] Check-out flow by room number lookup
-- [x] Unverified guest check-in (pending verification)
-- [x] Voice guidance using OpenAI TTS-1
+- [x] Unverified guest check-in with company name validation (CPKC only)
+- [x] Voice guidance using Web Speech API (configurable speed from admin)
 - [x] Help page with video tutorial
 - [x] Sign-in sheet view for guests
 - [x] Kiosk mode / fullscreen support
 - [x] Auto-idle reset to menu
+- [x] Larger signature box (200px) with thicker pen strokes for tablet use
+- [x] Security: "Call Help Phone" message after 2 wrong company name attempts
 
 ### Admin Dashboard (Completed)
 - [x] Employee management (CRUD)
@@ -43,6 +45,7 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] Guest verification section with bulk approve
 - [x] Room management
 - [x] Telegram notification settings
+- [x] Voice settings: Enable/disable, volume control, **speed control** (0.5-1.2)
 
 ### AI Sync Agent (Completed)
 - [x] Playwright automation for railroad portal
@@ -52,8 +55,12 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] Scheduled daily sync at 3 PM Central
 
 ### Latest Updates (March 2026)
-- [x] Check-out screen simplified: "On Duty Time" label (removed confusing 24hr format text)
-- [x] Voice message updated: "please enter your on duty time and press Complete check out"
+- [x] Check-out screen: "On Duty Time" label (removed confusing 24hr format text)
+- [x] Voice message: Full instructions for check-in flow
+- [x] New employee: Company name field with CPKC validation (case-insensitive)
+- [x] Security: Help phone message after 2 failed company name attempts
+- [x] Admin: Voice speed control slider (Slow/Normal/Fast)
+- [x] Signature box: Bigger + thicker for Fully Kiosk Browser compatibility
 
 ---
 
@@ -86,14 +93,14 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 ├── backend/
 │   ├── .env
 │   ├── requirements.txt
-│   ├── server.py          # FastAPI endpoints
+│   ├── server.py          # FastAPI endpoints, voice_speed setting added
 │   └── sync_agent.py      # Playwright portal automation
 └── frontend/
     └── src/
         ├── index.css
         └── pages/
-            ├── AdminDashboard.jsx
-            └── GuestPortal.jsx
+            ├── AdminDashboard.jsx  # Voice speed slider added
+            └── GuestPortal.jsx     # Company name field, bigger signature
 ```
 
 ### Tech Stack
@@ -108,6 +115,8 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - `/api/guests/register-pending` - Register unverified guest
 - `/api/admin/guests/bulk-verify` - Bulk approve pending guests
 - `/api/admin/sync/run` - Trigger AI sync agent
+- `/api/voice-settings` - Get voice settings (enabled, volume, speed)
+- `/api/admin/settings` - Update portal settings including voice_speed
 
 ---
 
@@ -118,4 +127,5 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 
 ## Critical Notes
 - **AI Sync Agent:** Uses `keyboard.type()`, clicks at (100, 100) to blur, 5-second wait between fields
-- **Do NOT modify sync logic** until user confirms 3 PM daily sync results
+- **Company Validation:** Only "CPKC" (case-insensitive) allowed for new employee check-ins
+- **Voice Speed:** Configurable from Admin → Portal Settings (0.5 to 1.2)
