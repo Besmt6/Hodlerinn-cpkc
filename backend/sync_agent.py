@@ -871,11 +871,19 @@ class APIGlobalSyncAgent:
                 self.results["errors"].append("No entries found on the sign-in sheet")
                 return self.results
             
-            # Step 5: Process each entry
+            # Step 5: Process each entry - ONLY RED ✗ status rows
             for entry in entries:
-                if entry["verified"]:
-                    logger.info(f"Skipping already verified: {entry['name']}")
+                # SKIP if already verified (BLUE ✓ checkmark)
+                if entry.get("verified") or entry.get("has_blue_status"):
+                    logger.info(f"SKIPPING (BLUE ✓ - already done): {entry['name']}")
                     continue
+                
+                # ONLY process RED ✗ status rows
+                if not entry.get("has_red_status") and entry.get("current_emp_id"):
+                    logger.info(f"SKIPPING (has Employee ID): {entry['name']}")
+                    continue
+                
+                logger.info(f"PROCESSING (RED ✗ status): {entry['name']}")
                 
                 api_name = entry["name"]
                 matched = False
