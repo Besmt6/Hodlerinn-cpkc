@@ -1436,6 +1436,163 @@ async def export_to_excel():
         headers={"Content-Disposition": "attachment; filename=hodler_inn_sign_in_sheet.xlsx"}
     )
 
+# Guarantee Report - Track CPKC room usage vs guaranteed rooms
+@api_router.get("/admin/guarantee-report")
+async def get_guarantee_report(start_date: str = None, end_date: str = None):
+    """Get report showing CPKC room usage vs guaranteed 25 rooms"""
+    GUARANTEED_ROOMS = 25
+    
+    # Get settings for nightly rate
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    nightly_rate = settings.get("nightly_rate", 75.0) if settings else 75.0
+    
+    # Build query
+    query = {"is_checked_out": True}
+    if start_date and end_date:
+        query["check_in_date"] = {"$gte": start_date, "$lte": end_date}
+    elif start_date:
+        query["check_in_date"] = {"$gte": start_date}
+    elif end_date:
+        query["check_in_date"] = {"$lte": end_date}
+    
+    # Get all bookings (railroad guests)
+    bookings = await db.bookings.find(query, {"_id": 0}).to_list(10000)
+    
+    # Get blocked rooms history (other guests) - Note: These are not billed to railroad
+    blocked_history = await db.blocked_rooms.find({}, {"_id": 0}).to_list(10000)
+    
+    # Group bookings by date
+    daily_data = {}
+    for booking in bookings:
+        date = booking.get('check_in_date')
+        if date:
+            if date not in daily_data:
+                daily_data[date] = {
+                    'date': date,
+                    'cpkc_rooms_used': 0,
+                    'other_guests': 0,
+                    'guaranteed_rooms': GUARANTEED_ROOMS,
+                    'unused_guaranteed': 0,
+                    'goodwill_amount': 0.0
+                }
+            daily_data[date]['cpkc_rooms_used'] += 1
+    
+    # Calculate unused guaranteed rooms and goodwill for each day
+    total_goodwill = 0.0
+    total_unused = 0
+    for date, data in daily_data.items():
+        cpkc_used = data['cpkc_rooms_used']
+        if cpkc_used < GUARANTEED_ROOMS:
+            unused = GUARANTEED_ROOMS - cpkc_used
+            data['unused_guaranteed'] = unused
+            data['goodwill_amount'] = unused * nightly_rate
+            total_unused += unused
+            total_goodwill += data['goodwill_amount']
+    
+    # Sort by date descending
+    sorted_data = sorted(daily_data.values(), key=lambda x: x['date'], reverse=True)
+    
+    return {
+        "guaranteed_rooms": GUARANTEED_ROOMS,
+        "nightly_rate": nightly_rate,
+        "total_days": len(sorted_data),
+        "total_unused_rooms": total_unused,
+        "total_goodwill_amount": total_goodwill,
+        "daily_data": sorted_data
+    }
+
+@api_router.get("/admin/export-guarantee-report")
+async def export_guarantee_report(start_date: str = None, end_date: str = None):
+    """Export guarantee report as Excel"""
+    # Get report data
+    report = await get_guarantee_report(start_date, end_date)
+    
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    worksheet = workbook.add_worksheet("Guarantee Report")
+    
+    # Styles
+    title_format = workbook.add_format({
+        'bold': True, 'font_size': 16, 'align': 'center', 'valign': 'vcenter'
+    })
+    subtitle_format = workbook.add_format({
+        'font_size': 11, 'align': 'center', 'valign': 'vcenter', 'italic': True
+    })
+    header_format = workbook.add_format({
+        'bold': True, 'bg_color': '#fbbf24', 'border': 1, 'align': 'center', 'valign': 'vcenter'
+    })
+    cell_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'valign': 'vcenter'
+    })
+    money_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'valign': 'vcenter', 'num_format': '$#,##0.00'
+    })
+    total_format = workbook.add_format({
+        'bold': True, 'bg_color': '#fef3c7', 'border': 1, 'align': 'center', 'valign': 'vcenter'
+    })
+    total_money_format = workbook.add_format({
+        'bold': True, 'bg_color': '#fef3c7', 'border': 1, 'align': 'center', 'valign': 'vcenter', 'num_format': '$#,##0.00'
+    })
+    
+    # Set column widths
+    worksheet.set_column('A:A', 15)  # Date
+    worksheet.set_column('B:B', 18)  # CPKC Rooms Used
+    worksheet.set_column('C:C', 18)  # Guaranteed Rooms
+    worksheet.set_column('D:D', 18)  # Unused Rooms
+    worksheet.set_column('E:E', 18)  # Goodwill Amount
+    
+    # Title
+    worksheet.merge_range('A1:E1', 'HODLER INN - CPKC GUARANTEE REPORT', title_format)
+    worksheet.merge_range('A2:E2', f'Guaranteed Rooms: {report["guaranteed_rooms"]} | Nightly Rate: ${report["nightly_rate"]:.2f}', subtitle_format)
+    worksheet.merge_range('A3:E3', f'Report Period: {start_date or "All"} to {end_date or "Present"}', subtitle_format)
+    
+    # Headers
+    headers = ['Date', 'CPKC Rooms Used', 'Guaranteed Rooms', 'Unused Rooms', 'Goodwill Amount']
+    for col, header in enumerate(headers):
+        worksheet.write(4, col, header, header_format)
+    
+    # Data rows
+    row = 5
+    for day in report['daily_data']:
+        worksheet.write(row, 0, day['date'], cell_format)
+        worksheet.write(row, 1, day['cpkc_rooms_used'], cell_format)
+        worksheet.write(row, 2, day['guaranteed_rooms'], cell_format)
+        worksheet.write(row, 3, day['unused_guaranteed'], cell_format)
+        worksheet.write(row, 4, day['goodwill_amount'], money_format)
+        row += 1
+    
+    # Totals row
+    worksheet.write(row, 0, 'TOTAL', total_format)
+    worksheet.write(row, 1, sum(d['cpkc_rooms_used'] for d in report['daily_data']), total_format)
+    worksheet.write(row, 2, '', total_format)
+    worksheet.write(row, 3, report['total_unused_rooms'], total_format)
+    worksheet.write(row, 4, report['total_goodwill_amount'], total_money_format)
+    
+    # Summary section
+    row += 3
+    worksheet.write(row, 0, 'SUMMARY', title_format)
+    row += 1
+    worksheet.write(row, 0, 'Total Days:', cell_format)
+    worksheet.write(row, 1, report['total_days'], cell_format)
+    row += 1
+    worksheet.write(row, 0, 'Total Unused Rooms:', cell_format)
+    worksheet.write(row, 1, report['total_unused_rooms'], cell_format)
+    row += 1
+    worksheet.write(row, 0, 'Total Goodwill Given:', cell_format)
+    worksheet.write(row, 1, report['total_goodwill_amount'], money_format)
+    row += 1
+    worksheet.write(row, 0, 'Note:', subtitle_format)
+    worksheet.merge_range(row, 1, row, 4, 'Goodwill = Unused guaranteed rooms that could have been billed but were not, for business relations.', subtitle_format)
+    
+    workbook.close()
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=hodler_inn_guarantee_report.xlsx"}
+    )
+
 # Admin - Export Billing Report
 @api_router.get("/admin/export-billing")
 async def export_billing_report():

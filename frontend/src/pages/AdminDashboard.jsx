@@ -70,7 +70,8 @@ import {
   Copy,
   CheckCheck,
   Link,
-  Shield
+  Shield,
+  FileBarChart
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -131,6 +132,11 @@ export default function AdminDashboard() {
   const [blockedRooms, setBlockedRooms] = useState([]);
   const [showBlockRoomDialog, setShowBlockRoomDialog] = useState(false);
   const [blockRoomForm, setBlockRoomForm] = useState({ room_number: "", guest_name: "", notes: "" });
+  
+  // Guarantee report state
+  const [guaranteeReport, setGuaranteeReport] = useState(null);
+  const [guaranteeLoading, setGuaranteeLoading] = useState(false);
+  const [guaranteeDateRange, setGuaranteeDateRange] = useState({ start: "", end: "" });
   
   // Portal Settings state
   const [portalSettings, setPortalSettings] = useState({
@@ -282,6 +288,46 @@ export default function AdminDashboard() {
       fetchRooms();
     } catch (error) {
       toast.error("Failed to update room status");
+    }
+  };
+
+  const fetchGuaranteeReport = async (startDate = "", endDate = "") => {
+    setGuaranteeLoading(true);
+    try {
+      let url = `${API}/admin/guarantee-report`;
+      const params = [];
+      if (startDate) params.push(`start_date=${startDate}`);
+      if (endDate) params.push(`end_date=${endDate}`);
+      if (params.length > 0) url += `?${params.join('&')}`;
+      
+      const response = await axios.get(url);
+      setGuaranteeReport(response.data);
+    } catch (error) {
+      toast.error("Failed to load guarantee report");
+    } finally {
+      setGuaranteeLoading(false);
+    }
+  };
+
+  const downloadGuaranteeReport = async () => {
+    try {
+      let url = `${API}/admin/export-guarantee-report`;
+      const params = [];
+      if (guaranteeDateRange.start) params.push(`start_date=${guaranteeDateRange.start}`);
+      if (guaranteeDateRange.end) params.push(`end_date=${guaranteeDateRange.end}`);
+      if (params.length > 0) url += `?${params.join('&')}`;
+      
+      const response = await axios.get(url, { responseType: 'blob' });
+      const blob = new Blob([response.data]);
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = 'hodler_inn_guarantee_report.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      toast.success("Guarantee report downloaded!");
+    } catch (error) {
+      toast.error("Failed to download report");
     }
   };
 
@@ -834,6 +880,14 @@ export default function AdminDashboard() {
             <span className="font-manrope text-sm">Guest Verification</span>
           </div>
           <div 
+            className={`admin-nav-item cursor-pointer ${activeView === 'guarantee' ? 'active' : ''}`}
+            onClick={() => setActiveView('guarantee')}
+            data-testid="nav-guarantee-view-btn"
+          >
+            <FileBarChart className="w-4 h-4" />
+            <span className="font-manrope text-sm">Guarantee Report</span>
+          </div>
+          <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveView('settings')}
             data-testid="nav-settings-view-btn"
@@ -897,6 +951,12 @@ export default function AdminDashboard() {
             className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'rooms' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
           >
             Rooms
+          </button>
+          <button 
+            onClick={() => setActiveView('guarantee')}
+            className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'guarantee' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
+          >
+            Guarantee
           </button>
           <button 
             onClick={() => setActiveView('settings')}
@@ -2213,6 +2273,160 @@ export default function AdminDashboard() {
                   </ScrollArea>
                 </CardContent>
               </Card>
+            </>
+          )}
+
+          {/* Guarantee Report View */}
+          {activeView === 'guarantee' && (
+            <>
+              {/* Header */}
+              <div className="mb-6">
+                <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">CPKC Guarantee Report</h1>
+                <p className="text-vault-text-secondary font-manrope mt-1">Track CPKC room usage vs guaranteed 25 rooms - Goodwill tracking for business relations</p>
+              </div>
+
+              {/* Date Range Filter */}
+              <Card className="bg-vault-surface-highlight/50 border-vault-border mb-6">
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div>
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Start Date</label>
+                      <Input
+                        type="date"
+                        value={guaranteeDateRange.start}
+                        onChange={(e) => setGuaranteeDateRange({...guaranteeDateRange, start: e.target.value})}
+                        className="bg-black/50 border-vault-border text-vault-text w-40"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">End Date</label>
+                      <Input
+                        type="date"
+                        value={guaranteeDateRange.end}
+                        onChange={(e) => setGuaranteeDateRange({...guaranteeDateRange, end: e.target.value})}
+                        className="bg-black/50 border-vault-border text-vault-text w-40"
+                      />
+                    </div>
+                    <Button
+                      onClick={() => fetchGuaranteeReport(guaranteeDateRange.start, guaranteeDateRange.end)}
+                      className="bg-vault-gold hover:bg-amber-500 text-black"
+                    >
+                      <Search className="w-4 h-4 mr-2" />
+                      Generate Report
+                    </Button>
+                    {guaranteeReport && (
+                      <Button
+                        onClick={downloadGuaranteeReport}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download Excel
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Report Summary */}
+              {guaranteeLoading ? (
+                <div className="text-vault-text-secondary text-center py-8">Loading report...</div>
+              ) : guaranteeReport ? (
+                <>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <Card className="bg-vault-surface-highlight/50 border-vault-border">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-vault-text-secondary text-xs uppercase">Guaranteed Rooms</p>
+                        <p className="text-3xl font-bold text-vault-gold">{guaranteeReport.guaranteed_rooms}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-vault-surface-highlight/50 border-vault-border">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-vault-text-secondary text-xs uppercase">Total Days</p>
+                        <p className="text-3xl font-bold text-vault-text">{guaranteeReport.total_days}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-vault-surface-highlight/50 border-vault-border">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-vault-text-secondary text-xs uppercase">Total Unused Rooms</p>
+                        <p className="text-3xl font-bold text-amber-400">{guaranteeReport.total_unused_rooms}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-emerald-900/30 border-emerald-600/50">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-emerald-400 text-xs uppercase">Total Goodwill Given</p>
+                        <p className="text-3xl font-bold text-emerald-400">${guaranteeReport.total_goodwill_amount.toFixed(2)}</p>
+                        <p className="text-emerald-400/70 text-xs mt-1">(Not billed to CPKC)</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Daily Data Table */}
+                  <Card className="bg-vault-surface-highlight/50 border-vault-border">
+                    <CardHeader className="border-b border-vault-border pb-4">
+                      <CardTitle className="font-outfit text-lg text-vault-gold">Daily Breakdown</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <ScrollArea className="h-[400px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-vault-border hover:bg-transparent">
+                              <TableHead className="text-vault-gold font-bold">Date</TableHead>
+                              <TableHead className="text-vault-gold font-bold text-center">CPKC Used</TableHead>
+                              <TableHead className="text-vault-gold font-bold text-center">Guaranteed</TableHead>
+                              <TableHead className="text-vault-gold font-bold text-center">Unused</TableHead>
+                              <TableHead className="text-vault-gold font-bold text-center">Goodwill</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {guaranteeReport.daily_data.map((day, idx) => (
+                              <TableRow key={idx} className="border-vault-border hover:bg-vault-surface">
+                                <TableCell className="font-mono text-vault-text">{day.date}</TableCell>
+                                <TableCell className="text-center">
+                                  <span className={`px-2 py-1 rounded text-sm font-medium ${
+                                    day.cpkc_rooms_used >= 25 ? 'bg-green-500/20 text-green-400' :
+                                    day.cpkc_rooms_used >= 20 ? 'bg-amber-500/20 text-amber-400' :
+                                    'bg-red-500/20 text-red-400'
+                                  }`}>
+                                    {day.cpkc_rooms_used}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-center text-vault-text-secondary">{day.guaranteed_rooms}</TableCell>
+                                <TableCell className="text-center">
+                                  {day.unused_guaranteed > 0 ? (
+                                    <span className="text-amber-400 font-medium">{day.unused_guaranteed}</span>
+                                  ) : (
+                                    <span className="text-green-400">0</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {day.goodwill_amount > 0 ? (
+                                    <span className="text-emerald-400 font-medium">${day.goodwill_amount.toFixed(2)}</span>
+                                  ) : (
+                                    <span className="text-vault-text-secondary">-</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
+
+                  {/* Note */}
+                  <p className="text-vault-text-secondary text-sm mt-4 italic">
+                    * Goodwill = Unused guaranteed rooms × ${guaranteeReport.nightly_rate}/night. This is revenue you could bill CPKC for but choose not to, for business relations.
+                  </p>
+                </>
+              ) : (
+                <Card className="bg-vault-surface-highlight/50 border-vault-border">
+                  <CardContent className="p-8 text-center">
+                    <FileBarChart className="w-12 h-12 text-vault-text-secondary mx-auto mb-4" />
+                    <p className="text-vault-text-secondary">Select a date range and click "Generate Report" to view CPKC guarantee usage data.</p>
+                  </CardContent>
+                </Card>
+              )}
             </>
           )}
 
