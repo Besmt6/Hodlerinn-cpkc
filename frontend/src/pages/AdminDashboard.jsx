@@ -265,6 +265,26 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleMarkRoomDirty = async (roomNumber) => {
+    try {
+      await axios.post(`${API}/admin/rooms/${roomNumber}/mark-dirty`);
+      toast.success(`Room ${roomNumber} marked as dirty`);
+      fetchRooms();
+    } catch (error) {
+      toast.error("Failed to update room status");
+    }
+  };
+
+  const handleMarkRoomClean = async (roomNumber) => {
+    try {
+      await axios.post(`${API}/admin/rooms/${roomNumber}/mark-clean`);
+      toast.success(`Room ${roomNumber} marked as clean`);
+      fetchRooms();
+    } catch (error) {
+      toast.error("Failed to update room status");
+    }
+  };
+
   const fetchEmployees = async () => {
     try {
       const response = await axios.get(`${API}/admin/employees`);
@@ -1518,7 +1538,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Room Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
                 <StatCard 
                   icon={<Bed className="w-6 h-6" />}
                   label="Total Rooms"
@@ -1542,6 +1562,12 @@ export default function AdminDashboard() {
                   label="Other Guests"
                   value={blockedRooms.length}
                   testId="stat-blocked-rooms"
+                />
+                <StatCard 
+                  icon={<AlertCircle className="w-6 h-6" />}
+                  label="Dirty"
+                  value={rooms.filter(r => r.status === 'dirty').length}
+                  testId="stat-dirty-rooms"
                 />
                 <StatCard 
                   icon={<XCircle className="w-6 h-6" />}
@@ -1623,14 +1649,38 @@ export default function AdminDashboard() {
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
                                   room.status === 'available' ? 'bg-green-500/20 text-green-400' :
                                   room.status === 'occupied' ? 'bg-amber-500/20 text-amber-400' :
+                                  room.status === 'dirty' ? 'bg-orange-500/20 text-orange-400' :
                                   'bg-red-500/20 text-red-400'
                                 }`}>
-                                  {room.status.charAt(0).toUpperCase() + room.status.slice(1)}
+                                  {room.status === 'available' ? 'Clean' : room.status.charAt(0).toUpperCase() + room.status.slice(1)}
                                 </span>
                               </TableCell>
                               <TableCell className="text-vault-text-secondary text-sm">{room.notes || "-"}</TableCell>
                               <TableCell>
                                 <div className="flex gap-1">
+                                  {/* Quick dirty/clean toggle */}
+                                  {room.status === 'dirty' && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="text-green-400 hover:text-green-300 hover:bg-green-900/30 h-8 px-2"
+                                      onClick={() => handleMarkRoomClean(room.room_number)}
+                                      title="Mark as Clean"
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  {room.status === 'available' && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="text-orange-400 hover:text-orange-300 hover:bg-orange-900/30 h-8 px-2"
+                                      onClick={() => handleMarkRoomDirty(room.room_number)}
+                                      title="Mark as Dirty"
+                                    >
+                                      <AlertCircle className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                   <Button 
                                     variant="ghost" 
                                     size="sm"

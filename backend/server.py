@@ -1197,6 +1197,12 @@ async def check_out(input: CheckOutCreate):
         f"━━━━━━━━━━━━━━━"
     )
     
+    # Mark room as dirty (needs cleaning) after checkout
+    await db.rooms.update_one(
+        {"room_number": input.room_number},
+        {"$set": {"status": "dirty"}}
+    )
+    
     return {"message": "Check-out successful", "booking_id": booking['id']}
 
 # ==================== Edit/Delete Bookings ====================
@@ -2004,6 +2010,26 @@ async def delete_room(room_id: str):
     
     await db.rooms.delete_one({"id": room_id})
     return {"message": "Room deleted successfully"}
+
+@api_router.post("/admin/rooms/{room_number}/mark-dirty")
+async def mark_room_dirty(room_number: str):
+    """Mark a room as dirty (needs cleaning)"""
+    room = await db.rooms.find_one({"room_number": room_number}, {"_id": 0})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    await db.rooms.update_one({"room_number": room_number}, {"$set": {"status": "dirty"}})
+    return {"message": f"Room {room_number} marked as dirty"}
+
+@api_router.post("/admin/rooms/{room_number}/mark-clean")
+async def mark_room_clean(room_number: str):
+    """Mark a room as clean (available)"""
+    room = await db.rooms.find_one({"room_number": room_number}, {"_id": 0})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    await db.rooms.update_one({"room_number": room_number}, {"$set": {"status": "available"}})
+    return {"message": f"Room {room_number} marked as clean/available"}
 
 # Block room for non-railroad guest (Other Guest)
 class BlockRoomInput(BaseModel):
