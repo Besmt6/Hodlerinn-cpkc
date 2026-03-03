@@ -3228,7 +3228,7 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                             email_report_time: portalSettings.email_report_time
                           });
                           toast.success("Email settings saved!");
-                          loadSettings();
+                          fetchSettings();
                         } catch (error) {
                           toast.error("Failed to save settings");
                         } finally {

@@ -7,7 +7,7 @@ import requests
 import os
 from datetime import datetime, timedelta
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://guest-portal-demo-1.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://hodler-inn.preview.emergentagent.com').rstrip('/')
 
 class TestRoomManagement:
     """Room Management CRUD tests"""

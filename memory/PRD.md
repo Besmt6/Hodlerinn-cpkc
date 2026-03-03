@@ -67,6 +67,7 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 ## Pending/In Progress
 
 ### P0 - Critical
+- [x] **Conflicting Toast Bug Fix (Dec 2025)** - Fixed `loadSettings()` → `fetchSettings()` in email settings save handler
 - [ ] **AI Daily Sync Confirmation** - Awaiting user feedback on 3 PM auto-sync results
 
 ### P1 - High Priority
