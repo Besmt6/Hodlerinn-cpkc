@@ -42,6 +42,11 @@ db = client[os.environ['DB_NAME']]
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
 
+# Zoho WorkDrive configuration
+ZOHO_CLIENT_ID = os.environ.get('ZOHO_CLIENT_ID', '')
+ZOHO_CLIENT_SECRET = os.environ.get('ZOHO_CLIENT_SECRET', '')
+ZOHO_REFRESH_TOKEN = os.environ.get('ZOHO_REFRESH_TOKEN', '')
+
 # Encryption configuration
 ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', '')
 fernet = Fernet(ENCRYPTION_KEY.encode()) if ENCRYPTION_KEY else None
@@ -89,6 +94,97 @@ def decrypt_data(encrypted_data: str) -> str:
     except Exception as e:
         # If decryption fails, data might not be encrypted (old data)
         return encrypted_data
+
+# ==================== Zoho WorkDrive Functions ====================
+
+async def get_zoho_access_token():
+    """Get fresh access token using refresh token"""
+    if not ZOHO_CLIENT_ID or not ZOHO_CLIENT_SECRET or not ZOHO_REFRESH_TOKEN:
+        logging.error("Zoho credentials not configured")
+        return None
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://accounts.zoho.com/oauth/v2/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "client_id": ZOHO_CLIENT_ID,
+                    "client_secret": ZOHO_CLIENT_SECRET,
+                    "refresh_token": ZOHO_REFRESH_TOKEN
+                }
+            )
+            data = response.json()
+            return data.get("access_token")
+    except Exception as e:
+        logging.error(f"Failed to get Zoho access token: {e}")
+        return None
+
+async def get_zoho_team_id(access_token):
+    """Get the team ID for WorkDrive"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://www.zohoapis.com/workdrive/api/v1/users/me",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            data = response.json()
+            return data.get("data", {}).get("attributes", {}).get("team_id")
+    except Exception as e:
+        logging.error(f"Failed to get Zoho team ID: {e}")
+        return None
+
+async def get_zoho_root_folder_id(access_token, team_id):
+    """Get the root folder ID for WorkDrive"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://www.zohoapis.com/workdrive/api/v1/teams/{team_id}/privatespace",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            data = response.json()
+            return data.get("data", {}).get("id")
+    except Exception as e:
+        logging.error(f"Failed to get Zoho root folder: {e}")
+        return None
+
+async def upload_to_zoho_drive(file_bytes: bytes, filename: str, folder_id: str = None):
+    """Upload a file to Zoho WorkDrive"""
+    access_token = await get_zoho_access_token()
+    if not access_token:
+        return {"success": False, "error": "Failed to get access token"}
+    
+    try:
+        # Get team ID if not cached
+        team_id = await get_zoho_team_id(access_token)
+        if not team_id:
+            return {"success": False, "error": "Failed to get team ID"}
+        
+        # Get root folder if not specified
+        if not folder_id:
+            folder_id = await get_zoho_root_folder_id(access_token, team_id)
+            if not folder_id:
+                return {"success": False, "error": "Failed to get root folder"}
+        
+        # Upload file
+        async with httpx.AsyncClient() as client:
+            files = {"content": (filename, file_bytes, "application/octet-stream")}
+            response = await client.post(
+                f"https://www.zohoapis.com/workdrive/api/v1/upload?parent_id={folder_id}&override-name-exist=true",
+                headers={"Authorization": f"Bearer {access_token}"},
+                files=files
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {"success": True, "data": data}
+            else:
+                logging.error(f"Zoho upload failed: {response.status_code} - {response.text}")
+                return {"success": False, "error": f"Upload failed: {response.status_code}"}
+                
+    except Exception as e:
+        logging.error(f"Failed to upload to Zoho Drive: {e}")
+        return {"success": False, "error": str(e)}
 
 # ==================== Scheduler for Monthly Reset & Auto-Sync ====================
 
@@ -2550,6 +2646,103 @@ async def test_email_connection():
     except Exception as e:
         logging.error(f"Email test failed: {e}")
         return {"success": False, "message": f"Email test failed: {str(e)}"}
+
+@api_router.post("/admin/settings/test-zoho")
+async def test_zoho_connection():
+    """Test Zoho WorkDrive connection"""
+    access_token = await get_zoho_access_token()
+    if not access_token:
+        return {"success": False, "message": "Failed to get Zoho access token. Check credentials."}
+    
+    team_id = await get_zoho_team_id(access_token)
+    if not team_id:
+        return {"success": False, "message": "Failed to get Zoho team ID"}
+    
+    folder_id = await get_zoho_root_folder_id(access_token, team_id)
+    if not folder_id:
+        return {"success": False, "message": "Failed to get Zoho root folder"}
+    
+    return {"success": True, "message": f"Zoho WorkDrive connected! Team ID: {team_id}", "folder_id": folder_id}
+
+@api_router.post("/admin/upload-to-zoho")
+async def upload_daily_reports_to_zoho():
+    """Manually trigger upload of today's reports to Zoho Drive"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    results = []
+    
+    # Generate and upload sign-in sheet PDF
+    try:
+        # Get today's bookings
+        bookings = await db.bookings.find({
+            "check_in_date": today,
+            "is_checked_out": False
+        }, {"_id": 0}).to_list(100)
+        
+        if bookings:
+            # Generate PDF
+            output = io.BytesIO()
+            doc = SimpleDocTemplate(output, pagesize=landscape(letter), 
+                                   rightMargin=30, leftMargin=30, 
+                                   topMargin=30, bottomMargin=30)
+            elements = []
+            styles = getSampleStyleSheet()
+            
+            # Title
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                alignment=TA_CENTER,
+                spaceAfter=20
+            )
+            elements.append(Paragraph(f"HODLER INN - SIGN IN SHEET", title_style))
+            elements.append(Paragraph(f"Date: {today}", styles['Normal']))
+            elements.append(Spacer(1, 20))
+            
+            # Table data
+            data = [["#", "Employee ID", "Name", "Room", "Check-In Time"]]
+            for i, booking in enumerate(bookings, 1):
+                guest = await db.guests.find_one({"employee_number": booking['employee_number']}, {"_id": 0})
+                name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown'))) if guest else "Unknown"
+                data.append([
+                    str(i),
+                    booking.get('employee_number', ''),
+                    name,
+                    booking.get('room_number', ''),
+                    booking.get('check_in_time', '')
+                ])
+            
+            table = Table(data, colWidths=[0.5*inch, 1.2*inch, 2.5*inch, 0.8*inch, 1.2*inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fbbf24')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            elements.append(table)
+            
+            doc.build(elements)
+            pdf_bytes = output.getvalue()
+            
+            # Upload to Zoho
+            result = await upload_to_zoho_drive(pdf_bytes, f"SignInSheet_{today}.pdf")
+            results.append({"file": "Sign-In Sheet", "result": result})
+        else:
+            results.append({"file": "Sign-In Sheet", "result": {"success": True, "message": "No bookings for today"}})
+            
+    except Exception as e:
+        logging.error(f"Failed to generate/upload sign-in sheet: {e}")
+        results.append({"file": "Sign-In Sheet", "result": {"success": False, "error": str(e)}})
+    
+    return {"results": results}
 
 # Sync status storage (in-memory for now)
 sync_status = {

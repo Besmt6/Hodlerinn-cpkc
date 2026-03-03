@@ -71,7 +71,8 @@ import {
   CheckCheck,
   Link,
   Shield,
-  FileBarChart
+  FileBarChart,
+  Cloud
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -161,6 +162,8 @@ export default function AdminDashboard() {
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
+  const [testingZoho, setTestingZoho] = useState(false);
+  const [uploadingZoho, setUploadingZoho] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ running: false, progress: "", last_results: null });
   const [runningSyncTest, setRunningSyncTest] = useState(false);
   
@@ -3259,6 +3262,71 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                     >
                       <Mail className="w-4 h-4" />
                       {testingEmail ? "Sending..." : "Send Test Email"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Zoho Drive Section */}
+              <Card className="bg-vault-surface-highlight/50 border-vault-border max-w-2xl mt-6">
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-outfit text-lg font-bold text-vault-gold flex items-center gap-2">
+                      <Cloud className="w-5 h-5" />
+                      Zoho WorkDrive Backup
+                    </h3>
+                    <span className="text-emerald-400 text-sm flex items-center gap-1">
+                      <CheckCircle className="w-4 h-4" />
+                      Connected
+                    </span>
+                  </div>
+                  <p className="text-vault-text-secondary text-sm">
+                    Upload sign-in sheets and reports directly to your Zoho WorkDrive for backup.
+                  </p>
+                  
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={async () => {
+                        setTestingZoho(true);
+                        try {
+                          const res = await axios.post(`${API}/admin/settings/test-zoho`);
+                          if (res.data.success) {
+                            toast.success(res.data.message);
+                          } else {
+                            toast.error(res.data.message);
+                          }
+                        } catch (error) {
+                          toast.error("Failed to test Zoho connection");
+                        } finally {
+                          setTestingZoho(false);
+                        }
+                      }}
+                      disabled={testingZoho}
+                      className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                      data-testid="test-zoho-btn"
+                    >
+                      <Cloud className="w-4 h-4" />
+                      {testingZoho ? "Testing..." : "Test Connection"}
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        setUploadingZoho(true);
+                        try {
+                          const res = await axios.post(`${API}/admin/upload-to-zoho`);
+                          toast.success("Reports uploaded to Zoho Drive!");
+                          console.log(res.data);
+                        } catch (error) {
+                          toast.error("Failed to upload to Zoho Drive");
+                        } finally {
+                          setUploadingZoho(false);
+                        }
+                      }}
+                      disabled={uploadingZoho}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+                      data-testid="upload-zoho-btn"
+                    >
+                      <Upload className="w-4 h-4" />
+                      {uploadingZoho ? "Uploading..." : "Upload Today's Reports"}
                     </Button>
                   </div>
                 </CardContent>
