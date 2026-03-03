@@ -129,17 +129,19 @@ async def get_zoho_team_id(access_token):
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             data = response.json()
-            return data.get("data", {}).get("attributes", {}).get("team_id")
+            # Team ID is in preferred_team_id
+            return data.get("data", {}).get("attributes", {}).get("preferred_team_id")
     except Exception as e:
         logging.error(f"Failed to get Zoho team ID: {e}")
         return None
 
 async def get_zoho_root_folder_id(access_token, team_id):
-    """Get the root folder ID for WorkDrive"""
+    """Get the root folder ID (My Folders) for WorkDrive"""
     try:
         async with httpx.AsyncClient() as client:
+            # Get privatespace (My Folders)
             response = await client.get(
-                f"https://www.zohoapis.com/workdrive/api/v1/teams/{team_id}/privatespace",
+                f"https://www.zohoapis.com/workdrive/api/v1/users/me/privatespace",
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             data = response.json()
