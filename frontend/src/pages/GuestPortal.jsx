@@ -112,43 +112,44 @@ const playVoiceMessage = (messageId, onEnd = null) => {
   });
 };
 
-// Play personalized welcome with name
-const playWelcomeWithName = (name, messageId) => {
+// Play personalized welcome with name (using dynamic audio generation)
+const playWelcomeWithName = (name, isNewEmployee = false) => {
   if (!voiceSettings.enabled) return;
   
-  // First speak the greeting with name
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    const greeting = getTimeBasedGreeting();
-    const nameUtterance = new SpeechSynthesisUtterance(`${greeting}, ${name}.`);
-    nameUtterance.volume = voiceSettings.volume;
-    nameUtterance.rate = voiceSettings.speed || 0.85;
-    
-    // After name is spoken, play the instruction audio
-    nameUtterance.onend = () => {
-      setTimeout(() => {
-        // Play instruction without greeting (we already said greeting with name)
-        const audio = new Audio(`${API}/voice/${messageId}`);
-        audio.volume = voiceSettings.volume;
-        audio.play().catch(err => console.log("Instruction audio failed:", err));
-      }, 300);
-    };
-    
-    window.speechSynthesis.speak(nameUtterance);
-  }
+  const messageType = isNewEmployee ? "checkin_new" : "checkin";
+  const encodedName = encodeURIComponent(name);
+  const audio = new Audio(`${API}/voice-dynamic/${messageType}/${encodedName}`);
+  audio.volume = voiceSettings.volume;
+  audio.play().catch(err => {
+    console.log("Dynamic audio failed, falling back to speech:", err);
+    // Fallback to Web Speech API
+    if ('speechSynthesis' in window) {
+      const greeting = getTimeBasedGreeting();
+      const utterance = new SpeechSynthesisUtterance(`${greeting}, ${name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
+      utterance.volume = voiceSettings.volume;
+      utterance.rate = voiceSettings.speed || 0.85;
+      window.speechSynthesis.speak(utterance);
+    }
+  });
 };
 
-// Play checkout found with employee name
+// Play checkout found with employee name (using dynamic audio generation)
 const playCheckoutFoundWithName = (name) => {
   if (!voiceSettings.enabled) return;
   
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(`Booking found for ${name}. Please enter your on duty time and press Complete check out.`);
-    utterance.volume = voiceSettings.volume;
-    utterance.rate = voiceSettings.speed || 0.85;
-    window.speechSynthesis.speak(utterance);
-  }
+  const encodedName = encodeURIComponent(name);
+  const audio = new Audio(`${API}/voice-dynamic/checkout_found/${encodedName}`);
+  audio.volume = voiceSettings.volume;
+  audio.play().catch(err => {
+    console.log("Dynamic audio failed, falling back to speech:", err);
+    // Fallback to Web Speech API
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(`Booking found for ${name}. Please enter your on duty time and press Complete check out.`);
+      utterance.volume = voiceSettings.volume;
+      utterance.rate = voiceSettings.speed || 0.85;
+      window.speechSynthesis.speak(utterance);
+    }
+  });
 };
 
 // Legacy speakMessage function (now uses audio files)
@@ -560,8 +561,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
         const response = await axios.get(`${API}/guests/${employeeNumber}`);
         setEmployeeName(response.data.name);
         setEmployeeStatus('found');
-        const timePeriod = getTimePeriod();
-        playWelcomeWithName(response.data.name, `checkin_instructions_${timePeriod}`);
+        playWelcomeWithName(response.data.name, false);
         setTimeout(() => roomInputRef.current?.focus(), 300);
       } catch (error) {
         // Check if employee ID is in admin's approved list
@@ -578,14 +578,12 @@ function CheckInForm({ setView, setSuccessMessage }) {
             });
             // Successfully registered - show full form
             setEmployeeStatus('found');
-            const timePeriod = getTimePeriod();
-            playWelcomeWithName(name, `checkin_instructions_${timePeriod}`);
+            playWelcomeWithName(name, false);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           } catch (regError) {
             // Registration failed - maybe already registered, still show form
             setEmployeeStatus('found');
-            const timePeriod = getTimePeriod();
-            playWelcomeWithName(name, `checkin_instructions_${timePeriod}`);
+            playWelcomeWithName(name, false);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           }
         } catch (empError) {
@@ -655,8 +653,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
       // Set status to allow check-in form to show
       setEmployeeStatus('found');
       setWrongAttempts(0); // Reset attempts on success
-      const timePeriod = getTimePeriod();
-      playWelcomeWithName(employeeName.trim(), `checkin_instructions_${timePeriod}`);
+      playWelcomeWithName(employeeName.trim(), true);
       toast.success("Welcome! Please continue with check-in.");
       setTimeout(() => roomInputRef.current?.focus(), 300);
     } catch (error) {

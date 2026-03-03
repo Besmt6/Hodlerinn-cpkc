@@ -1795,6 +1795,48 @@ async def generate_all_voice_messages():
         logging.error(f"Failed to generate voices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.get("/voice-dynamic/{message_type}/{name}")
+async def get_dynamic_voice(message_type: str, name: str):
+    """Generate voice message with dynamic name (for Fully Kiosk compatibility)"""
+    try:
+        from emergentintegrations.llm.openai import OpenAITextToSpeech
+        
+        # Get current time period for greeting
+        hour = datetime.now().hour
+        if 5 <= hour < 12:
+            greeting = "Good morning"
+        elif 12 <= hour < 17:
+            greeting = "Good afternoon"
+        elif 17 <= hour < 21:
+            greeting = "Good evening"
+        else:
+            greeting = "Good night"
+        
+        # Build message based on type
+        if message_type == "checkin":
+            text = f"{greeting}, {name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In."
+        elif message_type == "checkin_new":
+            text = f"{greeting}, {name}. Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In."
+        elif message_type == "checkout_found":
+            text = f"Booking found for {name}. Please enter your on duty time and press Complete check out."
+        else:
+            raise HTTPException(status_code=400, detail="Invalid message type")
+        
+        tts = OpenAITextToSpeech(api_key=os.getenv("EMERGENT_LLM_KEY"))
+        audio_bytes = await tts.generate_speech(
+            text=text,
+            model="tts-1",
+            voice="nova",
+            speed=0.95
+        )
+        
+        # Return audio directly (don't cache - names are dynamic)
+        return Response(content=audio_bytes, media_type="audio/mpeg")
+        
+    except Exception as e:
+        logging.error(f"Failed to generate dynamic voice: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate voice")
+
 @api_router.get("/admin/rooms")
 async def get_all_rooms():
     rooms = await db.rooms.find({}, {"_id": 0}).to_list(1000)
