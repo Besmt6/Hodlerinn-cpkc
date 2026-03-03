@@ -471,6 +471,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
   const [availableRooms, setAvailableRooms] = useState([]);
   const [signatureReminderSpoken, setSignatureReminderSpoken] = useState(false);
   const [requestingAccess, setRequestingAccess] = useState(false);
+  const [companyName, setCompanyName] = useState("");
   const sigRef = useRef(null);
   const roomInputRef = useRef(null);
   const signatureContainerRef = useRef(null);
@@ -510,8 +511,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
         const response = await axios.get(`${API}/guests/${employeeNumber}`);
         setEmployeeName(response.data.name);
         setEmployeeStatus('found');
-        const timePeriod = getTimePeriod();
-        playVoiceMessage(`checkin_welcome_${timePeriod}`);
+        const greeting = getTimeBasedGreeting();
+        speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`, 0.85);
         setTimeout(() => roomInputRef.current?.focus(), 300);
       } catch (error) {
         // Check if employee ID is in admin's approved list
@@ -528,12 +529,14 @@ function CheckInForm({ setView, setSuccessMessage }) {
             });
             // Successfully registered - show full form
             setEmployeeStatus('found');
-            const timePeriod = getTimePeriod();
-            playVoiceMessage(`checkin_welcome_${timePeriod}`);
+            const greeting = getTimeBasedGreeting();
+            speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`, 0.85);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           } catch (regError) {
             // Registration failed - maybe already registered, still show form
             setEmployeeStatus('found');
+            const greeting = getTimeBasedGreeting();
+            speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`, 0.85);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           }
         } catch (empError) {
@@ -578,6 +581,10 @@ function CheckInForm({ setView, setSuccessMessage }) {
       toast.error("Please enter your name");
       return;
     }
+    if (companyName.trim().toUpperCase() !== "CPKC") {
+      toast.error("Invalid company name. Only CPKC employees are allowed.");
+      return;
+    }
     setRequestingAccess(true);
     try {
       // Register as pending verification guest
@@ -588,8 +595,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
       
       // Set status to allow check-in form to show
       setEmployeeStatus('found');
-      const timePeriod = getTimePeriod();
-      playVoiceMessage(`checkin_welcome_${timePeriod}`);
+      const greeting = getTimeBasedGreeting();
+      speakMessage(`${greeting}. Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`, 0.85);
       toast.success("Welcome! Please continue with check-in.");
       setTimeout(() => roomInputRef.current?.focus(), 300);
     } catch (error) {
@@ -741,9 +748,10 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 className="mt-2 bg-amber-900/30 border border-amber-600/50 rounded-lg p-3 space-y-3"
               >
                 <p className="text-amber-400 text-sm">
-                  Employee ID not in system. Enter your name to continue:
+                  Employee ID not in system. Enter your details to continue:
                 </p>
                 <div>
+                  <label className="text-amber-300 text-xs uppercase tracking-wide mb-1 block">Full Name</label>
                   <Input
                     value={employeeName}
                     onChange={(e) => setEmployeeName(e.target.value)}
@@ -752,9 +760,19 @@ function CheckInForm({ setView, setSuccessMessage }) {
                     data-testid="request-name-input"
                   />
                 </div>
+                <div>
+                  <label className="text-amber-300 text-xs uppercase tracking-wide mb-1 block">Company Name</label>
+                  <Input
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="Enter company name (e.g. CPKC)"
+                    className="vault-input text-lg border-amber-500/50"
+                    data-testid="company-name-input"
+                  />
+                </div>
                 <Button
                   onClick={handleContinueAsNewEmployee}
-                  disabled={requestingAccess || !employeeName.trim()}
+                  disabled={requestingAccess || !employeeName.trim() || !companyName.trim()}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-10 disabled:opacity-50"
                   data-testid="continue-checkin-btn"
                 >
