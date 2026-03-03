@@ -472,6 +472,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
   const [signatureReminderSpoken, setSignatureReminderSpoken] = useState(false);
   const [requestingAccess, setRequestingAccess] = useState(false);
   const [companyName, setCompanyName] = useState("");
+  const [wrongAttempts, setWrongAttempts] = useState(0);
   const sigRef = useRef(null);
   const roomInputRef = useRef(null);
   const signatureContainerRef = useRef(null);
@@ -543,6 +544,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
           // Employee not in admin list - show request access form
           setEmployeeName("");
           setEmployeeStatus('not_found');
+          // Voice instruction for new employee
+          speakMessage("Please enter your full name and company name, then click Continue to Check-In.", 0.85);
         }
       } finally {
         setVerifying(false);
@@ -582,7 +585,15 @@ function CheckInForm({ setView, setSuccessMessage }) {
       return;
     }
     if (companyName.trim().toUpperCase() !== "CPKC") {
-      toast.error("Invalid company name. Only CPKC employees are allowed.");
+      const newAttempts = wrongAttempts + 1;
+      setWrongAttempts(newAttempts);
+      
+      if (newAttempts >= 2) {
+        toast.error("Invalid company name. Please call Help Phone from outside office.");
+        speakMessage("Please call Help Phone from outside office phone so we know someone need help.", 0.85);
+      } else {
+        toast.error("Invalid company name. Please try again.");
+      }
       return;
     }
     setRequestingAccess(true);
@@ -595,6 +606,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
       
       // Set status to allow check-in form to show
       setEmployeeStatus('found');
+      setWrongAttempts(0); // Reset attempts on success
       const greeting = getTimeBasedGreeting();
       speakMessage(`${greeting}. Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`, 0.85);
       toast.success("Welcome! Please continue with check-in.");
@@ -765,11 +777,18 @@ function CheckInForm({ setView, setSuccessMessage }) {
                   <Input
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Enter company name (e.g. CPKC)"
+                    placeholder="Enter company name here"
                     className="vault-input text-lg border-amber-500/50"
                     data-testid="company-name-input"
                   />
                 </div>
+                {wrongAttempts >= 2 && (
+                  <div className="bg-red-900/50 border border-red-500 rounded-lg p-3">
+                    <p className="text-red-400 text-sm text-center font-medium">
+                      Please call Help Phone from outside office phone so we know someone need help
+                    </p>
+                  </div>
+                )}
                 <Button
                   onClick={handleContinueAsNewEmployee}
                   disabled={requestingAccess || !employeeName.trim() || !companyName.trim()}
