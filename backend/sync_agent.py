@@ -486,8 +486,9 @@ class APIGlobalSyncAgent:
     async def verify_entry(self, entry: dict, employee_id: str, room_number: str) -> bool:
         """Fill in employee ID and room number for an entry.
         
-        Key insight: Clicking the selection checkbox causes an AJAX refresh.
-        After clicking, we must re-find all elements.
+        Structure: Each guest has a blue header row and a white data row.
+        The white row contains: Select All, Position, Name, Employee ID input, Room Number input
+        The red X on the right indicates unfilled status.
         """
         try:
             name = entry.get("name", "")
@@ -500,104 +501,150 @@ class APIGlobalSyncAgent:
             else:
                 search_name = name.split()[0] if ' ' in name else name
             
-            logger.info(f"Verifying {name}, searching for row with: {search_name}")
+            logger.info(f"Verifying {name}, searching for: {search_name}")
             
-            # === STEP 1: Click selection checkbox to enable editing ===
-            logger.info("Step 1: Finding and clicking selection checkbox...")
+            # === Find the Employee ID input field directly by looking for inputs near the name ===
+            # The structure shows: Name cell | Employee ID input | Room Number input
             
-            rows = await self.page.query_selector_all('tr')
-            checkbox_clicked = False
-            for row in rows:
-                try:
-                    row_text = await row.inner_text()
-                    if search_name in row_text and ',' in row_text:
-                        select_checkbox = await row.query_selector('.selectedGuestClicked .ui-chkbox-box, .ui-chkbox-box')
-                        if select_checkbox:
-                            await select_checkbox.click(force=True)
-                            checkbox_clicked = True
-                            logger.info(f"Clicked selection checkbox for {search_name}")
-                            await self.page.wait_for_timeout(2000)  # Wait for AJAX
-                            break
-                except:
-                    continue
+            logger.info("Step 1: Finding Employee ID input field...")
             
-            if not checkbox_clicked:
-                logger.warning(f"Could not click selection checkbox for {search_name}")
-            
-            # === STEP 2: Re-find the row and inputs after AJAX refresh ===
-            logger.info("Step 2: Re-finding elements after AJAX refresh...")
-            
-            target_row = None
-            rows = await self.page.query_selector_all('tr')
-            for row in rows:
-                try:
-                    row_text = await row.inner_text()
-                    if search_name in row_text and ',' in row_text:
-                        inputs = await row.query_selector_all('input[type="text"]')
-                        if len(inputs) >= 2:
-                            target_row = row
-                            logger.info(f"Found row for {search_name} with {len(inputs)} inputs")
-                            break
-                except:
-                    continue
-            
-            if not target_row:
-                logger.warning(f"Could not find row for: {name}")
-                return False
-            
-            # Find input fields
-            text_inputs = await target_row.query_selector_all('input[type="text"]')
+            # Find all text inputs on the page
+            all_inputs = await self.page.query_selector_all('input[type="text"]')
+            logger.info(f"Found {len(all_inputs)} text inputs on page")
             
             emp_input = None
             room_input = None
-            for i, inp in enumerate(text_inputs):
-                val = await inp.get_attribute('value') or ''
-                inp_id = await inp.get_attribute('id') or ''
-                logger.info(f"  Input {i}: value='{val}', id='{inp_id}'")
-                
-                if emp_input is None and (not val or len(val) < 4):
-                    emp_input = inp
-                elif room_input is None and (not val or len(val) < 2):
-                    room_input = inp
+            
+            # Look for inputs in the same row as our name
+            for inp in all_inputs:
+                try:
+                    # Get the parent row
+                    parent_row = await inp.evaluate_handle('el => el.closest("tr")')
+                    if parent_row:
+                        row_text = await parent_row.inner_text()
+                        if search_name in row_text:
+                            inp_id = await inp.get_attribute('id') or ''
+                            inp_val = await inp.get_attribute('value') or ''
+                            
+                            # Check if this is Employee ID or Room Number based on ID
+                            if 'employeeId' in inp_id.lower() or 'enteredemployeeid' in inp_id.lower():
+                                emp_input = inp
+                                logger.info(f"Found Employee ID input: {inp_id}, value='{inp_val}'")
+                            elif 'roomnumber' in inp_id.lower() or 'room' in inp_id.lower():
+                                room_input = inp
+                                logger.info(f"Found Room Number input: {inp_id}, value='{inp_val}'")
+                except Exception as e:
+                    continue
             
             if not emp_input:
-                logger.warning("Could not find Employee ID input")
+                logger.warning(f"Could not find Employee ID input for {search_name}")
                 return False
             
-            # === STEP 3: Type Employee ID ===
-            logger.info(f"Step 3: Typing Employee ID '{employee_id}'...")
+            # === Step 2: Click on the Employee ID input and type ===
+            logger.info(f"Step 2: Filling Employee ID '{employee_id}'...")
+            
+            # Get the input ID for JavaScript manipulation
+            emp_input_id = await emp_input.get_attribute('id')
+            
+            # Click to focus
             await emp_input.click()
             await self.page.wait_for_timeout(300)
-            await self.page.keyboard.type(str(employee_id), delay=80)
-            await self.page.wait_for_timeout(500)
             
-            val_check = await emp_input.get_attribute('value') or ''
-            logger.info(f"Employee ID value after typing: '{val_check}'")
+            # Set value via JS and immediately trigger blur to save
+            js_code = f'''() => {{
+                const el = document.getElementById("{emp_input_id}");
+                if (el) {{
+                    el.focus();
+                    el.value = "{employee_id}";
+                    
+                    // Fire events in quick succession
+                    el.dispatchEvent(new Event('input', {{bubbles: true}}));
+                    el.dispatchEvent(new Event('change', {{bubbles: true}}));
+                    el.dispatchEvent(new Event('blur', {{bubbles: true}}));
+                    
+                    // Also try triggering onblur handler directly
+                    if (el.onblur) el.onblur();
+                    
+                    return el.value;
+                }}
+                return null;
+            }}'''
+            result = await self.page.evaluate(js_code)
+            logger.info(f"Employee ID JS set result: '{result}'")
             
-            # === STEP 4: Type Room Number ===
+            # Wait a bit for any AJAX to process
+            await self.page.wait_for_timeout(1500)
+            
+            # Check if value persisted (might need to re-find element)
+            try:
+                emp_val = await emp_input.get_attribute('value') or ''
+                logger.info(f"Employee ID value check: '{emp_val}'")
+            except:
+                logger.info("Element was detached (page refreshed via AJAX)")
+            
+            # === Step 3: Move to Room Number and fill ===
             if room_input:
-                logger.info(f"Step 4: Typing Room Number '{room_number}'...")
-                await self.page.keyboard.press('Tab')
-                await self.page.wait_for_timeout(300)
-                await room_input.click()
-                await self.page.wait_for_timeout(300)
-                await self.page.keyboard.type(str(room_number), delay=80)
-                await self.page.wait_for_timeout(500)
+                logger.info(f"Step 3: Filling Room Number '{room_number}'...")
                 
-                room_check = await room_input.get_attribute('value') or ''
-                logger.info(f"Room Number value after typing: '{room_check}'")
+                room_input_id = await room_input.get_attribute('id')
+                
+                # Re-find the room input (in case page refreshed)
+                try:
+                    room_input = await self.page.query_selector(f'input[id="{room_input_id}"]')
+                    if not room_input:
+                        # Try to find it again by searching
+                        all_inputs = await self.page.query_selector_all('input[type="text"]')
+                        for inp in all_inputs:
+                            inp_id = await inp.get_attribute('id') or ''
+                            if 'roomnumber' in inp_id.lower() or 'room' in inp_id.lower():
+                                parent_row = await inp.evaluate_handle('el => el.closest("tr")')
+                                row_text = await parent_row.inner_text()
+                                if search_name in row_text:
+                                    room_input = inp
+                                    room_input_id = inp_id
+                                    break
+                except:
+                    pass
+                
+                if room_input:
+                    await room_input.click()
+                    await self.page.wait_for_timeout(300)
+                    
+                    # Set value and trigger blur immediately
+                    js_code = f'''() => {{
+                        const el = document.getElementById("{room_input_id}");
+                        if (el) {{
+                            el.focus();
+                            el.value = "{room_number}";
+                            el.dispatchEvent(new Event('input', {{bubbles: true}}));
+                            el.dispatchEvent(new Event('change', {{bubbles: true}}));
+                            el.dispatchEvent(new Event('blur', {{bubbles: true}}));
+                            if (el.onblur) el.onblur();
+                            return el.value;
+                        }}
+                        return null;
+                    }}'''
+                    result = await self.page.evaluate(js_code)
+                    logger.info(f"Room Number JS set result: '{result}'")
+                    
+                    await self.page.wait_for_timeout(1500)
             
-            # === STEP 5: Trigger save ===
-            logger.info("Step 5: Triggering save...")
+            # === Step 4: Trigger save by clicking elsewhere ===
+            logger.info("Step 4: Triggering save...")
+            
+            # Press Tab to blur
             await self.page.keyboard.press('Tab')
             await self.page.wait_for_timeout(500)
-            await self.page.mouse.click(100, 100)
-            await self.page.wait_for_timeout(500)
             
+            # Click on empty area
+            await self.page.mouse.click(50, 50)
+            await self.page.wait_for_timeout(1000)
+            
+            # Wait for auto-save
             logger.info("Waiting 5 seconds for auto-save...")
             await self.page.wait_for_timeout(5000)
             
-            # Screenshot for debugging
+            # Take screenshot
             try:
                 await self.page.screenshot(path=f"/tmp/sync_after_{search_name}.png")
             except:
