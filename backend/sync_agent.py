@@ -568,46 +568,36 @@ class APIGlobalSyncAgent:
             
             # Click to focus
             await emp_input.click()
-            await self.page.wait_for_timeout(300)
+            await self.page.wait_for_timeout(500)
             
-            # Clear and type using locator.fill() which properly handles focus
-            await emp_input.fill(str(employee_id))
-            await self.page.wait_for_timeout(300)
+            # Select all and delete existing content
+            await self.page.keyboard.press('Control+a')
+            await self.page.wait_for_timeout(100)
+            await self.page.keyboard.press('Backspace')
+            await self.page.wait_for_timeout(100)
             
-            # Press Tab to trigger blur event
-            await self.page.keyboard.press('Tab')
-            await self.page.wait_for_timeout(300)
+            # Type character by character
+            await self.page.keyboard.type(str(employee_id), delay=50)
+            await self.page.wait_for_timeout(500)
             
             # Verify value was entered
             emp_val = await emp_input.input_value()
-            logger.info(f"Employee ID value after fill: '{emp_val}'")
+            logger.info(f"Employee ID value after type: '{emp_val}'")
             
-            # === Step 3: Click away to trigger save ===
-            logger.info("Step 3: Clicking away to trigger auto-save...")
+            # === Step 3: Click on HEAVENER to trigger save ===
+            logger.info("Step 3: Clicking on HEAVENER to trigger auto-save...")
             
-            # Find HEAVENER text and click near it (empty space in header area)
+            # Click directly on HEAVENER text element
             try:
                 heavener = self.page.locator('text=HEAVENER').first
-                if await heavener.count() > 0:
-                    bbox = await heavener.bounding_box()
-                    if bbox:
-                        # Click to the right of HEAVENER (empty space)
-                        click_x = bbox['x'] + bbox['width'] + 50
-                        click_y = bbox['y']
-                        await self.page.mouse.click(click_x, click_y)
-                        logger.info(f"Clicked at ({click_x:.0f}, {click_y:.0f}) near HEAVENER")
-                    else:
-                        await self.page.mouse.click(400, 150)
-                        logger.info("Clicked at (400, 150) - bbox not available")
-                else:
-                    await self.page.mouse.click(400, 150)
-                    logger.info("Clicked at (400, 150) - HEAVENER not found")
+                await heavener.click()
+                logger.info("Clicked directly on HEAVENER text")
             except Exception as e:
+                logger.info(f"HEAVENER click failed: {e}, trying coordinates")
                 await self.page.mouse.click(400, 150)
-                logger.info(f"Clicked at (400, 150) - exception: {e}")
             
             # Wait for auto-save to complete
-            await self.page.wait_for_timeout(3000)
+            await self.page.wait_for_timeout(4000)
             
             # === Step 4: Enter Room Number ===
             if room_input:
@@ -615,37 +605,34 @@ class APIGlobalSyncAgent:
                 
                 # Click to focus
                 await room_input.click()
-                await self.page.wait_for_timeout(300)
+                await self.page.wait_for_timeout(500)
                 
-                # Fill room number
-                await room_input.fill(str(room_number))
-                await self.page.wait_for_timeout(300)
+                # Select all and delete
+                await self.page.keyboard.press('Control+a')
+                await self.page.wait_for_timeout(100)
+                await self.page.keyboard.press('Backspace')
+                await self.page.wait_for_timeout(100)
                 
-                # Press Tab to trigger blur event
-                await self.page.keyboard.press('Tab')
-                await self.page.wait_for_timeout(300)
+                # Type room number character by character
+                await self.page.keyboard.type(str(room_number), delay=50)
+                await self.page.wait_for_timeout(500)
                 
                 # Verify
                 room_val = await room_input.input_value()
-                logger.info(f"Room Number value after fill: '{room_val}'")
+                logger.info(f"Room Number value after type: '{room_val}'")
                 
-                # === Step 5: Click away again to save ===
-                logger.info("Step 5: Clicking away to save Room Number...")
+                # === Step 5: Click on HEAVENER to save Room Number ===
+                logger.info("Step 5: Clicking on HEAVENER to save Room Number...")
                 
                 try:
                     heavener = self.page.locator('text=HEAVENER').first
-                    if await heavener.count() > 0:
-                        bbox = await heavener.bounding_box()
-                        if bbox:
-                            click_x = bbox['x'] + bbox['width'] + 50
-                            click_y = bbox['y']
-                            await self.page.mouse.click(click_x, click_y)
-                            logger.info(f"Clicked at ({click_x:.0f}, {click_y:.0f}) near HEAVENER")
+                    await heavener.click()
+                    logger.info("Clicked directly on HEAVENER text")
                 except:
                     await self.page.mouse.click(400, 150)
                 
                 # Wait for save
-                await self.page.wait_for_timeout(3000)
+                await self.page.wait_for_timeout(4000)
             else:
                 logger.warning("Room Number input not found, only entered Employee ID")
             
