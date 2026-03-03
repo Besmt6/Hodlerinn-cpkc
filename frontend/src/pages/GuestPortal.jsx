@@ -1463,6 +1463,32 @@ function HelpView({ setView }) {
               Need assistance? Please contact front desk staff.
             </p>
           </div>
+
+          {/* Voice Speed Test */}
+          <div className="bg-vault-surface border border-vault-gold/50 rounded-lg p-4 mt-4">
+            <h3 className="font-outfit text-sm font-bold text-vault-gold mb-3 text-center">TEST VOICE SPEED</h3>
+            <p className="text-vault-text-secondary text-xs text-center mb-3">Tap to hear different speeds:</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => speakMessage("Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.", 0.7)}
+                className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium"
+              >
+                Slow (0.7)
+              </button>
+              <button
+                onClick={() => speakMessage("Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.", 0.85)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-3 rounded-lg text-sm font-medium"
+              >
+                Normal (0.85)
+              </button>
+              <button
+                onClick={() => speakMessage("Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.", 1.0)}
+                className="bg-amber-600 hover:bg-amber-700 text-white py-2 px-3 rounded-lg text-sm font-medium"
+              >
+                Fast (1.0)
+              </button>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </motion.div>
