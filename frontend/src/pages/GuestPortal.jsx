@@ -93,7 +93,7 @@ const playVoiceMessage = (messageId) => {
         "checkout_night": "Good night! Thank you for staying at Hodler Inn. Have a safe journey.",
         "signature_reminder": "Please sign your full name legibly.",
         "room_reminder": "Please select the room number from key on desk.",
-        "checkout_found": "Booking found. Please verify and complete check out."
+        "checkout_found": "Booking found. Please enter your on duty time and press Complete check out."
       };
       const text = messages[messageId];
       if (text) {
@@ -916,7 +916,7 @@ function CheckOutForm({ setView, setSuccessMessage }) {
       toast.success(`Found: ${response.data.employee_name} in Room ${roomNumber}`);
       
       // Voice confirmation
-      speakMessage(`Found booking for ${response.data.employee_name}. Please verify and complete check out.`);
+      speakMessage(`Found booking for ${response.data.employee_name}. Please enter your on duty time and press Complete check out.`);
     } catch (error) {
       toast.error(error.response?.data?.detail || "No active booking found for this room.");
       setVerifiedBooking(null);
@@ -1075,7 +1075,7 @@ function CheckOutForm({ setView, setSuccessMessage }) {
                 </Popover>
               </div>
               <div>
-                <label className="vault-label">Check-Out Time (24hr format, e.g. 14:30)</label>
+                <label className="vault-label">On Duty Time</label>
                 <div className="relative">
                   <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
                   <Input
