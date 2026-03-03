@@ -486,15 +486,13 @@ class APIGlobalSyncAgent:
     async def verify_entry(self, entry: dict, employee_id: str, room_number: str) -> bool:
         """Fill in employee ID and room number for an entry.
         
-        Replicates the user's exact manual workflow:
-        1. PASTE the Employee ID (triggers paste event)
-        2. TYPE the Room Number character by character
-        3. CLICK on empty space and wait for auto-save
+        Key insight: Clicking the selection checkbox causes an AJAX refresh.
+        After clicking, we must re-find all elements.
         """
         try:
             name = entry.get("name", "")
             
-            # Extract just the last name for searching (more reliable)
+            # Extract just the last name for searching
             if ',' in name:
                 search_name = name.split(',')[0]
             elif '/' in name:
@@ -504,171 +502,106 @@ class APIGlobalSyncAgent:
             
             logger.info(f"Verifying {name}, searching for row with: {search_name}")
             
-            # Find the specific cell containing this name
-            name_cells = await self.page.query_selector_all(f'td:has-text("{search_name}")')
+            # === STEP 1: Click selection checkbox to enable editing ===
+            logger.info("Step 1: Finding and clicking selection checkbox...")
+            
+            rows = await self.page.query_selector_all('tr')
+            checkbox_clicked = False
+            for row in rows:
+                try:
+                    row_text = await row.inner_text()
+                    if search_name in row_text and ',' in row_text:
+                        select_checkbox = await row.query_selector('.selectedGuestClicked .ui-chkbox-box, .ui-chkbox-box')
+                        if select_checkbox:
+                            await select_checkbox.click(force=True)
+                            checkbox_clicked = True
+                            logger.info(f"Clicked selection checkbox for {search_name}")
+                            await self.page.wait_for_timeout(2000)  # Wait for AJAX
+                            break
+                except:
+                    continue
+            
+            if not checkbox_clicked:
+                logger.warning(f"Could not click selection checkbox for {search_name}")
+            
+            # === STEP 2: Re-find the row and inputs after AJAX refresh ===
+            logger.info("Step 2: Re-finding elements after AJAX refresh...")
             
             target_row = None
-            for cell in name_cells:
-                cell_text = await cell.inner_text()
-                # Make sure it's the actual name cell, not just any cell mentioning the name
-                if search_name in cell_text and ',' in cell_text:
-                    # Get parent row
-                    target_row = await cell.evaluate_handle('el => el.closest("tr")')
-                    if target_row:
-                        # Verify this row has input fields
-                        inputs = await target_row.query_selector_all('input[type="text"]')
+            rows = await self.page.query_selector_all('tr')
+            for row in rows:
+                try:
+                    row_text = await row.inner_text()
+                    if search_name in row_text and ',' in row_text:
+                        inputs = await row.query_selector_all('input[type="text"]')
                         if len(inputs) >= 2:
-                            logger.info(f"Found correct row for {search_name} with {len(inputs)} text inputs")
+                            target_row = row
+                            logger.info(f"Found row for {search_name} with {len(inputs)} inputs")
                             break
-                        else:
-                            target_row = None
-            
-            if not target_row:
-                # Fallback: search all rows
-                all_rows = await self.page.query_selector_all('tr')
-                for row in all_rows:
-                    try:
-                        row_text = await row.inner_text()
-                        if search_name in row_text and ',' in row_text:
-                            inputs = await row.query_selector_all('input[type="text"]')
-                            if len(inputs) >= 2:
-                                target_row = row
-                                logger.info(f"Found row via fallback for {search_name}")
-                                break
-                    except:
-                        continue
+                except:
+                    continue
             
             if not target_row:
                 logger.warning(f"Could not find row for: {name}")
                 return False
             
-            # Find all text inputs in this specific row
+            # Find input fields
             text_inputs = await target_row.query_selector_all('input[type="text"]')
-            logger.info(f"Found {len(text_inputs)} text inputs in row")
-            
-            # Log what we're working with
-            for i, inp in enumerate(text_inputs):
-                val = await inp.get_attribute('value') or ''
-                inp_id = await inp.get_attribute('id') or 'no-id'
-                logger.info(f"  Input {i}: value='{val}', id='{inp_id}'")
             
             emp_input = None
             room_input = None
-            emp_input_index = -1
-            
-            # Find the Employee ID input (first empty text input)
-            for i, inp in enumerate(text_inputs[:3]):
-                val = await inp.get_attribute('value') or ''
-                if not val or val == 'NO ID' or len(val) < 4:
-                    emp_input = inp
-                    emp_input_index = i
-                    logger.info(f"Identified Employee ID input at index {i}")
-                    break
-            
-            # Find the Room Number input (next empty input after emp_input)
             for i, inp in enumerate(text_inputs):
-                if i == emp_input_index:
-                    continue
                 val = await inp.get_attribute('value') or ''
-                if not val or len(val) < 2:
+                inp_id = await inp.get_attribute('id') or ''
+                logger.info(f"  Input {i}: value='{val}', id='{inp_id}'")
+                
+                if emp_input is None and (not val or len(val) < 4):
+                    emp_input = inp
+                elif room_input is None and (not val or len(val) < 2):
                     room_input = inp
-                    logger.info(f"Identified Room Number input at index {i}")
-                    break
             
             if not emp_input:
-                logger.warning("Could not find Employee ID input field")
+                logger.warning("Could not find Employee ID input")
                 return False
             
-            # === STEP 1: PASTE Employee ID (simulating Ctrl+V) ===
-            logger.info(f"Step 1: Pasting Employee ID '{employee_id}' into input...")
-            
-            # Click and focus the input
+            # === STEP 3: Type Employee ID ===
+            logger.info(f"Step 3: Typing Employee ID '{employee_id}'...")
             await emp_input.click()
             await self.page.wait_for_timeout(300)
-            
-            # Clear any existing value first
-            await emp_input.evaluate('el => el.value = ""')
-            await self.page.wait_for_timeout(100)
-            
-            # Simulate paste by setting value and dispatching paste + input + change events
-            await emp_input.evaluate(f'''el => {{
-                el.value = "{employee_id}";
-                el.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-            }}''')
-            logger.info(f"Pasted Employee ID: {employee_id}")
+            await self.page.keyboard.type(str(employee_id), delay=80)
             await self.page.wait_for_timeout(500)
             
-            # === STEP 2: TYPE Room Number character by character ===
+            val_check = await emp_input.get_attribute('value') or ''
+            logger.info(f"Employee ID value after typing: '{val_check}'")
+            
+            # === STEP 4: Type Room Number ===
             if room_input:
-                logger.info(f"Step 2: Typing Room Number '{room_number}' character by character...")
-                
-                # Click and focus room input
+                logger.info(f"Step 4: Typing Room Number '{room_number}'...")
+                await self.page.keyboard.press('Tab')
+                await self.page.wait_for_timeout(300)
                 await room_input.click()
                 await self.page.wait_for_timeout(300)
-                
-                # Clear any existing value
-                await room_input.evaluate('el => el.value = ""')
-                await self.page.wait_for_timeout(100)
-                
-                # Type character by character (like a real user)
-                await room_input.type(str(room_number), delay=100)
-                logger.info(f"Typed Room Number: {room_number}")
+                await self.page.keyboard.type(str(room_number), delay=80)
                 await self.page.wait_for_timeout(500)
                 
-                # Dispatch events to ensure PrimeFaces picks up the change
-                await room_input.evaluate('''el => {
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                }''')
-                await self.page.wait_for_timeout(300)
-            else:
-                logger.warning("Could not find Room Number input, only filled Employee ID")
+                room_check = await room_input.get_attribute('value') or ''
+                logger.info(f"Room Number value after typing: '{room_check}'")
             
-            # === STEP 3: CLICK elsewhere and wait for auto-save ===
-            logger.info("Step 3: Clicking elsewhere to trigger auto-save...")
+            # === STEP 5: Trigger save ===
+            logger.info("Step 5: Triggering save...")
+            await self.page.keyboard.press('Tab')
+            await self.page.wait_for_timeout(500)
+            await self.page.mouse.click(100, 100)
+            await self.page.wait_for_timeout(500)
             
-            # First blur the current input
-            if room_input:
-                await room_input.evaluate('el => el.blur()')
-            else:
-                await emp_input.evaluate('el => el.blur()')
-            await self.page.wait_for_timeout(300)
+            logger.info("Waiting 5 seconds for auto-save...")
+            await self.page.wait_for_timeout(5000)
             
-            # Click on a neutral area (like the user clicking on empty space)
+            # Screenshot for debugging
             try:
-                # Try clicking on HEAVENER text (city label)
-                heavener = self.page.locator('text=HEAVENER').first
-                if await heavener.count() > 0:
-                    await heavener.click(force=True)
-                    logger.info("Clicked on HEAVENER text")
-                else:
-                    raise Exception("HEAVENER not found")
+                await self.page.screenshot(path=f"/tmp/sync_after_{search_name}.png")
             except:
-                try:
-                    # Try clicking on a header cell
-                    header = self.page.locator('th:has-text("Name")').first
-                    if await header.count() > 0:
-                        await header.click(force=True)
-                        logger.info("Clicked on 'Name' header")
-                    else:
-                        raise Exception("Header not found")
-                except:
-                    # Fallback: click on body at a safe position
-                    await self.page.click('body', position={"x": 100, "y": 100})
-                    logger.info("Clicked on body")
-            
-            # Wait for auto-save (PrimeFaces typically saves after 2-3 seconds of inactivity)
-            logger.info("Waiting 6 seconds for auto-save to complete...")
-            await self.page.wait_for_timeout(6000)
-            
-            # Verify the values were saved by re-reading the inputs
-            if emp_input:
-                saved_emp = await emp_input.get_attribute('value') or ''
-                logger.info(f"After save - Employee ID field value: '{saved_emp}'")
-            if room_input:
-                saved_room = await room_input.get_attribute('value') or ''
-                logger.info(f"After save - Room Number field value: '{saved_room}'")
+                pass
             
             logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
             return True
