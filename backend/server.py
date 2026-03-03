@@ -3243,10 +3243,13 @@ async def export_billing_pdf(
         headers={"Content-Disposition": "attachment; filename=hodler_inn_billing_report.pdf"}
     )
 
+# CORS Configuration - Required for production deployment
+cors_origins_env = os.environ.get('CORS_ORIGINS', '*')
+cors_origins = ['*'] if cors_origins_env == '*' else cors_origins_env.split(',')
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
