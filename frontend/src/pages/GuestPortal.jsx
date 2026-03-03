@@ -68,6 +68,9 @@ const getTimePeriod = () => {
   return "night";
 };
 
+// Track current playing audio to prevent overlap
+let currentAudio = null;
+
 // Audio player for voice messages (works on Fully Kiosk)
 const playVoiceMessage = (messageId, onEnd = null) => {
   if (!voiceSettings.enabled) {
@@ -76,8 +79,18 @@ const playVoiceMessage = (messageId, onEnd = null) => {
     return;
   }
   
+  // Stop any currently playing audio
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  
   const audio = new Audio(`${API}/voice/${messageId}`);
   audio.volume = voiceSettings.volume;
+  currentAudio = audio;
   if (onEnd) {
     audio.onended = onEnd;
   }
@@ -116,11 +129,21 @@ const playVoiceMessage = (messageId, onEnd = null) => {
 const playWelcomeWithName = (name, isNewEmployee = false) => {
   if (!voiceSettings.enabled) return;
   
+  // Stop any currently playing audio
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  
   const messageType = isNewEmployee ? "checkin_new" : "checkin";
   const encodedName = encodeURIComponent(name);
   const greeting = encodeURIComponent(getTimeBasedGreeting());
   const audio = new Audio(`${API}/voice-dynamic/${messageType}/${encodedName}?greeting=${greeting}`);
   audio.volume = voiceSettings.volume;
+  currentAudio = audio;
   audio.play().catch(err => {
     console.log("Dynamic audio failed, falling back to speech:", err);
     // Fallback to Web Speech API
@@ -138,9 +161,19 @@ const playWelcomeWithName = (name, isNewEmployee = false) => {
 const playCheckoutFoundWithName = (name) => {
   if (!voiceSettings.enabled) return;
   
+  // Stop any currently playing audio
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  
   const encodedName = encodeURIComponent(name);
   const audio = new Audio(`${API}/voice-dynamic/checkout_found/${encodedName}`);
   audio.volume = voiceSettings.volume;
+  currentAudio = audio;
   audio.play().catch(err => {
     console.log("Dynamic audio failed, falling back to speech:", err);
     // Fallback to Web Speech API
