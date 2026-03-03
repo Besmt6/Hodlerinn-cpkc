@@ -171,13 +171,33 @@ async def auto_sync_task():
         agent = APIGlobalSyncAgent(username, password)
         results = await agent.run_sync(hodler_records)
         
+        # Auto-update employee names to match portal format
+        names_updated = 0
+        if results.get("verified"):
+            for verified in results["verified"]:
+                if verified.get("update_name") and verified.get("portal_name") and verified.get("employee_id"):
+                    portal_name = verified["portal_name"]
+                    employee_id = verified["employee_id"]
+                    
+                    await db.employees.update_one(
+                        {"employee_number": employee_id},
+                        {"$set": {"name": portal_name, "portal_name_synced": True}}
+                    )
+                    await db.guests.update_one(
+                        {"employee_number": employee_id},
+                        {"$set": {"name": portal_name}}
+                    )
+                    names_updated += 1
+                    logging.info(f"Auto-sync: Updated employee name to portal format: {employee_id} -> {portal_name}")
+        
         # Store sync history
         await db.sync_history.insert_one({
             "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "target_date": yesterday,
             "results": results,
-            "auto_triggered": True
+            "auto_triggered": True,
+            "names_updated": names_updated
         })
         
         # Update sync status
@@ -2121,6 +2141,29 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
             sync_status["last_results"] = results
             sync_status["last_run"] = datetime.now(timezone.utc).isoformat()
             sync_status["progress"] = "Sync completed"
+            
+            # Auto-update employee names to match portal format
+            if results.get("verified"):
+                names_updated = 0
+                for verified in results["verified"]:
+                    if verified.get("update_name") and verified.get("portal_name") and verified.get("employee_id"):
+                        # Update employee name in database to match portal format
+                        portal_name = verified["portal_name"]
+                        employee_id = verified["employee_id"]
+                        
+                        await db.employees.update_one(
+                            {"employee_number": employee_id},
+                            {"$set": {"name": portal_name, "portal_name_synced": True}}
+                        )
+                        await db.guests.update_one(
+                            {"employee_number": employee_id},
+                            {"$set": {"name": portal_name}}
+                        )
+                        names_updated += 1
+                        logging.info(f"Updated employee name to portal format: {employee_id} -> {portal_name}")
+                
+                if names_updated > 0:
+                    logging.info(f"Synced {names_updated} employee name(s) to portal format")
             
             # Store sync history
             await db.sync_history.insert_one({

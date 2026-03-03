@@ -900,7 +900,9 @@ class APIGlobalSyncAgent:
                                     "api_name": api_name,
                                     "hodler_name": hodler_name,
                                     "employee_id": record.get("employee_number"),
-                                    "room": record.get("room_number")
+                                    "room": record.get("room_number"),
+                                    "portal_name": api_name,  # Store portal name for syncing
+                                    "update_name": api_name != hodler_name  # Flag to update if names differ
                                 })
                         except Exception as ve:
                             logger.error(f"Error in verify_entry: {str(ve)}")
