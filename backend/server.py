@@ -2170,11 +2170,55 @@ async def generate_all_voice_messages():
         logging.error(f"Failed to generate voices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def format_name_for_speech(name: str) -> str:
+    """
+    Convert portal-style names to natural speech format.
+    Examples:
+    - "BAKER,(AUSTIN) E" -> "Austin Baker"
+    - "SMITH,JOHN BHW" -> "John Smith"
+    - "DOE,(JANE)" -> "Jane Doe"
+    - "JOHNSON, MICHAEL E" -> "Michael Johnson"
+    """
+    if not name:
+        return "Guest"
+    
+    name = name.strip()
+    
+    # Remove common suffixes like E, BHW, etc. at the end
+    import re
+    # Remove trailing single letters or abbreviations (E, BHW, JR, SR, etc.)
+    name = re.sub(r'\s+[A-Z]{1,4}$', '', name)
+    
+    # Handle format: "LASTNAME,(FIRSTNAME)" or "LASTNAME, (FIRSTNAME)"
+    match = re.match(r'^([A-Z]+)[,\s]+\(([A-Z]+)\)$', name, re.IGNORECASE)
+    if match:
+        last_name = match.group(1).strip()
+        first_name = match.group(2).strip()
+        return f"{first_name.title()} {last_name.title()}"
+    
+    # Handle format: "LASTNAME,FIRSTNAME" or "LASTNAME, FIRSTNAME"
+    if ',' in name:
+        parts = name.split(',', 1)
+        last_name = parts[0].strip()
+        first_name = parts[1].strip() if len(parts) > 1 else ""
+        # Remove parentheses if present
+        first_name = re.sub(r'[()]', '', first_name).strip()
+        if first_name and last_name:
+            return f"{first_name.title()} {last_name.title()}"
+        elif last_name:
+            return last_name.title()
+    
+    # If no comma, assume it's already in normal format
+    return name.title()
+
 @api_router.get("/voice-dynamic/{message_type}/{name}")
 async def get_dynamic_voice(message_type: str, name: str, greeting: str = None):
     """Generate voice message with dynamic name (for Fully Kiosk compatibility)"""
     try:
         from emergentintegrations.llm.openai import OpenAITextToSpeech
+        
+        # Format name for natural speech (convert "BAKER,(AUSTIN) E" to "Austin Baker")
+        spoken_name = format_name_for_speech(name)
         
         # Use greeting from frontend (user's local time) or fallback to server time
         if not greeting:
@@ -2190,11 +2234,11 @@ async def get_dynamic_voice(message_type: str, name: str, greeting: str = None):
         
         # Build message based on type
         if message_type == "checkin":
-            text = f"{greeting}, {name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In."
+            text = f"{greeting}, {spoken_name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In."
         elif message_type == "checkin_new":
-            text = f"{greeting}, {name}. Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In."
+            text = f"{greeting}, {spoken_name}. Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In."
         elif message_type == "checkout_found":
-            text = f"Booking found for {name}. Please enter your on duty time and press Complete check out."
+            text = f"Booking found for {spoken_name}. Please enter your on duty time and press Complete check out."
         else:
             raise HTTPException(status_code=400, detail="Invalid message type")
         
