@@ -574,6 +574,10 @@ class APIGlobalSyncAgent:
             await emp_input.fill(str(employee_id))
             await self.page.wait_for_timeout(300)
             
+            # Press Tab to trigger blur event
+            await self.page.keyboard.press('Tab')
+            await self.page.wait_for_timeout(300)
+            
             # Verify value was entered
             emp_val = await emp_input.input_value()
             logger.info(f"Employee ID value after fill: '{emp_val}'")
@@ -617,6 +621,10 @@ class APIGlobalSyncAgent:
                 await room_input.fill(str(room_number))
                 await self.page.wait_for_timeout(300)
                 
+                # Press Tab to trigger blur event
+                await self.page.keyboard.press('Tab')
+                await self.page.wait_for_timeout(300)
+                
                 # Verify
                 room_val = await room_input.input_value()
                 logger.info(f"Room Number value after fill: '{room_val}'")
@@ -647,6 +655,9 @@ class APIGlobalSyncAgent:
                 logger.info(f"Screenshot saved: /tmp/sync_final_{search_name}.png")
             except:
                 pass
+            
+            # Wait for page to stabilize before processing next entry
+            await self.page.wait_for_timeout(2000)
             
             logger.info(f"Completed: {name} -> EmpID: {employee_id}, Room: {room_number}")
             return True
