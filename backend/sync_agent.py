@@ -484,7 +484,13 @@ class APIGlobalSyncAgent:
             return []
     
     async def verify_entry(self, entry: dict, employee_id: str, room_number: str) -> bool:
-        """Fill in employee ID and room number for an entry."""
+        """Fill in employee ID and room number for an entry.
+        
+        Replicates the user's exact manual workflow:
+        1. PASTE the Employee ID (triggers paste event)
+        2. TYPE the Room Number character by character
+        3. CLICK on empty space and wait for auto-save
+        """
         try:
             name = entry.get("name", "")
             
@@ -546,55 +552,123 @@ class APIGlobalSyncAgent:
                 inp_id = await inp.get_attribute('id') or 'no-id'
                 logger.info(f"  Input {i}: value='{val}', id='{inp_id}'")
             
-            # Employee ID is typically the FIRST text input that's not already filled with a long value
+            emp_input = None
+            room_input = None
             emp_input_index = -1
-            for i, inp in enumerate(text_inputs[:3]):  # Check first 3 inputs
+            
+            # Find the Employee ID input (first empty text input)
+            for i, inp in enumerate(text_inputs[:3]):
                 val = await inp.get_attribute('value') or ''
                 if not val or val == 'NO ID' or len(val) < 4:
-                    # This input is empty or has placeholder - fill it with Employee ID
-                    await inp.click()
-                    await self.page.wait_for_timeout(300)
-                    # Select all and clear
-                    await inp.evaluate('el => el.select()')
-                    await self.page.wait_for_timeout(100)
-                    # Type the employee ID
-                    await self.page.keyboard.type(str(employee_id))
-                    logger.info(f"Typed Employee ID {employee_id} in input {i}")
-                    await self.page.wait_for_timeout(500)
-                    emp_input_index = i  # Remember which input we used
+                    emp_input = inp
+                    emp_input_index = i
+                    logger.info(f"Identified Employee ID input at index {i}")
                     break
             
-            # Room Number - find the NEXT empty input after employee ID
+            # Find the Room Number input (next empty input after emp_input)
             for i, inp in enumerate(text_inputs):
-                # Skip the employee ID input we just filled
                 if i == emp_input_index:
                     continue
                 val = await inp.get_attribute('value') or ''
-                # Skip if this now has our employee ID value
-                if val == str(employee_id):
-                    continue
                 if not val or len(val) < 2:
-                    # This looks like the room number field
-                    await inp.click()
-                    await self.page.wait_for_timeout(300)
-                    await inp.evaluate('el => el.select()')
-                    await self.page.wait_for_timeout(100)
-                    await self.page.keyboard.type(str(room_number))
-                    logger.info(f"Typed Room Number {room_number} in input {i}")
-                    await self.page.wait_for_timeout(500)
+                    room_input = inp
+                    logger.info(f"Identified Room Number input at index {i}")
                     break
             
-            # Click elsewhere to trigger save
-            try:
-                await self.page.click('text=HEAVENER', force=True)
-                logger.info("Clicked HEAVENER to trigger save")
-            except:
-                await self.page.click('body', position={"x": 300, "y": 100})
-                logger.info("Clicked body to trigger save")
+            if not emp_input:
+                logger.warning("Could not find Employee ID input field")
+                return False
             
-            # Wait for auto-save
-            logger.info("Waiting 5 seconds for auto-save...")
-            await self.page.wait_for_timeout(5000)
+            # === STEP 1: PASTE Employee ID (simulating Ctrl+V) ===
+            logger.info(f"Step 1: Pasting Employee ID '{employee_id}' into input...")
+            
+            # Click and focus the input
+            await emp_input.click()
+            await self.page.wait_for_timeout(300)
+            
+            # Clear any existing value first
+            await emp_input.evaluate('el => el.value = ""')
+            await self.page.wait_for_timeout(100)
+            
+            # Simulate paste by setting value and dispatching paste + input + change events
+            await emp_input.evaluate(f'''el => {{
+                el.value = "{employee_id}";
+                el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+            }}''')
+            logger.info(f"Pasted Employee ID: {employee_id}")
+            await self.page.wait_for_timeout(500)
+            
+            # === STEP 2: TYPE Room Number character by character ===
+            if room_input:
+                logger.info(f"Step 2: Typing Room Number '{room_number}' character by character...")
+                
+                # Click and focus room input
+                await room_input.click()
+                await self.page.wait_for_timeout(300)
+                
+                # Clear any existing value
+                await room_input.evaluate('el => el.value = ""')
+                await self.page.wait_for_timeout(100)
+                
+                # Type character by character (like a real user)
+                await room_input.type(str(room_number), delay=100)
+                logger.info(f"Typed Room Number: {room_number}")
+                await self.page.wait_for_timeout(500)
+                
+                # Dispatch events to ensure PrimeFaces picks up the change
+                await room_input.evaluate('''el => {
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }''')
+                await self.page.wait_for_timeout(300)
+            else:
+                logger.warning("Could not find Room Number input, only filled Employee ID")
+            
+            # === STEP 3: CLICK elsewhere and wait for auto-save ===
+            logger.info("Step 3: Clicking elsewhere to trigger auto-save...")
+            
+            # First blur the current input
+            if room_input:
+                await room_input.evaluate('el => el.blur()')
+            else:
+                await emp_input.evaluate('el => el.blur()')
+            await self.page.wait_for_timeout(300)
+            
+            # Click on a neutral area (like the user clicking on empty space)
+            try:
+                # Try clicking on HEAVENER text (city label)
+                heavener = self.page.locator('text=HEAVENER').first
+                if await heavener.count() > 0:
+                    await heavener.click(force=True)
+                    logger.info("Clicked on HEAVENER text")
+                else:
+                    raise Exception("HEAVENER not found")
+            except:
+                try:
+                    # Try clicking on a header cell
+                    header = self.page.locator('th:has-text("Name")').first
+                    if await header.count() > 0:
+                        await header.click(force=True)
+                        logger.info("Clicked on 'Name' header")
+                    else:
+                        raise Exception("Header not found")
+                except:
+                    # Fallback: click on body at a safe position
+                    await self.page.click('body', position={"x": 100, "y": 100})
+                    logger.info("Clicked on body")
+            
+            # Wait for auto-save (PrimeFaces typically saves after 2-3 seconds of inactivity)
+            logger.info("Waiting 6 seconds for auto-save to complete...")
+            await self.page.wait_for_timeout(6000)
+            
+            # Verify the values were saved by re-reading the inputs
+            if emp_input:
+                saved_emp = await emp_input.get_attribute('value') or ''
+                logger.info(f"After save - Employee ID field value: '{saved_emp}'")
+            if room_input:
+                saved_room = await room_input.get_attribute('value') or ''
+                logger.info(f"After save - Room Number field value: '{saved_room}'")
             
             logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
             return True
