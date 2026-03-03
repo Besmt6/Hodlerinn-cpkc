@@ -139,9 +139,17 @@ export default function AdminDashboard() {
     voice_speed: 0.85,
     telegram_chat_id: "",
     public_api_key: "",
-    nightly_rate: 75.0
+    nightly_rate: 75.0,
+    email_reports_enabled: false,
+    email_smtp_host: "smtp.zoho.com",
+    email_smtp_port: 587,
+    email_sender: "",
+    email_password_set: false,
+    email_recipient: "",
+    email_report_time: "00:00"
   });
   const [savingSettings, setSavingSettings] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ running: false, progress: "", last_results: null });
   const [runningSyncTest, setRunningSyncTest] = useState(false);
   
@@ -374,7 +382,15 @@ export default function AdminDashboard() {
         voice_speed: settingsRes.data.voice_speed || 0.85,
         telegram_chat_id: settingsRes.data.telegram_chat_id || "",
         public_api_key: settingsRes.data.public_api_key || "",
-        nightly_rate: settingsRes.data.nightly_rate || 75.0
+        nightly_rate: settingsRes.data.nightly_rate || 75.0,
+        email_reports_enabled: settingsRes.data.email_reports_enabled || false,
+        email_smtp_host: settingsRes.data.email_smtp_host || "smtp.zoho.com",
+        email_smtp_port: settingsRes.data.email_smtp_port || 587,
+        email_sender: settingsRes.data.email_sender || "",
+        email_password: "",
+        email_password_set: settingsRes.data.email_password_set || false,
+        email_recipient: settingsRes.data.email_recipient || "",
+        email_report_time: settingsRes.data.email_report_time || "00:00"
       });
       setSyncStatus(syncStatusRes.data);
     } catch (error) {
@@ -2714,6 +2730,177 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                     <Volume2 className="w-4 h-4" />
                     Test Voice
                   </Button>
+                </CardContent>
+              </Card>
+
+              {/* Email Reports Section */}
+              <Card className="bg-vault-surface-highlight/50 border-vault-border max-w-2xl mt-6">
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-outfit text-lg font-bold text-vault-gold flex items-center gap-2">
+                      <Mail className="w-5 h-5" />
+                      Daily Email Reports
+                    </h3>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <span className="text-vault-text-secondary text-sm">
+                        {portalSettings.email_reports_enabled ? "Enabled" : "Disabled"}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={portalSettings.email_reports_enabled}
+                        onChange={async (e) => {
+                          const enabled = e.target.checked;
+                          setPortalSettings({...portalSettings, email_reports_enabled: enabled});
+                          try {
+                            await axios.post(`${API}/admin/settings`, { email_reports_enabled: enabled });
+                            toast.success(enabled ? "Email reports enabled" : "Email reports disabled");
+                          } catch (error) {
+                            toast.error("Failed to update setting");
+                          }
+                        }}
+                        className="w-5 h-5 accent-vault-gold"
+                        data-testid="email-reports-toggle"
+                      />
+                    </label>
+                  </div>
+                  <p className="text-vault-text-secondary text-sm">
+                    Automatically email sign-in sheets and billing records as PDF attachments daily.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* SMTP Host */}
+                    <div>
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">SMTP Host</label>
+                      <Input
+                        value={portalSettings.email_smtp_host}
+                        onChange={(e) => setPortalSettings({...portalSettings, email_smtp_host: e.target.value})}
+                        placeholder="smtp.zoho.com"
+                        className="bg-black/50 border-vault-border text-vault-text"
+                        data-testid="email-smtp-host"
+                      />
+                    </div>
+
+                    {/* SMTP Port */}
+                    <div>
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">SMTP Port</label>
+                      <Input
+                        type="number"
+                        value={portalSettings.email_smtp_port}
+                        onChange={(e) => setPortalSettings({...portalSettings, email_smtp_port: parseInt(e.target.value) || 587})}
+                        placeholder="587"
+                        className="bg-black/50 border-vault-border text-vault-text"
+                        data-testid="email-smtp-port"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sender Email */}
+                  <div>
+                    <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Sender Email (Your Zoho Email)</label>
+                    <Input
+                      value={portalSettings.email_sender}
+                      onChange={(e) => setPortalSettings({...portalSettings, email_sender: e.target.value})}
+                      placeholder="your-email@yourdomain.com"
+                      className="bg-black/50 border-vault-border text-vault-text"
+                      data-testid="email-sender"
+                    />
+                  </div>
+
+                  {/* Email Password */}
+                  <div>
+                    <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">
+                      Email Password {portalSettings.email_password_set && <span className="text-emerald-400">(Set ✓)</span>}
+                    </label>
+                    <Input
+                      type="password"
+                      value={portalSettings.email_password}
+                      onChange={(e) => setPortalSettings({...portalSettings, email_password: e.target.value})}
+                      placeholder={portalSettings.email_password_set ? "••••••••" : "Enter password or app password"}
+                      className="bg-black/50 border-vault-border text-vault-text"
+                      data-testid="email-password"
+                    />
+                    <p className="text-vault-text-secondary text-xs mt-1">
+                      Use an App Password if you have 2FA enabled on Zoho
+                    </p>
+                  </div>
+
+                  {/* Recipient Email */}
+                  <div>
+                    <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Send Reports To</label>
+                    <Input
+                      value={portalSettings.email_recipient}
+                      onChange={(e) => setPortalSettings({...portalSettings, email_recipient: e.target.value})}
+                      placeholder="signinsheets@hodlerinn.com"
+                      className="bg-black/50 border-vault-border text-vault-text"
+                      data-testid="email-recipient"
+                    />
+                  </div>
+
+                  {/* Report Time */}
+                  <div>
+                    <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Send Report At (Your Local Time)</label>
+                    <Input
+                      type="time"
+                      value={portalSettings.email_report_time}
+                      onChange={(e) => setPortalSettings({...portalSettings, email_report_time: e.target.value})}
+                      className="bg-black/50 border-vault-border text-vault-text w-40"
+                      data-testid="email-report-time"
+                    />
+                  </div>
+
+                  {/* Save & Test Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      onClick={async () => {
+                        setSavingSettings(true);
+                        try {
+                          await axios.post(`${API}/admin/settings`, {
+                            email_reports_enabled: portalSettings.email_reports_enabled,
+                            email_smtp_host: portalSettings.email_smtp_host,
+                            email_smtp_port: portalSettings.email_smtp_port,
+                            email_sender: portalSettings.email_sender,
+                            email_password: portalSettings.email_password || null,
+                            email_recipient: portalSettings.email_recipient,
+                            email_report_time: portalSettings.email_report_time
+                          });
+                          toast.success("Email settings saved!");
+                          loadSettings();
+                        } catch (error) {
+                          toast.error("Failed to save settings");
+                        } finally {
+                          setSavingSettings(false);
+                        }
+                      }}
+                      disabled={savingSettings}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      data-testid="save-email-settings-btn"
+                    >
+                      {savingSettings ? "Saving..." : "Save Email Settings"}
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        setTestingEmail(true);
+                        try {
+                          const res = await axios.post(`${API}/admin/settings/test-email`);
+                          if (res.data.success) {
+                            toast.success(res.data.message);
+                          } else {
+                            toast.error(res.data.message);
+                          }
+                        } catch (error) {
+                          toast.error(error.response?.data?.detail || "Failed to send test email");
+                        } finally {
+                          setTestingEmail(false);
+                        }
+                      }}
+                      disabled={testingEmail || !portalSettings.email_sender}
+                      className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                      data-testid="test-email-btn"
+                    >
+                      <Mail className="w-4 h-4" />
+                      {testingEmail ? "Sending..." : "Send Test Email"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 

@@ -434,6 +434,14 @@ class PortalSettingsUpdate(BaseModel):
     telegram_chat_id: Optional[str] = None  # Telegram group/chat ID for notifications
     public_api_key: Optional[str] = None  # API key for public endpoints
     nightly_rate: Optional[float] = None  # Nightly room rate for billing
+    # Email report settings
+    email_reports_enabled: Optional[bool] = None
+    email_smtp_host: Optional[str] = None
+    email_smtp_port: Optional[int] = None
+    email_sender: Optional[str] = None
+    email_password: Optional[str] = None  # Will be encrypted
+    email_recipient: Optional[str] = None
+    email_report_time: Optional[str] = None  # Format: HH:MM (24hr)
 
 # ==================== Helper Functions ====================
 
@@ -2007,7 +2015,14 @@ async def get_portal_settings():
             "telegram_chat_id": TELEGRAM_CHAT_ID or "",
             "public_api_key": "",
             "public_api_key_set": False,
-            "nightly_rate": 75.0
+            "nightly_rate": 75.0,
+            "email_reports_enabled": False,
+            "email_smtp_host": "smtp.zoho.com",
+            "email_smtp_port": 587,
+            "email_sender": "",
+            "email_password_set": False,
+            "email_recipient": "",
+            "email_report_time": "00:00"
         }
     
     # Mask password - only indicate if it's set
@@ -2024,7 +2039,14 @@ async def get_portal_settings():
         "telegram_chat_id": settings.get("telegram_chat_id", "") or TELEGRAM_CHAT_ID or "",
         "public_api_key": settings.get("public_api_key", ""),
         "public_api_key_set": bool(settings.get("public_api_key")),
-        "nightly_rate": settings.get("nightly_rate", 75.0)
+        "nightly_rate": settings.get("nightly_rate", 75.0),
+        "email_reports_enabled": settings.get("email_reports_enabled", False),
+        "email_smtp_host": settings.get("email_smtp_host", "smtp.zoho.com"),
+        "email_smtp_port": settings.get("email_smtp_port", 587),
+        "email_sender": settings.get("email_sender", ""),
+        "email_password_set": bool(settings.get("email_password_encrypted")),
+        "email_recipient": settings.get("email_recipient", ""),
+        "email_report_time": settings.get("email_report_time", "00:00")
     }
 
 @api_router.post("/admin/settings")
@@ -2069,6 +2091,30 @@ async def update_portal_settings(input: PortalSettingsUpdate):
     if input.nightly_rate is not None:
         update_data["nightly_rate"] = max(0.0, input.nightly_rate)
     
+    # Email report settings
+    if input.email_reports_enabled is not None:
+        update_data["email_reports_enabled"] = input.email_reports_enabled
+    
+    if input.email_smtp_host is not None:
+        update_data["email_smtp_host"] = input.email_smtp_host
+    
+    if input.email_smtp_port is not None:
+        update_data["email_smtp_port"] = input.email_smtp_port
+    
+    if input.email_sender is not None:
+        update_data["email_sender"] = input.email_sender
+    
+    if input.email_password is not None and input.email_password != "":
+        # Encrypt password before storing
+        encrypted_password = encrypt_data(input.email_password)
+        update_data["email_password_encrypted"] = encrypted_password
+    
+    if input.email_recipient is not None:
+        update_data["email_recipient"] = input.email_recipient
+    
+    if input.email_report_time is not None:
+        update_data["email_report_time"] = input.email_report_time
+    
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     if existing:
@@ -2103,6 +2149,45 @@ async def test_portal_connection():
         return result
     except Exception as e:
         return {"success": False, "message": f"Test failed: {str(e)}"}
+
+@api_router.post("/admin/settings/test-email")
+async def test_email_connection():
+    """Test email SMTP connection and send test email"""
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    
+    if not settings or not settings.get("email_sender") or not settings.get("email_password_encrypted"):
+        raise HTTPException(status_code=400, detail="Email credentials not configured")
+    
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        smtp_host = settings.get("email_smtp_host", "smtp.zoho.com")
+        smtp_port = settings.get("email_smtp_port", 587)
+        sender = settings.get("email_sender")
+        password = decrypt_data(settings.get("email_password_encrypted"))
+        recipient = settings.get("email_recipient", sender)
+        
+        # Create test email
+        msg = MIMEMultipart()
+        msg['From'] = sender
+        msg['To'] = recipient
+        msg['Subject'] = "Hodler Inn - Email Test"
+        body = "This is a test email from Hodler Inn. If you receive this, your email settings are configured correctly!"
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Send email
+        server = smtplib.SMTP(smtp_host, smtp_port)
+        server.starttls()
+        server.login(sender, password)
+        server.send_message(msg)
+        server.quit()
+        
+        return {"success": True, "message": f"Test email sent to {recipient}"}
+    except Exception as e:
+        logging.error(f"Email test failed: {e}")
+        return {"success": False, "message": f"Email test failed: {str(e)}"}
 
 # Sync status storage (in-memory for now)
 sync_status = {
