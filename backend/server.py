@@ -46,6 +46,7 @@ TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
 ZOHO_CLIENT_ID = os.environ.get('ZOHO_CLIENT_ID', '')
 ZOHO_CLIENT_SECRET = os.environ.get('ZOHO_CLIENT_SECRET', '')
 ZOHO_REFRESH_TOKEN = os.environ.get('ZOHO_REFRESH_TOKEN', '')
+ZOHO_FOLDER_ID = os.environ.get('ZOHO_FOLDER_ID', '')
 
 # Encryption configuration
 ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', '')
@@ -157,16 +158,12 @@ async def upload_to_zoho_drive(file_bytes: bytes, filename: str, folder_id: str 
         return {"success": False, "error": "Failed to get access token"}
     
     try:
-        # Get team ID if not cached
-        team_id = await get_zoho_team_id(access_token)
-        if not team_id:
-            return {"success": False, "error": "Failed to get team ID"}
-        
-        # Get root folder if not specified
+        # Use configured folder if not specified
         if not folder_id:
-            folder_id = await get_zoho_root_folder_id(access_token, team_id)
-            if not folder_id:
-                return {"success": False, "error": "Failed to get root folder"}
+            folder_id = ZOHO_FOLDER_ID
+        
+        if not folder_id:
+            return {"success": False, "error": "Zoho folder ID not configured"}
         
         # Upload file
         async with httpx.AsyncClient() as client:
@@ -2656,15 +2653,10 @@ async def test_zoho_connection():
     if not access_token:
         return {"success": False, "message": "Failed to get Zoho access token. Check credentials."}
     
-    team_id = await get_zoho_team_id(access_token)
-    if not team_id:
-        return {"success": False, "message": "Failed to get Zoho team ID"}
+    if not ZOHO_FOLDER_ID:
+        return {"success": False, "message": "Zoho folder ID not configured"}
     
-    folder_id = await get_zoho_root_folder_id(access_token, team_id)
-    if not folder_id:
-        return {"success": False, "message": "Failed to get Zoho root folder"}
-    
-    return {"success": True, "message": f"Zoho WorkDrive connected! Team ID: {team_id}", "folder_id": folder_id}
+    return {"success": True, "message": f"Zoho WorkDrive connected! Folder: {ZOHO_FOLDER_ID}"}
 
 @api_router.post("/admin/upload-to-zoho")
 async def upload_daily_reports_to_zoho():
