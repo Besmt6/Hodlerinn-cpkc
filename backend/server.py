@@ -1796,21 +1796,22 @@ async def generate_all_voice_messages():
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/voice-dynamic/{message_type}/{name}")
-async def get_dynamic_voice(message_type: str, name: str):
+async def get_dynamic_voice(message_type: str, name: str, greeting: str = None):
     """Generate voice message with dynamic name (for Fully Kiosk compatibility)"""
     try:
         from emergentintegrations.llm.openai import OpenAITextToSpeech
         
-        # Get current time period for greeting
-        hour = datetime.now().hour
-        if 5 <= hour < 12:
-            greeting = "Good morning"
-        elif 12 <= hour < 17:
-            greeting = "Good afternoon"
-        elif 17 <= hour < 21:
-            greeting = "Good evening"
-        else:
-            greeting = "Good night"
+        # Use greeting from frontend (user's local time) or fallback to server time
+        if not greeting:
+            hour = datetime.now().hour
+            if 5 <= hour < 12:
+                greeting = "Good morning"
+            elif 12 <= hour < 17:
+                greeting = "Good afternoon"
+            elif 17 <= hour < 21:
+                greeting = "Good evening"
+            else:
+                greeting = "Good night"
         
         # Build message based on type
         if message_type == "checkin":
@@ -1827,7 +1828,7 @@ async def get_dynamic_voice(message_type: str, name: str):
             text=text,
             model="tts-1",
             voice="nova",
-            speed=0.95
+            speed=1.0  # Slightly faster for quicker response
         )
         
         # Return audio directly (don't cache - names are dynamic)

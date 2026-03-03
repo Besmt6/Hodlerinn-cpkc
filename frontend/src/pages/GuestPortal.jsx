@@ -118,14 +118,15 @@ const playWelcomeWithName = (name, isNewEmployee = false) => {
   
   const messageType = isNewEmployee ? "checkin_new" : "checkin";
   const encodedName = encodeURIComponent(name);
-  const audio = new Audio(`${API}/voice-dynamic/${messageType}/${encodedName}`);
+  const greeting = encodeURIComponent(getTimeBasedGreeting());
+  const audio = new Audio(`${API}/voice-dynamic/${messageType}/${encodedName}?greeting=${greeting}`);
   audio.volume = voiceSettings.volume;
   audio.play().catch(err => {
     console.log("Dynamic audio failed, falling back to speech:", err);
     // Fallback to Web Speech API
     if ('speechSynthesis' in window) {
-      const greeting = getTimeBasedGreeting();
-      const utterance = new SpeechSynthesisUtterance(`${greeting}, ${name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
+      const greetingText = getTimeBasedGreeting();
+      const utterance = new SpeechSynthesisUtterance(`${greetingText}, ${name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
       utterance.volume = voiceSettings.volume;
       utterance.rate = voiceSettings.speed || 0.85;
       window.speechSynthesis.speak(utterance);
