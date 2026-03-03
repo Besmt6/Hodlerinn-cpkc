@@ -1031,6 +1031,18 @@ async def check_in(input: CheckInCreate):
     
     await db.bookings.insert_one(doc)
     
+    # Update room status to occupied (regardless of previous status - dirty, maintenance, etc.)
+    await db.rooms.update_one(
+        {"room_number": input.room_number},
+        {"$set": {"status": "occupied"}}
+    )
+    
+    # Also remove any "other guest" block on this room if it exists
+    await db.blocked_rooms.update_one(
+        {"room_number": input.room_number, "is_active": True},
+        {"$set": {"is_active": False, "unblocked_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
     # Check if this is a first-time check-in
     check_in_count = await db.bookings.count_documents({"employee_number": input.employee_number})
     is_first_time = check_in_count == 1
