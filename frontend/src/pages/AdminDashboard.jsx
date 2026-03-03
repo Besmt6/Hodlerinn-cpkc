@@ -167,6 +167,7 @@ export default function AdminDashboard() {
   const [uploadingZoho, setUploadingZoho] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ running: false, progress: "", last_results: null });
   const [runningSyncTest, setRunningSyncTest] = useState(false);
+  const [syncTargetDate, setSyncTargetDate] = useState("");
   
   const navigate = useNavigate();
 
@@ -571,8 +572,13 @@ export default function AdminDashboard() {
 
   const handleRunSync = async () => {
     try {
-      const response = await axios.post(`${API}/admin/sync/run`);
-      toast.success(`Sync started! Processing ${response.data.hodler_records_count} records...`);
+      // Build URL with optional date parameter
+      let url = `${API}/admin/sync/run`;
+      if (syncTargetDate) {
+        url += `?target_date=${syncTargetDate}`;
+      }
+      const response = await axios.post(url);
+      toast.success(`Sync started for ${syncTargetDate || 'default date'}! Processing ${response.data.hodler_records_count} records...`);
       setSyncStatus({ ...syncStatus, running: true, progress: "Starting..." });
       
       // Poll for status
@@ -2866,25 +2872,42 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                   </div>
 
                   {/* Manual Sync Buttons */}
-                  <div className="flex flex-wrap gap-3">
-                    <Button
-                      onClick={handleTestConnection}
-                      disabled={runningSyncTest || !portalSettings.api_global_password_set}
-                      className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-                      data-testid="test-connection-btn"
-                    >
-                      <Key className="w-4 h-4" />
-                      {runningSyncTest ? "Testing..." : "Test Connection"}
-                    </Button>
-                    <Button
-                      onClick={handleRunSync}
-                      disabled={syncStatus.running || !portalSettings.api_global_password_set}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
-                      data-testid="run-sync-btn"
-                    >
-                      <Globe className="w-4 h-4" />
-                      {syncStatus.running ? "Syncing..." : "Run Sync Now"}
-                    </Button>
+                  <div className="space-y-3">
+                    {/* Date Picker for Manual Sync */}
+                    <div className="flex items-center gap-3 bg-black/30 p-3 rounded-lg border border-vault-border">
+                      <label className="text-vault-text-secondary text-sm whitespace-nowrap">Sync Date:</label>
+                      <Input
+                        type="date"
+                        value={syncTargetDate}
+                        onChange={(e) => setSyncTargetDate(e.target.value)}
+                        className="bg-black/50 border-vault-border text-vault-text w-44"
+                        data-testid="sync-date-picker"
+                      />
+                      <span className="text-vault-text-secondary text-xs">
+                        {syncTargetDate ? `Selected: ${syncTargetDate}` : "Leave empty for yesterday/today"}
+                      </span>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        onClick={handleTestConnection}
+                        disabled={runningSyncTest || !portalSettings.api_global_password_set}
+                        className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                        data-testid="test-connection-btn"
+                      >
+                        <Key className="w-4 h-4" />
+                        {runningSyncTest ? "Testing..." : "Test Connection"}
+                      </Button>
+                      <Button
+                        onClick={handleRunSync}
+                        disabled={syncStatus.running || !portalSettings.api_global_password_set}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+                        data-testid="run-sync-btn"
+                      >
+                        <Globe className="w-4 h-4" />
+                        {syncStatus.running ? "Syncing..." : "Run Sync Now"}
+                      </Button>
+                    </div>
                   </div>
                   
                   {!portalSettings.api_global_password_set && (
