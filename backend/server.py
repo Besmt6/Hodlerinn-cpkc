@@ -575,6 +575,92 @@ async def register_guest_pending(input: GuestRegistrationCreate):
     
     return {"message": "Guest registered pending verification", "employee_number": input.employee_number}
 
+# Track if sold-out notification was already sent today
+sold_out_notification_sent_date = None
+
+async def check_and_send_sold_out_notification():
+    """Check if all rooms are occupied and send notification to railroad company"""
+    global sold_out_notification_sent_date
+    
+    # Get total rooms count
+    total_rooms = await db.rooms.count_documents({})
+    if total_rooms == 0:
+        total_rooms = 28  # Default to 28 if rooms not configured
+    
+    # Get occupied rooms count
+    occupied_rooms = await db.bookings.count_documents({"is_checked_out": False})
+    
+    # Check if we're at 100% capacity
+    if occupied_rooms >= total_rooms:
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        # Only send once per day when we hit 100%
+        if sold_out_notification_sent_date != today:
+            # Get email settings
+            settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+            
+            if settings and settings.get("email_sender") and settings.get("email_password_encrypted"):
+                try:
+                    import smtplib
+                    from email.mime.text import MIMEText
+                    from email.mime.multipart import MIMEMultipart
+                    
+                    smtp_host = settings.get("email_smtp_host", "smtp.zoho.com")
+                    smtp_port = settings.get("email_smtp_port", 587)
+                    sender = settings.get("email_sender")
+                    password = decrypt_data(settings.get("email_password_encrypted"))
+                    
+                    # Railroad company emails
+                    recipients = ["crewtravel@cpkcr.com", "crewmanagers@cpkcr.com"]
+                    
+                    # Create email
+                    msg = MIMEMultipart()
+                    msg['From'] = sender
+                    msg['To'] = ", ".join(recipients)
+                    msg['Subject'] = f"Hodler Inn - 100% Occupied ({today})"
+                    
+                    body = f"""Hello,
+
+This is an automated notification from Hodler Inn.
+
+We are currently 100% occupied with {occupied_rooms} crews in house.
+
+More rooms will become available as crew gets called out from the hotel.
+
+Thank you,
+Hodler Inn
+
+---
+This is an automated message. Please do not reply to this email.
+"""
+                    msg.attach(MIMEText(body, 'plain'))
+                    
+                    # Send email
+                    server = smtplib.SMTP(smtp_host, smtp_port)
+                    server.starttls()
+                    server.login(sender, password)
+                    server.sendmail(sender, recipients, msg.as_string())
+                    server.quit()
+                    
+                    sold_out_notification_sent_date = today
+                    logging.info(f"Sold-out notification sent to railroad company: {recipients}")
+                    
+                    # Also send Telegram notification
+                    await send_telegram_notification(
+                        f"📧 <b>SOLD OUT NOTIFICATION SENT</b>\n"
+                        f"━━━━━━━━━━━━━━━\n"
+                        f"✅ Email sent to:\n"
+                        f"• crewtravel@cpkcr.com\n"
+                        f"• crewmanagers@cpkcr.com\n"
+                        f"━━━━━━━━━━━━━━━\n"
+                        f"🏨 {occupied_rooms}/{total_rooms} rooms occupied"
+                    )
+                    
+                except Exception as e:
+                    logging.error(f"Failed to send sold-out notification: {e}")
+            else:
+                logging.warning("Email settings not configured - cannot send sold-out notification")
+
 @api_router.get("/guests/{employee_number}")
 async def get_guest(employee_number: str):
     guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
@@ -971,6 +1057,9 @@ async def check_in(input: CheckInCreate):
             f"🚪 <b>Room:</b> {input.room_number}\n"
             f"📅 {input.check_in_date} @ {input.check_in_time}"
         )
+    
+    # Check if we're now at 100% capacity and send notification to railroad company
+    await check_and_send_sold_out_notification()
     
     return checkin
 
