@@ -573,6 +573,32 @@ function CheckInForm({ setView, setSuccessMessage }) {
     }
   };
 
+  const handleContinueAsNewEmployee = async () => {
+    if (!employeeName.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+    setRequestingAccess(true);
+    try {
+      // Register as pending verification guest
+      await axios.post(`${API}/guests/register-pending`, {
+        employee_number: employeeNumber,
+        name: employeeName.trim()
+      });
+      
+      // Set status to allow check-in form to show
+      setEmployeeStatus('found');
+      const timePeriod = getTimePeriod();
+      playVoiceMessage(`checkin_welcome_${timePeriod}`);
+      toast.success("Welcome! Please continue with check-in.");
+      setTimeout(() => roomInputRef.current?.focus(), 300);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to register. Please try again.");
+    } finally {
+      setRequestingAccess(false);
+    }
+  };
+
   const speakSignatureReminder = () => {
     if (!signatureReminderSpoken) {
       speakMessage("Please sign your full name legibly.", 0.9);
@@ -712,30 +738,30 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
-                className="mt-2 bg-red-900/30 border border-red-600/50 rounded-lg p-3 space-y-3"
+                className="mt-2 bg-amber-900/30 border border-amber-600/50 rounded-lg p-3 space-y-3"
               >
-                <p className="text-red-400 text-sm">
-                  Employee ID not found in system. Enter your name to request access:
+                <p className="text-amber-400 text-sm">
+                  Employee ID not in system. Enter your name to continue:
                 </p>
                 <div>
                   <Input
                     value={employeeName}
                     onChange={(e) => setEmployeeName(e.target.value)}
                     placeholder="Enter your full name"
-                    className="vault-input text-lg border-red-500/50"
+                    className="vault-input text-lg border-amber-500/50"
                     data-testid="request-name-input"
                   />
                 </div>
                 <Button
-                  onClick={handleRequestAccess}
+                  onClick={handleContinueAsNewEmployee}
                   disabled={requestingAccess || !employeeName.trim()}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white h-10 disabled:opacity-50"
-                  data-testid="request-access-btn"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-10 disabled:opacity-50"
+                  data-testid="continue-checkin-btn"
                 >
-                  {requestingAccess ? "Sending Request..." : "Request Access from Admin"}
+                  {requestingAccess ? "Processing..." : "Continue to Check-In"}
                 </Button>
-                <p className="text-red-300 text-xs text-center">
-                  Admin will receive notification and can approve instantly
+                <p className="text-amber-300 text-xs text-center">
+                  You can check in now. Admin will verify your information later.
                 </p>
               </motion.div>
             )}

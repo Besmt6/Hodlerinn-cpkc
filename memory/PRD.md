@@ -7,11 +7,14 @@ Build a two-part application for a hotel named "Hodler Inn":
 1. Register: First-time users register with employee number, name, and digital signature
 2. Check-In: Guests check in with employee number, check-in date/time, and room number
 3. Check-Out: Guests check out by entering room number, check-out date/time
+4. **Allow non-listed employees to check in** with pending verification
 
 **Admin Backend Requirements:**
 1. Dashboard showing all guest activities (check-in/out dates, times, employee info, signatures, rooms)
 2. Billing calculation: >24 hours = 2 nights auto-billing
 3. Excel-formatted reports for billing
+4. **Guest Verification panel** with bulk verification option
+5. **AI Sync Agent** for railroad portal data entry (in progress)
 
 ## User Personas
 - **Corporate Employees (Guests)**: Use kiosk-style interface for self-service check-in/out
@@ -35,24 +38,28 @@ Build a two-part application for a hotel named "Hodler Inn":
 - [x] Password protection for guest Sign-In Sheet view (password: "cpkc" or valid employee ID)
 - [x] Room Management (add/edit/delete rooms with types, floors, status)
 - [x] Date Range Filtering on Sign-In Sheet and Billing Report
+- [x] **Non-listed employee check-in**: Employees not in system can enter name and continue (pending verification)
+- [x] **Guest Verification panel**: Admin can verify pending guests individually or in bulk
+- [ ] **AI Sync Agent**: Automated data entry to railroad portal (in progress - save working, room number needs fix)
 
-## What's Been Implemented (Feb 2026)
-- Full-stack app with React frontend + FastAPI backend + MongoDB
-- Dark luxury "Vault" theme with gold accents (Hodler Inn branding)
-- Digital signature canvas using react-signature-canvas
-- Calendar date picker for check-in/out dates
-- Admin dashboard with real-time stats, edit/delete functionality
-- **Room Management** with CRUD operations and status tracking (Available/Occupied/Maintenance)
-- **Date Range Filtering** on both Sign-In Sheet and Billing Report views
-- **PDF Export** using ReportLab for professional report generation
-- Excel export using xlsxwriter (Sign-In Sheet + Billing Report)
-- PNG export with embedded signature images
-- Room occupancy validation
-- Employee verification step before check-in
-- Telegram notifications for check-in/out events
-- AES encryption for sensitive data at rest
-- Monthly data reset scheduler (APScheduler)
-- Guest sign-in sheet view with password/employee ID protection
+## What's Been Implemented
+
+### March 3, 2026
+- **Non-listed Employee Check-in Flow**: Guests whose Employee ID is not in the system can now:
+  1. Enter their name in the prompt
+  2. Click "Continue to Check-In" 
+  3. Complete full check-in with room number and signature
+  4. Admin will verify their information later
+- **Guest Verification Panel**: New sidebar menu item "Guest Verification" showing:
+  - Total Guests, Verified count, Pending count cards
+  - Table with all registered guests and their verification status
+  - "Verify" and "Flag" action buttons for pending guests
+  - **"Verify All Pending" bulk verification button** - verifies all pending guests in one click
+- **Backend Endpoints Added**:
+  - `POST /api/guests/register-pending` - Register guest with pending verification
+  - `POST /api/admin/guests/bulk-verify` - Bulk verify multiple guests
+  - `GET /api/admin/guests/pending-verification` - Get all pending guests
+- **Telegram Notification**: Sends alert when unverified employee checks in
 
 ## Technical Stack
 - Frontend: React 19, Tailwind CSS, Framer Motion, Shadcn/UI

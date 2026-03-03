@@ -191,6 +191,23 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleBulkVerifyAll = async () => {
+    const pendingGuests = registeredGuests.filter(g => !g.is_verified);
+    if (pendingGuests.length === 0) {
+      toast.info("No pending guests to verify");
+      return;
+    }
+    
+    try {
+      const employeeNumbers = pendingGuests.map(g => g.employee_number);
+      await axios.post(`${API}/admin/guests/bulk-verify`, { employee_numbers: employeeNumbers });
+      toast.success(`Verified ${pendingGuests.length} guests!`);
+      fetchRegisteredGuests();
+    } catch (error) {
+      toast.error("Failed to bulk verify guests");
+    }
+  };
+
   const fetchEmployees = async () => {
     try {
       const response = await axios.get(`${API}/admin/employees`);
@@ -721,6 +738,14 @@ export default function AdminDashboard() {
           >
             <Users className="w-4 h-4" />
             <span className="font-manrope text-sm">Employee List</span>
+          </div>
+          <div 
+            className={`admin-nav-item cursor-pointer ${activeView === 'guests' ? 'active' : ''}`}
+            onClick={() => setActiveView('guests')}
+            data-testid="nav-guests-view-btn"
+          >
+            <UserCheck className="w-4 h-4" />
+            <span className="font-manrope text-sm">Guest Verification</span>
           </div>
           <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'settings' ? 'active' : ''}`}
@@ -1863,13 +1888,25 @@ export default function AdminDashboard() {
                   <h1 className="font-outfit text-3xl font-bold text-vault-text tracking-tight">Guest Verification</h1>
                   <p className="text-vault-text-secondary font-manrope mt-1">Review and verify registered guests</p>
                 </div>
-                <Button
-                  onClick={fetchRegisteredGuests}
-                  className="bg-vault-surface border border-vault-border hover:bg-vault-surface-highlight text-vault-text"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
-                </Button>
+                <div className="flex gap-2">
+                  {registeredGuests.filter(g => !g.is_verified).length > 0 && (
+                    <Button
+                      onClick={handleBulkVerifyAll}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      data-testid="bulk-verify-all-btn"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Verify All Pending ({registeredGuests.filter(g => !g.is_verified).length})
+                    </Button>
+                  )}
+                  <Button
+                    onClick={fetchRegisteredGuests}
+                    className="bg-vault-surface border border-vault-border hover:bg-vault-surface-highlight text-vault-text"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
               </div>
 
               {/* Stats */}

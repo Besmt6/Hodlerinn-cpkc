@@ -487,6 +487,65 @@ async def register_guest(input: GuestRegistrationCreate):
     
     return guest
 
+
+@api_router.post("/guests/register-pending")
+async def register_guest_pending(input: GuestRegistrationCreate):
+    """Register a guest as pending verification - allows check-in without admin approval.
+    Admin can verify later through bulk verification."""
+    
+    # Check if employee already registered as guest
+    existing = await db.guests.find_one({"employee_number": input.employee_number}, {"_id": 0})
+    if existing:
+        # If already registered, just return success
+        return {"message": "Guest already registered", "employee_number": input.employee_number}
+    
+    # Create guest with pending verification status
+    guest = GuestRegistration(
+        employee_number=input.employee_number,
+        name=input.name
+    )
+    doc = guest.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['is_verified'] = False  # Pending verification
+    doc['verified_at'] = None
+    doc['pending_verification'] = True
+    
+    # Encrypt sensitive data before storing
+    doc['name_encrypted'] = encrypt_data(doc['name'])
+    
+    await db.guests.insert_one(doc)
+    
+    # Also add to employees list as unverified
+    await db.employees.update_one(
+        {"employee_number": input.employee_number},
+        {"$set": {
+            "employee_number": input.employee_number,
+            "name": input.name,
+            "is_active": True,
+            "is_verified": False,
+            "pending_verification": True,
+            "added_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    # Send Telegram notification about new unverified employee
+    chat_id = await get_telegram_chat_id()
+    if TELEGRAM_BOT_TOKEN and chat_id:
+        try:
+            bot = Bot(token=TELEGRAM_BOT_TOKEN)
+            message = (
+                f"⚠️ *New Unverified Employee Check-In*\n\n"
+                f"Employee ID: `{input.employee_number}`\n"
+                f"Name: {input.name}\n\n"
+                f"_Employee checked in but needs verification in Admin Dashboard._"
+            )
+            await bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
+        except Exception as e:
+            logger.error(f"Failed to send Telegram notification: {e}")
+    
+    return {"message": "Guest registered pending verification", "employee_number": input.employee_number}
+
 @api_router.get("/guests/{employee_number}")
 async def get_guest(employee_number: str):
     guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
@@ -696,7 +755,17 @@ async def verify_guest(employee_number: str):
         {"employee_number": employee_number},
         {"$set": {
             "is_verified": True,
-            "verified_at": datetime.now(timezone.utc).isoformat()
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+            "pending_verification": False
+        }}
+    )
+    
+    # Also update employee record
+    await db.employees.update_one(
+        {"employee_number": employee_number},
+        {"$set": {
+            "is_verified": True,
+            "pending_verification": False
         }}
     )
     
@@ -712,6 +781,68 @@ async def verify_guest(employee_number: str):
     )
     
     return {"message": f"Guest {name} verified successfully"}
+
+
+class BulkVerifyRequest(BaseModel):
+    employee_numbers: List[str]
+
+
+@api_router.post("/admin/guests/bulk-verify")
+async def bulk_verify_guests(request: BulkVerifyRequest):
+    """Bulk verify multiple guests at once"""
+    verified_count = 0
+    verified_names = []
+    
+    for employee_number in request.employee_numbers:
+        guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
+        if guest:
+            await db.guests.update_one(
+                {"employee_number": employee_number},
+                {"$set": {
+                    "is_verified": True,
+                    "verified_at": datetime.now(timezone.utc).isoformat(),
+                    "pending_verification": False
+                }}
+            )
+            
+            # Also update employee record
+            await db.employees.update_one(
+                {"employee_number": employee_number},
+                {"$set": {
+                    "is_verified": True,
+                    "pending_verification": False
+                }}
+            )
+            
+            name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown')))
+            verified_names.append(name)
+            verified_count += 1
+    
+    if verified_count > 0:
+        await send_telegram_notification(
+            f"✅ <b>BULK VERIFICATION</b>\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"Verified {verified_count} guests\n"
+            f"━━━━━━━━━━━━━━━"
+        )
+    
+    return {"message": f"Verified {verified_count} guests", "verified": verified_names}
+
+
+@api_router.get("/admin/guests/pending-verification")
+async def get_pending_verification_guests():
+    """Get all guests pending verification"""
+    guests = await db.guests.find(
+        {"$or": [{"pending_verification": True}, {"is_verified": False}]},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    # Decrypt names
+    for guest in guests:
+        if 'name_encrypted' in guest:
+            guest['name'] = decrypt_data(guest['name_encrypted'])
+    
+    return guests
 
 # Admin: Flag a guest (unverify/block)
 @api_router.post("/admin/guests/{employee_number}/flag")
