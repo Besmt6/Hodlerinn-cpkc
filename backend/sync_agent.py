@@ -486,9 +486,13 @@ class APIGlobalSyncAgent:
     async def verify_entry(self, entry: dict, employee_id: str, room_number: str) -> bool:
         """Fill in employee ID and room number for an entry.
         
-        Structure: Each guest has a blue header row and a white data row.
-        The white row contains: Select All, Position, Name, Employee ID input, Room Number input
-        The red X on the right indicates unfilled status.
+        User's exact workflow:
+        1. Find the row with the name
+        2. Enter Employee ID in the field
+        3. Click near "Heavener, OK" text to trigger save
+        4. Enter Room Number
+        5. Click near "Heavener, OK" again to trigger save
+        6. Status changes from red X to blue checkmark
         """
         try:
             name = entry.get("name", "")
@@ -503,154 +507,131 @@ class APIGlobalSyncAgent:
             
             logger.info(f"Verifying {name}, searching for: {search_name}")
             
-            # === Find the Employee ID input field directly by looking for inputs near the name ===
-            # The structure shows: Name cell | Employee ID input | Room Number input
-            
-            logger.info("Step 1: Finding Employee ID input field...")
-            
-            # Find all text inputs on the page
-            all_inputs = await self.page.query_selector_all('input[type="text"]')
-            logger.info(f"Found {len(all_inputs)} text inputs on page")
+            # === Step 1: Find Employee ID and Room Number inputs for this name ===
+            logger.info("Step 1: Finding input fields...")
             
             emp_input = None
             room_input = None
             
-            # Look for inputs in the same row as our name
+            all_inputs = await self.page.query_selector_all('input[type="text"]')
             for inp in all_inputs:
                 try:
-                    # Get the parent row
                     parent_row = await inp.evaluate_handle('el => el.closest("tr")')
                     if parent_row:
                         row_text = await parent_row.inner_text()
                         if search_name in row_text:
                             inp_id = await inp.get_attribute('id') or ''
-                            inp_val = await inp.get_attribute('value') or ''
-                            
-                            # Check if this is Employee ID or Room Number based on ID
-                            if 'employeeId' in inp_id.lower() or 'enteredemployeeid' in inp_id.lower():
+                            if 'employeeid' in inp_id.lower():
                                 emp_input = inp
-                                logger.info(f"Found Employee ID input: {inp_id}, value='{inp_val}'")
-                            elif 'roomnumber' in inp_id.lower() or 'room' in inp_id.lower():
+                                logger.info(f"Found Employee ID input: {inp_id}")
+                            elif 'roomnumber' in inp_id.lower():
                                 room_input = inp
-                                logger.info(f"Found Room Number input: {inp_id}, value='{inp_val}'")
-                except Exception as e:
+                                logger.info(f"Found Room Number input: {inp_id}")
+                except:
                     continue
             
             if not emp_input:
                 logger.warning(f"Could not find Employee ID input for {search_name}")
                 return False
             
-            # === Step 2: Click on the Employee ID input and type ===
-            logger.info(f"Step 2: Filling Employee ID '{employee_id}'...")
+            # Find the "Heavener" text element to click on for saving
+            heavener_element = await self.page.query_selector('text=HEAVENER')
+            if not heavener_element:
+                # Try to find any empty space we can click
+                heavener_element = await self.page.query_selector('.ui-panel-title, .panel-heading')
             
-            # Get the input ID for JavaScript manipulation
-            emp_input_id = await emp_input.get_attribute('id')
+            # === Step 2: Enter Employee ID ===
+            logger.info(f"Step 2: Entering Employee ID '{employee_id}'...")
             
-            # Click to focus
+            # Click on the Employee ID input field
             await emp_input.click()
             await self.page.wait_for_timeout(300)
             
-            # Set value via JS and immediately trigger blur to save
-            js_code = f'''() => {{
-                const el = document.getElementById("{emp_input_id}");
-                if (el) {{
-                    el.focus();
-                    el.value = "{employee_id}";
-                    
-                    // Fire events in quick succession
-                    el.dispatchEvent(new Event('input', {{bubbles: true}}));
-                    el.dispatchEvent(new Event('change', {{bubbles: true}}));
-                    el.dispatchEvent(new Event('blur', {{bubbles: true}}));
-                    
-                    // Also try triggering onblur handler directly
-                    if (el.onblur) el.onblur();
-                    
-                    return el.value;
-                }}
-                return null;
-            }}'''
-            result = await self.page.evaluate(js_code)
-            logger.info(f"Employee ID JS set result: '{result}'")
+            # Clear any existing value and type the employee ID
+            await self.page.keyboard.press('Control+a')
+            await self.page.wait_for_timeout(100)
+            await self.page.keyboard.type(str(employee_id), delay=50)
+            await self.page.wait_for_timeout(500)
             
-            # Wait a bit for any AJAX to process
-            await self.page.wait_for_timeout(1500)
+            # === Step 3: Click near "Heavener, OK" to save ===
+            logger.info("Step 3: Clicking near Heavener to save Employee ID...")
             
-            # Check if value persisted (might need to re-find element)
-            try:
-                emp_val = await emp_input.get_attribute('value') or ''
-                logger.info(f"Employee ID value check: '{emp_val}'")
-            except:
-                logger.info("Element was detached (page refreshed via AJAX)")
+            if heavener_element:
+                # Get the bounding box of Heavener element
+                box = await heavener_element.bounding_box()
+                if box:
+                    # Click slightly to the right of the Heavener text (empty space)
+                    click_x = box['x'] + box['width'] + 50
+                    click_y = box['y'] + box['height'] / 2
+                    await self.page.mouse.click(click_x, click_y)
+                    logger.info(f"Clicked at ({click_x}, {click_y}) near Heavener")
+                else:
+                    await self.page.mouse.click(300, 200)
+                    logger.info("Clicked at (300, 200) - fallback position")
+            else:
+                await self.page.mouse.click(300, 200)
+                logger.info("Clicked at (300, 200) - no Heavener found")
             
-            # === Step 3: Move to Room Number and fill ===
+            # Wait for auto-save
+            await self.page.wait_for_timeout(3000)
+            
+            # === Step 4: Enter Room Number ===
             if room_input:
-                logger.info(f"Step 3: Filling Room Number '{room_number}'...")
+                logger.info(f"Step 4: Entering Room Number '{room_number}'...")
                 
-                room_input_id = await room_input.get_attribute('id')
-                
-                # Re-find the room input (in case page refreshed)
-                try:
-                    room_input = await self.page.query_selector(f'input[id="{room_input_id}"]')
-                    if not room_input:
-                        # Try to find it again by searching
-                        all_inputs = await self.page.query_selector_all('input[type="text"]')
-                        for inp in all_inputs:
-                            inp_id = await inp.get_attribute('id') or ''
-                            if 'roomnumber' in inp_id.lower() or 'room' in inp_id.lower():
-                                parent_row = await inp.evaluate_handle('el => el.closest("tr")')
-                                row_text = await parent_row.inner_text()
-                                if search_name in row_text:
-                                    room_input = inp
-                                    room_input_id = inp_id
-                                    break
-                except:
-                    pass
+                # Re-find room input (page might have refreshed)
+                room_inputs = await self.page.query_selector_all('input[type="text"]')
+                for inp in room_inputs:
+                    try:
+                        inp_id = await inp.get_attribute('id') or ''
+                        if 'roomnumber' in inp_id.lower():
+                            parent_row = await inp.evaluate_handle('el => el.closest("tr")')
+                            row_text = await parent_row.inner_text()
+                            if search_name in row_text:
+                                room_input = inp
+                                break
+                    except:
+                        continue
                 
                 if room_input:
+                    # Click on Room Number input
                     await room_input.click()
                     await self.page.wait_for_timeout(300)
                     
-                    # Set value and trigger blur immediately
-                    js_code = f'''() => {{
-                        const el = document.getElementById("{room_input_id}");
-                        if (el) {{
-                            el.focus();
-                            el.value = "{room_number}";
-                            el.dispatchEvent(new Event('input', {{bubbles: true}}));
-                            el.dispatchEvent(new Event('change', {{bubbles: true}}));
-                            el.dispatchEvent(new Event('blur', {{bubbles: true}}));
-                            if (el.onblur) el.onblur();
-                            return el.value;
-                        }}
-                        return null;
-                    }}'''
-                    result = await self.page.evaluate(js_code)
-                    logger.info(f"Room Number JS set result: '{result}'")
+                    # Clear and type room number
+                    await self.page.keyboard.press('Control+a')
+                    await self.page.wait_for_timeout(100)
+                    await self.page.keyboard.type(str(room_number), delay=50)
+                    await self.page.wait_for_timeout(500)
                     
-                    await self.page.wait_for_timeout(1500)
+                    # === Step 5: Click near "Heavener, OK" again to save ===
+                    logger.info("Step 5: Clicking near Heavener to save Room Number...")
+                    
+                    # Re-find Heavener element
+                    heavener_element = await self.page.query_selector('text=HEAVENER')
+                    if heavener_element:
+                        box = await heavener_element.bounding_box()
+                        if box:
+                            click_x = box['x'] + box['width'] + 50
+                            click_y = box['y'] + box['height'] / 2
+                            await self.page.mouse.click(click_x, click_y)
+                            logger.info(f"Clicked at ({click_x}, {click_y}) near Heavener")
+                        else:
+                            await self.page.mouse.click(300, 200)
+                    else:
+                        await self.page.mouse.click(300, 200)
+                    
+                    # Wait for save
+                    await self.page.wait_for_timeout(3000)
             
-            # === Step 4: Trigger save by clicking elsewhere ===
-            logger.info("Step 4: Triggering save...")
-            
-            # Press Tab to blur
-            await self.page.keyboard.press('Tab')
-            await self.page.wait_for_timeout(500)
-            
-            # Click on empty area
-            await self.page.mouse.click(50, 50)
-            await self.page.wait_for_timeout(1000)
-            
-            # Wait for auto-save
-            logger.info("Waiting 5 seconds for auto-save...")
-            await self.page.wait_for_timeout(5000)
-            
-            # Take screenshot
+            # Take screenshot to see final state
             try:
-                await self.page.screenshot(path=f"/tmp/sync_after_{search_name}.png")
+                await self.page.screenshot(path=f"/tmp/sync_final_{search_name}.png")
+                logger.info(f"Screenshot saved to /tmp/sync_final_{search_name}.png")
             except:
                 pass
             
-            logger.info(f"Verified: {name} -> EmpID: {employee_id}, Room: {room_number}")
+            logger.info(f"Completed verification for: {name} -> EmpID: {employee_id}, Room: {room_number}")
             return True
             
         except Exception as e:
