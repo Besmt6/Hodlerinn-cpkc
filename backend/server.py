@@ -1699,7 +1699,19 @@ VOICE_MESSAGES = {
     # Register welcome
     "register_welcome": "Welcome to Hodler Inn. If you are first time here, please register your employee number and name, then go to check in.",
     
-    # Check-in welcome (when clicking check-in button)
+    # Check-in welcome with full instructions (when employee is verified)
+    "checkin_instructions_morning": "Good morning. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.",
+    "checkin_instructions_afternoon": "Good afternoon. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.",
+    "checkin_instructions_evening": "Good evening. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.",
+    "checkin_instructions_night": "Good night. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.",
+    
+    # New employee instructions
+    "new_employee_instructions": "Please enter your full name and company name, then click Continue to Check-In.",
+    
+    # Help phone message (after wrong company name attempts)
+    "help_phone_message": "Please call Help Phone from outside office phone so we know someone need help.",
+    
+    # Check-in welcome (when clicking check-in button - short version)
     "checkin_welcome_morning": "Good morning. Welcome back to Hodler Inn.",
     "checkin_welcome_afternoon": "Good afternoon. Welcome back to Hodler Inn.",
     "checkin_welcome_evening": "Good evening. Welcome back to Hodler Inn.",
@@ -1714,10 +1726,12 @@ VOICE_MESSAGES = {
     "checkout_evening": "Good evening! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.",
     "checkout_night": "Good night! Thank you for staying at Hodler Inn. Have a safe journey. Please drop your room key in the key drop box in the lounge.",
     
+    # Check-out found with on duty time instruction
+    "checkout_found": "Booking found. Please enter your on duty time and press Complete check out.",
+    
     # Other reminders
     "signature_reminder": "Please sign your full name legibly. A simple line or X will not be accepted.",
-    "room_reminder": "Please select the room number from key on desk. Print your name and room number on yellow card.",
-    "checkout_found": "Booking found. Please verify and complete check out."
+    "room_reminder": "Please select the room number from key on desk. Print your name and room number on yellow card."
 }
 
 @api_router.get("/voice/{message_id}")

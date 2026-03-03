@@ -516,8 +516,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
         const response = await axios.get(`${API}/guests/${employeeNumber}`);
         setEmployeeName(response.data.name);
         setEmployeeStatus('found');
-        const greeting = getTimeBasedGreeting();
-        speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
+        const timePeriod = getTimePeriod();
+        playVoiceMessage(`checkin_instructions_${timePeriod}`);
         setTimeout(() => roomInputRef.current?.focus(), 300);
       } catch (error) {
         // Check if employee ID is in admin's approved list
@@ -534,14 +534,14 @@ function CheckInForm({ setView, setSuccessMessage }) {
             });
             // Successfully registered - show full form
             setEmployeeStatus('found');
-            const greeting = getTimeBasedGreeting();
-            speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
+            const timePeriod = getTimePeriod();
+            playVoiceMessage(`checkin_instructions_${timePeriod}`);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           } catch (regError) {
             // Registration failed - maybe already registered, still show form
             setEmployeeStatus('found');
-            const greeting = getTimeBasedGreeting();
-            speakMessage(`${greeting}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
+            const timePeriod = getTimePeriod();
+            playVoiceMessage(`checkin_instructions_${timePeriod}`);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           }
         } catch (empError) {
@@ -549,7 +549,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
           setEmployeeName("");
           setEmployeeStatus('not_found');
           // Voice instruction for new employee
-          speakMessage("Please enter your full name and company name, then click Continue to Check-In.");
+          playVoiceMessage("new_employee_instructions");
         }
       } finally {
         setVerifying(false);
@@ -594,7 +594,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
       
       if (newAttempts >= 2) {
         toast.error("Invalid company name. Please call Help Phone from outside office.");
-        speakMessage("Please call Help Phone from outside office phone so we know someone need help.");
+        playVoiceMessage("help_phone_message");
       } else {
         toast.error("Invalid company name. Please try again.");
       }
@@ -611,8 +611,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
       // Set status to allow check-in form to show
       setEmployeeStatus('found');
       setWrongAttempts(0); // Reset attempts on success
-      const greeting = getTimeBasedGreeting();
-      speakMessage(`${greeting}. Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
+      const timePeriod = getTimePeriod();
+      playVoiceMessage(`checkin_instructions_${timePeriod}`);
       toast.success("Welcome! Please continue with check-in.");
       setTimeout(() => roomInputRef.current?.focus(), 300);
     } catch (error) {
@@ -959,7 +959,7 @@ function CheckOutForm({ setView, setSuccessMessage }) {
       toast.success(`Found: ${response.data.employee_name} in Room ${roomNumber}`);
       
       // Voice confirmation
-      speakMessage(`Found booking for ${response.data.employee_name}. Please enter your on duty time and press Complete check out.`);
+      playVoiceMessage("checkout_found");
     } catch (error) {
       toast.error(error.response?.data?.detail || "No active booking found for this room.");
       setVerifiedBooking(null);
