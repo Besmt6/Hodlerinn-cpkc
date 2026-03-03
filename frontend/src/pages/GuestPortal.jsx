@@ -239,31 +239,31 @@ export default function GuestPortal() {
   }, [view]);
 
   return (
-    <div className="kiosk-container grid-bg min-h-screen relative">
-      {/* Logo Header */}
-      <div className="absolute top-6 left-6 flex items-center gap-3">
+    <div className="kiosk-container grid-bg min-h-screen relative overflow-y-auto">
+      {/* Logo Header - smaller on mobile */}
+      <div className="absolute top-3 sm:top-6 left-3 sm:left-6 flex items-center gap-2 sm:gap-3 z-10">
         <img 
           src="https://customer-assets.emergentagent.com/job_guest-hotel-mgmt/artifacts/56yphta2_17721406444867042425090808501904.jpg" 
           alt="Hodler Inn Logo" 
-          className="w-12 h-12 rounded-lg object-cover"
+          className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg object-cover"
         />
         <div>
-          <h1 className="font-outfit font-bold text-vault-text text-xl tracking-tight">HODLER INN</h1>
-          <p className="font-mono text-[10px] text-vault-gold uppercase tracking-widest">Be Responsible to Be Free</p>
+          <h1 className="font-outfit font-bold text-vault-text text-base sm:text-xl tracking-tight">HODLER INN</h1>
+          <p className="font-mono text-[8px] sm:text-[10px] text-vault-gold uppercase tracking-widest">Be Responsible to Be Free</p>
         </div>
       </div>
 
       {/* Top Right Buttons */}
-      <div className="absolute top-6 right-6 flex items-center gap-2">
+      <div className="absolute top-3 sm:top-6 right-3 sm:right-6 flex items-center gap-2 z-10">
         {/* Fullscreen/Kiosk Mode Button */}
         <button 
           onClick={toggleFullscreen}
-          className="flex items-center gap-2 text-vault-text-secondary hover:text-vault-gold transition-colors bg-vault-surface px-3 py-2 rounded-lg border border-gray-300 shadow-sm"
+          className="flex items-center gap-1 sm:gap-2 text-vault-text-secondary hover:text-vault-gold transition-colors bg-vault-surface px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-gray-300 shadow-sm"
           data-testid="fullscreen-btn"
           title={isFullscreen ? "Exit Kiosk Mode" : "Enter Kiosk Mode"}
         >
           {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-          <span className="text-sm font-mono hidden sm:inline">{isFullscreen ? "Exit Kiosk" : "Kiosk Mode"}</span>
+          <span className="text-xs sm:text-sm font-mono hidden sm:inline">{isFullscreen ? "Exit Kiosk" : "Kiosk Mode"}</span>
         </button>
       </div>
 
@@ -693,34 +693,35 @@ function CheckInForm({ setView, setSuccessMessage }) {
       animate="animate"
       exit="exit"
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="w-full max-w-md"
+      className="w-full max-w-md pb-64"
     >
-      <Card className="glass-card p-8" data-testid="checkin-form-card">
-        <CardHeader className="pb-6">
+      <Card className="glass-card p-4 sm:p-6" data-testid="checkin-form-card">
+        <CardHeader className="pb-3 sm:pb-4">
           <button 
             onClick={() => setView("menu")} 
-            className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-4 flex items-center gap-2"
+            className="text-vault-text-secondary hover:text-vault-gold transition-colors mb-2 flex items-center gap-2"
             data-testid="back-btn"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          <CardTitle className="font-outfit text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
-            <LogIn className="w-6 h-6 text-vault-gold" />
+          <CardTitle className="font-outfit text-xl sm:text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
+            <LogIn className="w-5 h-5 sm:w-6 sm:h-6 text-vault-gold" />
             Guest Check-In
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-3 sm:space-y-4">
           {/* Employee Number */}
           <div>
-            <label className="vault-label">Employee Number</label>
+            <label className="vault-label text-xs sm:text-sm">Employee Number</label>
             <div className="relative">
-              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
+              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-vault-gold" />
               <Input
                 value={employeeNumber}
                 onChange={(e) => setEmployeeNumber(e.target.value)}
+                onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
                 placeholder="⬇️ TAP HERE to enter number"
-                className="vault-input pl-10 input-highlight text-lg"
+                className="vault-input pl-10 input-highlight text-base sm:text-lg h-11 sm:h-12"
                 data-testid="checkin-employee-input"
                 autoFocus
               />
@@ -734,15 +735,15 @@ function CheckInForm({ setView, setSuccessMessage }) {
 
           {/* Employee Name - Auto-filled when found */}
           <div>
-            <label className="vault-label">Name</label>
+            <label className="vault-label text-xs sm:text-sm">Name</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-vault-gold" />
               <Input
                 value={employeeName}
                 readOnly
                 placeholder="Name will appear automatically"
                 className={cn(
-                  "vault-input pl-10 text-lg",
+                  "vault-input pl-10 text-base sm:text-lg h-11 sm:h-12",
                   employeeStatus === 'found' && "border-emerald-500 bg-emerald-900/20",
                   employeeStatus === 'new_guest' && "border-amber-500 bg-amber-900/20",
                   employeeStatus === 'not_found' && "border-red-500 bg-red-900/20"
@@ -813,68 +814,73 @@ function CheckInForm({ setView, setSuccessMessage }) {
             <>
               {/* Room Number */}
               <div>
-                <label className="vault-label">Room Number</label>
+                <label className="vault-label text-xs sm:text-sm">Room Number</label>
                 <div className="relative">
-                  <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
+                  <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-vault-gold" />
                   <Input
                     ref={roomInputRef}
                     value={roomNumber}
                     onChange={(e) => setRoomNumber(e.target.value)}
+                    onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
                     placeholder="⬇️ TAP HERE to enter room"
-                    className="vault-input pl-10 input-highlight text-lg"
+                    className="vault-input pl-10 input-highlight text-base sm:text-lg h-11 sm:h-12"
                     data-testid="checkin-room-input"
                   />
                 </div>
               </div>
 
-              {/* Date */}
-              <div>
-                <label className="vault-label">Check-In Date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full vault-input justify-start text-left font-normal",
-                        !date && "text-muted-foreground"
-                      )}
-                      data-testid="checkin-date-btn"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-vault-text-secondary" />
-                      {date ? format(date, "dd MMM yyyy") : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={setDate}
-                      initialFocus
-                      className="bg-vault-surface text-vault-text"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+              {/* Date and Time in row on tablet */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Date */}
+                <div>
+                  <label className="vault-label text-xs sm:text-sm">Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full vault-input justify-start text-left font-normal h-11 sm:h-12 text-sm sm:text-base",
+                          !date && "text-muted-foreground"
+                        )}
+                        data-testid="checkin-date-btn"
+                      >
+                        <CalendarIcon className="mr-1 sm:mr-2 h-4 w-4 text-vault-text-secondary" />
+                        {date ? format(date, "dd MMM") : "Date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={setDate}
+                        initialFocus
+                        className="bg-vault-surface text-vault-text"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-              {/* Time */}
-              <div>
-                <label className="vault-label">Check-In Time (24hr)</label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
-                  <Input
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="vault-input pl-10"
-                    data-testid="checkin-time-input"
-                  />
+                {/* Time */}
+                <div>
+                  <label className="vault-label text-xs sm:text-sm">Time</label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                    <Input
+                      type="time"
+                      value={time}
+                      onChange={(e) => setTime(e.target.value)}
+                      onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
+                      className="vault-input pl-10 h-11 sm:h-12 text-sm sm:text-base"
+                      data-testid="checkin-time-input"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Signature */}
               <div ref={signatureContainerRef}>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="vault-label mb-0">Signature</label>
+                  <label className="vault-label text-xs sm:text-sm mb-0">Signature (sign below)</label>
                   <button 
                     onClick={clearSignature}
                     className="text-vault-text-secondary hover:text-vault-gold text-xs flex items-center gap-1"
@@ -884,13 +890,19 @@ function CheckInForm({ setView, setSuccessMessage }) {
                     Clear
                   </button>
                 </div>
-                <div className="bg-vault-surface border-2 border-amber-500 rounded-lg">
+                <div 
+                  className="bg-vault-surface border-2 border-amber-500 rounded-lg"
+                  onClick={() => signatureContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                >
                   <SignatureCanvas
                     ref={sigRef}
-                    onBegin={speakSignatureReminder}
+                    onBegin={() => {
+                      speakSignatureReminder();
+                      setTimeout(() => signatureContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                    }}
                     canvasProps={{
                       className: "signature-canvas w-full bg-transparent",
-                      style: { width: "100%", height: "200px", touchAction: "none" }
+                      style: { width: "100%", height: "150px", touchAction: "none" }
                     }}
                     penColor="#fbbf24"
                     backgroundColor="transparent"
@@ -904,7 +916,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
               <Button
                 onClick={handleCheckIn}
                 disabled={loading}
-                className="w-full vault-btn-primary h-12"
+                className="w-full vault-btn-primary h-12 sm:h-14 text-base sm:text-lg font-bold"
                 data-testid="submit-checkin-btn"
               >
                 {loading ? "Processing..." : "Complete Check-In"}
