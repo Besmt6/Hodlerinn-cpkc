@@ -465,8 +465,35 @@ class APIGlobalSyncAgent:
                     # Log the value for debugging
                     logger.info(f"Employee ID field value for {name_text}: '{emp_value}' (len={len(emp_value)})")
                     
+                    # Check for RED status indicator (unfilled) vs BLUE checkmark (filled)
+                    # The status column has an icon - red exclamation (!) for unfilled, blue checkmark for filled
+                    has_red_status = False
+                    has_blue_status = False
+                    
+                    try:
+                        # Look for status indicators in the row
+                        row_html = await row.inner_html()
+                        # Red status usually has 'ui-icon-alert' or red color, blue has 'ui-icon-check' or checkmark
+                        if 'color:red' in row_html.lower() or 'ui-icon-alert' in row_html or 'status-red' in row_html.lower():
+                            has_red_status = True
+                        if 'color:blue' in row_html.lower() or 'ui-icon-check' in row_html or 'checkmark' in row_html.lower() or 'color:green' in row_html.lower():
+                            has_blue_status = True
+                        
+                        # Also check for specific icon elements
+                        status_icons = await row.query_selector_all('span[class*="ui-icon"], img[src*="status"], .status-icon')
+                        for icon in status_icons:
+                            icon_class = await icon.get_attribute('class') or ''
+                            icon_style = await icon.get_attribute('style') or ''
+                            if 'red' in icon_class.lower() or 'red' in icon_style.lower() or 'alert' in icon_class.lower():
+                                has_red_status = True
+                            if 'blue' in icon_class.lower() or 'green' in icon_class.lower() or 'check' in icon_class.lower():
+                                has_blue_status = True
+                    except:
+                        pass
+                    
                     # Only consider verified if it has actual numbers (employee IDs are numeric)
-                    is_verified = emp_value and len(emp_value) >= 4 and any(c.isdigit() for c in emp_value)
+                    # OR if blue status is detected
+                    is_verified = (emp_value and len(emp_value) >= 4 and any(c.isdigit() for c in emp_value)) or has_blue_status
                     
                     entry = {
                         "name": name_text,
@@ -474,11 +501,13 @@ class APIGlobalSyncAgent:
                         "room_input": room_input,
                         "no_bill_checkbox": no_bill_checkbox,
                         "verified": is_verified,
+                        "has_red_status": has_red_status,
+                        "has_blue_status": has_blue_status,
                         "current_emp_id": emp_value,
                         "row": row
                     }
                     entries.append(entry)
-                    logger.info(f"Entry added: {name_text}, verified={is_verified}")
+                    logger.info(f"Entry added: {name_text}, verified={is_verified}, red_status={has_red_status}, blue_status={has_blue_status}")
                     
                 except Exception as row_err:
                     continue
@@ -627,6 +656,26 @@ class APIGlobalSyncAgent:
                 # Wait longer for Room Number to save and blue checkmark to appear
                 logger.info("Waiting 5 seconds for Room Number to save...")
                 await self.page.wait_for_timeout(5000)
+                
+                # === Step 6: Check for blue checkmark (verify save was successful) ===
+                logger.info("Step 6: Checking for blue checkmark...")
+                
+                # Re-find the row and check status
+                try:
+                    rows = self.page.locator('tr')
+                    for i in range(await rows.count()):
+                        row = rows.nth(i)
+                        row_text = await row.inner_text()
+                        if search_name.upper() in row_text.upper():
+                            row_html = await row.inner_html()
+                            if 'color:blue' in row_html.lower() or 'ui-icon-check' in row_html or 'checkmark' in row_html.lower() or 'color:green' in row_html.lower():
+                                logger.info("✓ Blue checkmark detected - save successful!")
+                                break
+                            elif 'color:red' in row_html.lower() or 'ui-icon-alert' in row_html:
+                                logger.warning("✗ Red status still showing - save may have failed")
+                                break
+                except Exception as status_err:
+                    logger.info(f"Could not verify status: {status_err}")
             else:
                 logger.warning("Room Number input not found, only entered Employee ID")
             
