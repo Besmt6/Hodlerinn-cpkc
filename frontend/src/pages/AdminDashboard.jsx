@@ -384,7 +384,9 @@ export default function AdminDashboard() {
     
     try {
       if (editingEmployee) {
-        await axios.put(`${API}/admin/employees/${editingEmployee.id}`, employeeForm);
+        // Use id if available, otherwise fallback to employee_number
+        const employeeIdentifier = editingEmployee.id || editingEmployee.employee_number;
+        await axios.put(`${API}/admin/employees/${employeeIdentifier}`, employeeForm);
         toast.success("Employee updated successfully");
       } else {
         await axios.post(`${API}/admin/employees`, employeeForm);
@@ -2101,7 +2103,7 @@ export default function AdminDashboard() {
                       <Button variant="ghost" className="text-vault-text-secondary">Cancel</Button>
                     </DialogClose>
                     <Button 
-                      onClick={() => handleDeleteEmployee(deleteEmployeeConfirm?.id)}
+                      onClick={() => handleDeleteEmployee(deleteEmployeeConfirm?.id || deleteEmployeeConfirm?.employee_number)}
                       className="bg-red-600 hover:bg-red-700"
                       data-testid="confirm-delete-employee-btn"
                     >

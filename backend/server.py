@@ -2414,7 +2414,15 @@ async def bulk_import_employees(employees: List[EmployeeCreate]):
 @api_router.put("/admin/employees/{employee_id}")
 async def update_employee(employee_id: str, input: EmployeeUpdate):
     """Update an employee"""
+    # Try to find by id first, then by employee_number (for legacy records)
     employee = await db.employees.find_one({"id": employee_id}, {"_id": 0})
+    query_field = "id"
+    
+    if not employee:
+        # Fallback: try finding by employee_number
+        employee = await db.employees.find_one({"employee_number": employee_id}, {"_id": 0})
+        query_field = "employee_number"
+    
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
     
@@ -2426,22 +2434,30 @@ async def update_employee(employee_id: str, input: EmployeeUpdate):
     if "employee_number" in update_data:
         existing = await db.employees.find_one({
             "employee_number": update_data["employee_number"],
-            "id": {"$ne": employee_id}
+            query_field: {"$ne": employee_id}
         }, {"_id": 0})
         if existing:
             raise HTTPException(status_code=400, detail="Employee number already exists")
     
-    await db.employees.update_one({"id": employee_id}, {"$set": update_data})
+    await db.employees.update_one({query_field: employee_id}, {"$set": update_data})
     return {"message": "Employee updated successfully"}
 
 @api_router.delete("/admin/employees/{employee_id}")
 async def delete_employee(employee_id: str):
     """Delete an employee"""
+    # Try to find by id first, then by employee_number (for legacy records)
     employee = await db.employees.find_one({"id": employee_id}, {"_id": 0})
+    query_field = "id"
+    
+    if not employee:
+        # Fallback: try finding by employee_number
+        employee = await db.employees.find_one({"employee_number": employee_id}, {"_id": 0})
+        query_field = "employee_number"
+    
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
     
-    await db.employees.delete_one({"id": employee_id})
+    await db.employees.delete_one({query_field: employee_id})
     return {"message": "Employee deleted successfully"}
 
 @api_router.get("/employees/verify/{employee_number}")
