@@ -843,16 +843,18 @@ function CheckInForm({ setView, setSuccessMessage }) {
                     Clear
                   </button>
                 </div>
-                <div className="bg-vault-surface border border-gray-300 rounded-lg">
+                <div className="bg-vault-surface border-2 border-amber-500 rounded-lg">
                   <SignatureCanvas
                     ref={sigRef}
                     onBegin={speakSignatureReminder}
                     canvasProps={{
-                      className: "signature-canvas w-full h-32 bg-transparent",
-                      style: { width: "100%", height: "128px" }
+                      className: "signature-canvas w-full bg-transparent",
+                      style: { width: "100%", height: "200px", touchAction: "none" }
                     }}
                     penColor="#fbbf24"
                     backgroundColor="transparent"
+                    minWidth={3}
+                    maxWidth={6}
                   />
                 </div>
               </div>
