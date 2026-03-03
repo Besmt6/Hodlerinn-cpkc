@@ -584,20 +584,16 @@ class APIGlobalSyncAgent:
             emp_val = await emp_input.input_value()
             logger.info(f"Employee ID value after type: '{emp_val}'")
             
-            # === Step 3: Click on HEAVENER to trigger save ===
-            logger.info("Step 3: Clicking on HEAVENER to trigger auto-save...")
+            # === Step 3: Click OUTSIDE the row to trigger save ===
+            logger.info("Step 3: Clicking OUTSIDE the row to trigger auto-save...")
             
-            # Click directly on HEAVENER text element
-            try:
-                heavener = self.page.locator('text=HEAVENER').first
-                await heavener.click()
-                logger.info("Clicked directly on HEAVENER text")
-            except Exception as e:
-                logger.info(f"HEAVENER click failed: {e}, trying coordinates")
-                await self.page.mouse.click(400, 150)
+            # Click on body area far from the table (outside the row)
+            await self.page.mouse.click(100, 100)
+            logger.info("Clicked at (100, 100) - outside the row")
             
-            # Wait for auto-save to complete
-            await self.page.wait_for_timeout(4000)
+            # Wait longer for auto-save to complete
+            logger.info("Waiting 5 seconds for Employee ID to save...")
+            await self.page.wait_for_timeout(5000)
             
             # === Step 4: Enter Room Number ===
             if room_input:
@@ -621,18 +617,16 @@ class APIGlobalSyncAgent:
                 room_val = await room_input.input_value()
                 logger.info(f"Room Number value after type: '{room_val}'")
                 
-                # === Step 5: Click on HEAVENER to save Room Number ===
-                logger.info("Step 5: Clicking on HEAVENER to save Room Number...")
+                # === Step 5: Click OUTSIDE the row to save Room Number ===
+                logger.info("Step 5: Clicking OUTSIDE the row to save Room Number...")
                 
-                try:
-                    heavener = self.page.locator('text=HEAVENER').first
-                    await heavener.click()
-                    logger.info("Clicked directly on HEAVENER text")
-                except:
-                    await self.page.mouse.click(400, 150)
+                # Click on body area far from the table
+                await self.page.mouse.click(100, 100)
+                logger.info("Clicked at (100, 100) - outside the row")
                 
-                # Wait for save
-                await self.page.wait_for_timeout(4000)
+                # Wait longer for Room Number to save and blue checkmark to appear
+                logger.info("Waiting 5 seconds for Room Number to save...")
+                await self.page.wait_for_timeout(5000)
             else:
                 logger.warning("Room Number input not found, only entered Employee ID")
             
