@@ -587,11 +587,17 @@ async def check_and_send_sold_out_notification():
     if total_rooms == 0:
         total_rooms = 28  # Default to 28 if rooms not configured
     
-    # Get occupied rooms count
-    occupied_rooms = await db.bookings.count_documents({"is_checked_out": False})
+    # Get occupied rooms count (railroad guests)
+    occupied_by_railroad = await db.bookings.count_documents({"is_checked_out": False})
+    
+    # Get blocked rooms count (other guests)
+    blocked_rooms = await db.blocked_rooms.count_documents({"is_active": True})
+    
+    # Total occupied = railroad guests + other guests
+    total_occupied = occupied_by_railroad + blocked_rooms
     
     # Check if we're at 100% capacity
-    if occupied_rooms >= total_rooms:
+    if total_occupied >= total_rooms:
         today = datetime.now().strftime("%Y-%m-%d")
         
         # Only send once per day when we hit 100%
@@ -623,7 +629,7 @@ async def check_and_send_sold_out_notification():
 
 This is an automated notification from Hodler Inn.
 
-We are currently 100% occupied with {occupied_rooms} crews in house.
+We are currently 100% occupied with {total_occupied} rooms in house.
 
 More rooms will become available as crew gets called out from the hotel.
 
@@ -653,7 +659,9 @@ This is an automated message. Please do not reply to this email.
                         f"• crewtravel@cpkcr.com\n"
                         f"• crewmanagers@cpkcr.com\n"
                         f"━━━━━━━━━━━━━━━\n"
-                        f"🏨 {occupied_rooms}/{total_rooms} rooms occupied"
+                        f"🏨 {total_occupied}/{total_rooms} rooms occupied\n"
+                        f"🚂 Railroad: {occupied_by_railroad}\n"
+                        f"👤 Other: {blocked_rooms}"
                     )
                     
                 except Exception as e:
@@ -1996,6 +2004,76 @@ async def delete_room(room_id: str):
     
     await db.rooms.delete_one({"id": room_id})
     return {"message": "Room deleted successfully"}
+
+# Block room for non-railroad guest (Other Guest)
+class BlockRoomInput(BaseModel):
+    room_number: str
+    guest_name: Optional[str] = "Other Guest"
+    notes: Optional[str] = ""
+
+@api_router.post("/admin/rooms/block")
+async def block_room_other_guest(input: BlockRoomInput):
+    """Block a room for non-railroad guest. Counts toward occupancy but not billed to railroad."""
+    # Check if room exists
+    room = await db.rooms.find_one({"room_number": input.room_number}, {"_id": 0})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    # Check if room is already occupied
+    active_booking = await db.bookings.find_one({
+        "room_number": input.room_number,
+        "is_checked_out": False
+    }, {"_id": 0})
+    if active_booking:
+        raise HTTPException(status_code=400, detail="Room is already occupied")
+    
+    # Check if room is already blocked
+    existing_block = await db.blocked_rooms.find_one({
+        "room_number": input.room_number,
+        "is_active": True
+    }, {"_id": 0})
+    if existing_block:
+        raise HTTPException(status_code=400, detail="Room is already blocked")
+    
+    # Create blocked room record
+    block_doc = {
+        "id": str(uuid.uuid4()),
+        "room_number": input.room_number,
+        "guest_name": input.guest_name,
+        "notes": input.notes,
+        "is_active": True,
+        "blocked_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.blocked_rooms.insert_one(block_doc)
+    
+    # Check if we're now at 100% capacity
+    await check_and_send_sold_out_notification()
+    
+    return {"message": f"Room {input.room_number} blocked for other guest", "block": block_doc}
+
+@api_router.post("/admin/rooms/unblock/{room_number}")
+async def unblock_room(room_number: str):
+    """Release a blocked room (other guest checked out)"""
+    block = await db.blocked_rooms.find_one({
+        "room_number": room_number,
+        "is_active": True
+    }, {"_id": 0})
+    
+    if not block:
+        raise HTTPException(status_code=404, detail="No active block found for this room")
+    
+    await db.blocked_rooms.update_one(
+        {"room_number": room_number, "is_active": True},
+        {"$set": {"is_active": False, "unblocked_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"message": f"Room {room_number} unblocked"}
+
+@api_router.get("/admin/rooms/blocked")
+async def get_blocked_rooms():
+    """Get all currently blocked rooms (other guests)"""
+    blocked = await db.blocked_rooms.find({"is_active": True}, {"_id": 0}).to_list(100)
+    return blocked
 
 # ==================== Employee Management ====================
 

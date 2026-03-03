@@ -127,6 +127,11 @@ export default function AdminDashboard() {
   const [registeredGuests, setRegisteredGuests] = useState([]);
   const [loadingGuests, setLoadingGuests] = useState(false);
   
+  // Blocked rooms state (other guests)
+  const [blockedRooms, setBlockedRooms] = useState([]);
+  const [showBlockRoomDialog, setShowBlockRoomDialog] = useState(false);
+  const [blockRoomForm, setBlockRoomForm] = useState({ room_number: "", guest_name: "", notes: "" });
+  
   // Portal Settings state
   const [portalSettings, setPortalSettings] = useState({
     api_global_username: "",
@@ -166,6 +171,7 @@ export default function AdminDashboard() {
     fetchSettings();
     fetchEmployees();
     fetchRegisteredGuests();
+    fetchBlockedRooms();
   }, [navigate]);
 
   const fetchRegisteredGuests = async () => {
@@ -214,6 +220,48 @@ export default function AdminDashboard() {
       fetchRegisteredGuests();
     } catch (error) {
       toast.error("Failed to bulk verify guests");
+    }
+  };
+
+  // Blocked rooms functions (Other Guests)
+  const fetchBlockedRooms = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/rooms/blocked`);
+      setBlockedRooms(response.data);
+    } catch (error) {
+      console.error("Failed to load blocked rooms");
+    }
+  };
+
+  const handleBlockRoom = async () => {
+    if (!blockRoomForm.room_number) {
+      toast.error("Please select a room");
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/rooms/block`, {
+        room_number: blockRoomForm.room_number,
+        guest_name: blockRoomForm.guest_name || "Other Guest",
+        notes: blockRoomForm.notes
+      });
+      toast.success(`Room ${blockRoomForm.room_number} blocked for other guest`);
+      setShowBlockRoomDialog(false);
+      setBlockRoomForm({ room_number: "", guest_name: "", notes: "" });
+      fetchRooms();
+      fetchBlockedRooms();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to block room");
+    }
+  };
+
+  const handleUnblockRoom = async (roomNumber) => {
+    try {
+      await axios.post(`${API}/admin/rooms/unblock/${roomNumber}`);
+      toast.success(`Room ${roomNumber} unblocked`);
+      fetchRooms();
+      fetchBlockedRooms();
+    } catch (error) {
+      toast.error("Failed to unblock room");
     }
   };
 
@@ -1445,7 +1493,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 {/* Add Room Button - Separate row for visibility */}
-                <div className="mt-4">
+                <div className="mt-4 flex gap-2">
                   <Button 
                     onClick={() => {
                       setEditingRoom(null);
@@ -1458,11 +1506,19 @@ export default function AdminDashboard() {
                     <Plus className="w-4 h-4" />
                     Add Room
                   </Button>
+                  <Button 
+                    onClick={() => setShowBlockRoomDialog(true)}
+                    className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2"
+                    data-testid="block-room-btn"
+                  >
+                    <Users className="w-4 h-4" />
+                    Block Room (Other Guest)
+                  </Button>
                 </div>
               </div>
 
               {/* Room Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
                 <StatCard 
                   icon={<Bed className="w-6 h-6" />}
                   label="Total Rooms"
@@ -1472,14 +1528,20 @@ export default function AdminDashboard() {
                 <StatCard 
                   icon={<CheckCircle className="w-6 h-6" />}
                   label="Available"
-                  value={rooms.filter(r => r.status === 'available').length}
+                  value={rooms.filter(r => r.status === 'available').length - blockedRooms.length}
                   testId="stat-available-rooms"
                 />
                 <StatCard 
                   icon={<DoorOpen className="w-6 h-6" />}
-                  label="Occupied"
+                  label="Railroad Guests"
                   value={rooms.filter(r => r.status === 'occupied').length}
                   testId="stat-occupied-rooms"
+                />
+                <StatCard 
+                  icon={<Users className="w-6 h-6" />}
+                  label="Other Guests"
+                  value={blockedRooms.length}
+                  testId="stat-blocked-rooms"
                 />
                 <StatCard 
                   icon={<XCircle className="w-6 h-6" />}
@@ -1488,6 +1550,40 @@ export default function AdminDashboard() {
                   testId="stat-maintenance-rooms"
                 />
               </div>
+
+              {/* Blocked Rooms (Other Guests) Section */}
+              {blockedRooms.length > 0 && (
+                <Card className="bg-amber-900/20 border-amber-600/50 mb-6">
+                  <CardHeader className="border-b border-amber-600/30 pb-3">
+                    <CardTitle className="font-outfit text-lg text-amber-400 flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      Blocked Rooms (Other Guests) - Not Billed to Railroad
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {blockedRooms.map((block) => (
+                        <div key={block.id} className="bg-black/30 border border-amber-600/30 rounded-lg p-3 flex justify-between items-center">
+                          <div>
+                            <p className="text-amber-400 font-bold">Room {block.room_number}</p>
+                            <p className="text-vault-text-secondary text-sm">{block.guest_name}</p>
+                            {block.notes && <p className="text-vault-text-secondary text-xs">{block.notes}</p>}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-400 hover:text-red-300 hover:bg-red-900/30"
+                            onClick={() => handleUnblockRoom(block.room_number)}
+                            data-testid={`unblock-room-${block.room_number}`}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Rooms Table */}
               <Card className="bg-vault-surface border-vault-border" data-testid="rooms-table-card">
@@ -3129,6 +3225,76 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
               </Button>
               <Button onClick={() => handleDeleteRoom(deleteRoomConfirm.id)} className="bg-red-600 hover:bg-red-700 text-white">
                 Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Block Room Dialog (Other Guest) */}
+      {showBlockRoomDialog && (
+        <Dialog open={showBlockRoomDialog} onOpenChange={() => setShowBlockRoomDialog(false)}>
+          <DialogContent className="bg-vault-surface border-vault-border">
+            <DialogHeader>
+              <DialogTitle className="font-outfit text-vault-text flex items-center gap-2">
+                <Users className="w-5 h-5 text-amber-400" />
+                Block Room for Other Guest
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-vault-text-secondary text-sm mb-4">
+              Block a room for a non-railroad guest. This room will count toward occupancy but will NOT be billed to the railroad.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Number *</label>
+                <Select 
+                  value={blockRoomForm.room_number} 
+                  onValueChange={(val) => setBlockRoomForm({...blockRoomForm, room_number: val})}
+                >
+                  <SelectTrigger className="bg-black/50 border-vault-border text-vault-text">
+                    <SelectValue placeholder="Select available room" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-vault-surface border-vault-border">
+                    {rooms
+                      .filter(r => r.status === 'available' && !blockedRooms.some(b => b.room_number === r.room_number))
+                      .map(room => (
+                        <SelectItem key={room.id} value={room.room_number} className="text-vault-text">
+                          Room {room.room_number} ({room.room_type})
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Guest Name (Optional)</label>
+                <Input
+                  value={blockRoomForm.guest_name}
+                  onChange={(e) => setBlockRoomForm({...blockRoomForm, guest_name: e.target.value})}
+                  placeholder="e.g. Walk-in Guest, John Doe"
+                  className="bg-black/50 border-vault-border text-vault-text"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Notes (Optional)</label>
+                <Input
+                  value={blockRoomForm.notes}
+                  onChange={(e) => setBlockRoomForm({...blockRoomForm, notes: e.target.value})}
+                  placeholder="e.g. Paid cash, 2 nights"
+                  className="bg-black/50 border-vault-border text-vault-text"
+                />
+              </div>
+            </div>
+            <DialogFooter className="mt-4">
+              <Button variant="ghost" onClick={() => setShowBlockRoomDialog(false)} className="text-vault-text-secondary">
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleBlockRoom}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                data-testid="confirm-block-room-btn"
+              >
+                Block Room
               </Button>
             </DialogFooter>
           </DialogContent>
