@@ -69,14 +69,18 @@ const getTimePeriod = () => {
 };
 
 // Audio player for voice messages (works on Fully Kiosk)
-const playVoiceMessage = (messageId) => {
+const playVoiceMessage = (messageId, onEnd = null) => {
   if (!voiceSettings.enabled) {
     console.log("Voice is disabled");
+    if (onEnd) onEnd();
     return;
   }
   
   const audio = new Audio(`${API}/voice/${messageId}`);
   audio.volume = voiceSettings.volume;
+  if (onEnd) {
+    audio.onended = onEnd;
+  }
   audio.play().catch(err => {
     console.log("Audio play failed:", err);
     // Fallback to Web Speech API if audio fails
@@ -100,11 +104,51 @@ const playVoiceMessage = (messageId) => {
       if (text) {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.volume = voiceSettings.volume;
-        utterance.rate = 0.9;
+        utterance.rate = voiceSettings.speed || 0.9;
+        if (onEnd) utterance.onend = onEnd;
         window.speechSynthesis.speak(utterance);
       }
     }
   });
+};
+
+// Play personalized welcome with name
+const playWelcomeWithName = (name, messageId) => {
+  if (!voiceSettings.enabled) return;
+  
+  // First speak the greeting with name
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const greeting = getTimeBasedGreeting();
+    const nameUtterance = new SpeechSynthesisUtterance(`${greeting}, ${name}.`);
+    nameUtterance.volume = voiceSettings.volume;
+    nameUtterance.rate = voiceSettings.speed || 0.85;
+    
+    // After name is spoken, play the instruction audio
+    nameUtterance.onend = () => {
+      setTimeout(() => {
+        // Play instruction without greeting (we already said greeting with name)
+        const audio = new Audio(`${API}/voice/${messageId}`);
+        audio.volume = voiceSettings.volume;
+        audio.play().catch(err => console.log("Instruction audio failed:", err));
+      }, 300);
+    };
+    
+    window.speechSynthesis.speak(nameUtterance);
+  }
+};
+
+// Play checkout found with employee name
+const playCheckoutFoundWithName = (name) => {
+  if (!voiceSettings.enabled) return;
+  
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(`Booking found for ${name}. Please enter your on duty time and press Complete check out.`);
+    utterance.volume = voiceSettings.volume;
+    utterance.rate = voiceSettings.speed || 0.85;
+    window.speechSynthesis.speak(utterance);
+  }
 };
 
 // Legacy speakMessage function (now uses audio files)
@@ -517,7 +561,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
         setEmployeeName(response.data.name);
         setEmployeeStatus('found');
         const timePeriod = getTimePeriod();
-        playVoiceMessage(`checkin_instructions_${timePeriod}`);
+        playWelcomeWithName(response.data.name, `checkin_instructions_${timePeriod}`);
         setTimeout(() => roomInputRef.current?.focus(), 300);
       } catch (error) {
         // Check if employee ID is in admin's approved list
@@ -535,13 +579,13 @@ function CheckInForm({ setView, setSuccessMessage }) {
             // Successfully registered - show full form
             setEmployeeStatus('found');
             const timePeriod = getTimePeriod();
-            playVoiceMessage(`checkin_instructions_${timePeriod}`);
+            playWelcomeWithName(name, `checkin_instructions_${timePeriod}`);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           } catch (regError) {
             // Registration failed - maybe already registered, still show form
             setEmployeeStatus('found');
             const timePeriod = getTimePeriod();
-            playVoiceMessage(`checkin_instructions_${timePeriod}`);
+            playWelcomeWithName(name, `checkin_instructions_${timePeriod}`);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           }
         } catch (empError) {
@@ -612,7 +656,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
       setEmployeeStatus('found');
       setWrongAttempts(0); // Reset attempts on success
       const timePeriod = getTimePeriod();
-      playVoiceMessage(`checkin_instructions_${timePeriod}`);
+      playWelcomeWithName(employeeName.trim(), `checkin_instructions_${timePeriod}`);
       toast.success("Welcome! Please continue with check-in.");
       setTimeout(() => roomInputRef.current?.focus(), 300);
     } catch (error) {
@@ -970,8 +1014,8 @@ function CheckOutForm({ setView, setSuccessMessage }) {
       setVerifiedBooking(response.data);
       toast.success(`Found: ${response.data.employee_name} in Room ${roomNumber}`);
       
-      // Voice confirmation
-      playVoiceMessage("checkout_found");
+      // Voice confirmation with name
+      playCheckoutFoundWithName(response.data.employee_name);
     } catch (error) {
       toast.error(error.response?.data?.detail || "No active booking found for this room.");
       setVerifiedBooking(null);
