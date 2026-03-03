@@ -109,12 +109,20 @@ class APIGlobalSyncAgent:
         """Initialize browser."""
         try:
             self.playwright = await async_playwright().start()
+            # Use headless mode with additional flags
             self.browser = await self.playwright.chromium.launch(
                 headless=True,
-                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                args=[
+                    '--no-sandbox', 
+                    '--disable-setuid-sandbox', 
+                    '--disable-dev-shm-usage',
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-web-security'
+                ]
             )
             self.context = await self.browser.new_context(
-                viewport={'width': 1920, 'height': 1080}
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             )
             self.page = await self.context.new_page()
             logger.info("Browser started successfully")
@@ -512,8 +520,12 @@ class APIGlobalSyncAgent:
             
             emp_input = None
             room_input = None
+            emp_input_id = None
+            room_input_id = None
             
             all_inputs = await self.page.query_selector_all('input[type="text"]')
+            logger.info(f"Found {len(all_inputs)} text inputs on page")
+            
             for inp in all_inputs:
                 try:
                     parent_row = await inp.evaluate_handle('el => el.closest("tr")')
@@ -523,9 +535,11 @@ class APIGlobalSyncAgent:
                             inp_id = await inp.get_attribute('id') or ''
                             if 'employeeid' in inp_id.lower():
                                 emp_input = inp
+                                emp_input_id = inp_id
                                 logger.info(f"Found Employee ID input: {inp_id}")
                             elif 'roomnumber' in inp_id.lower():
                                 room_input = inp
+                                room_input_id = inp_id
                                 logger.info(f"Found Room Number input: {inp_id}")
                 except:
                     continue
@@ -534,92 +548,102 @@ class APIGlobalSyncAgent:
                 logger.warning(f"Could not find Employee ID input for {search_name}")
                 return False
             
-            # Find the "Heavener" text element to click on for saving
-            heavener_element = await self.page.query_selector('text=HEAVENER')
-            if not heavener_element:
-                # Try to find any empty space we can click
-                heavener_element = await self.page.query_selector('.ui-panel-title, .panel-heading')
-            
-            # === Step 2: Enter Employee ID ===
+            # === Step 2: Enter Employee ID using press_sequentially ===
             logger.info(f"Step 2: Entering Employee ID '{employee_id}'...")
             
-            # Click on the Employee ID input field
-            await emp_input.click()
-            await self.page.wait_for_timeout(300)
+            # Use locator for more reliable interaction
+            emp_locator = self.page.locator(f'input[id="{emp_input_id}"]')
             
-            # Clear any existing value and type the employee ID
-            await self.page.keyboard.press('Control+a')
-            await self.page.wait_for_timeout(100)
-            await self.page.keyboard.type(str(employee_id), delay=50)
+            # Click to focus
+            await emp_locator.click()
             await self.page.wait_for_timeout(500)
+            
+            # Clear existing content
+            await emp_locator.press('Control+a')
+            await self.page.wait_for_timeout(100)
+            
+            # Use press_sequentially which simulates real keystrokes
+            await emp_locator.press_sequentially(str(employee_id), delay=100)
+            await self.page.wait_for_timeout(500)
+            
+            # Verify the value was set
+            emp_val = await emp_locator.input_value()
+            logger.info(f"Employee ID value after press_sequentially: '{emp_val}'")
             
             # === Step 3: Click near "Heavener, OK" to save ===
             logger.info("Step 3: Clicking near Heavener to save Employee ID...")
             
-            if heavener_element:
-                # Get the bounding box of Heavener element
-                box = await heavener_element.bounding_box()
-                if box:
-                    # Click slightly to the right of the Heavener text (empty space)
-                    click_x = box['x'] + box['width'] + 50
-                    click_y = box['y'] + box['height'] / 2
-                    await self.page.mouse.click(click_x, click_y)
-                    logger.info(f"Clicked at ({click_x}, {click_y}) near Heavener")
+            # Find HEAVENER text and click near it
+            try:
+                heavener = self.page.locator('text=HEAVENER').first
+                if await heavener.count() > 0:
+                    box = await heavener.bounding_box()
+                    if box:
+                        # Click to the right of HEAVENER (empty space)
+                        click_x = box['x'] + box['width'] + 30
+                        click_y = box['y'] + 10
+                        await self.page.mouse.click(click_x, click_y)
+                        logger.info(f"Clicked at ({click_x}, {click_y}) near HEAVENER")
+                    else:
+                        await self.page.mouse.click(400, 200)
                 else:
-                    await self.page.mouse.click(300, 200)
-                    logger.info("Clicked at (300, 200) - fallback position")
-            else:
-                await self.page.mouse.click(300, 200)
-                logger.info("Clicked at (300, 200) - no Heavener found")
+                    await self.page.mouse.click(400, 200)
+            except Exception as e:
+                logger.info(f"Heavener click fallback: {e}")
+                await self.page.mouse.click(400, 200)
             
-            # Wait for auto-save
+            # Wait for potential AJAX save
             await self.page.wait_for_timeout(3000)
             
             # === Step 4: Enter Room Number ===
             if room_input:
                 logger.info(f"Step 4: Entering Room Number '{room_number}'...")
                 
-                # Re-find room input (page might have refreshed)
-                room_inputs = await self.page.query_selector_all('input[type="text"]')
-                for inp in room_inputs:
+                # Re-find room input in case page refreshed
+                if room_input_id:
                     try:
-                        inp_id = await inp.get_attribute('id') or ''
-                        if 'roomnumber' in inp_id.lower():
-                            parent_row = await inp.evaluate_handle('el => el.closest("tr")')
-                            row_text = await parent_row.inner_text()
-                            if search_name in row_text:
-                                room_input = inp
-                                break
+                        room_input = await self.page.query_selector(f'input[id="{room_input_id}"]')
                     except:
-                        continue
+                        pass
                 
                 if room_input:
-                    # Click on Room Number input
-                    await room_input.click()
-                    await self.page.wait_for_timeout(300)
+                    # Use locator for room input
+                    room_locator = self.page.locator(f'input[id="{room_input_id}"]')
                     
-                    # Clear and type room number
-                    await self.page.keyboard.press('Control+a')
-                    await self.page.wait_for_timeout(100)
-                    await self.page.keyboard.type(str(room_number), delay=50)
+                    # Click to focus
+                    await room_locator.click()
                     await self.page.wait_for_timeout(500)
+                    
+                    # Clear and type
+                    await room_locator.press('Control+a')
+                    await self.page.wait_for_timeout(100)
+                    
+                    # Use press_sequentially
+                    await room_locator.press_sequentially(str(room_number), delay=100)
+                    await self.page.wait_for_timeout(500)
+                    
+                    # Verify
+                    room_val = await room_locator.input_value()
+                    logger.info(f"Room Number value after press_sequentially: '{room_val}'")
                     
                     # === Step 5: Click near "Heavener, OK" again to save ===
                     logger.info("Step 5: Clicking near Heavener to save Room Number...")
                     
-                    # Re-find Heavener element
-                    heavener_element = await self.page.query_selector('text=HEAVENER')
-                    if heavener_element:
-                        box = await heavener_element.bounding_box()
-                        if box:
-                            click_x = box['x'] + box['width'] + 50
-                            click_y = box['y'] + box['height'] / 2
-                            await self.page.mouse.click(click_x, click_y)
-                            logger.info(f"Clicked at ({click_x}, {click_y}) near Heavener")
+                    try:
+                        heavener = self.page.locator('text=HEAVENER').first
+                        if await heavener.count() > 0:
+                            box = await heavener.bounding_box()
+                            if box:
+                                click_x = box['x'] + box['width'] + 30
+                                click_y = box['y'] + 10
+                                await self.page.mouse.click(click_x, click_y)
+                                logger.info(f"Clicked at ({click_x}, {click_y}) near HEAVENER")
+                            else:
+                                await self.page.mouse.click(400, 200)
                         else:
-                            await self.page.mouse.click(300, 200)
-                    else:
-                        await self.page.mouse.click(300, 200)
+                            await self.page.mouse.click(400, 200)
+                    except:
+                        await self.page.mouse.click(400, 200)
                     
                     # Wait for save
                     await self.page.wait_for_timeout(3000)
