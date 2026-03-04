@@ -98,6 +98,7 @@ export default function AdminDashboard() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isFiltered, setIsFiltered] = useState(false);
+  const [showActiveOnly, setShowActiveOnly] = useState(true);  // Default to showing only active/in-house guests
   
   // Room management state
   const [showRoomDialog, setShowRoomDialog] = useState(false);
@@ -1179,6 +1180,25 @@ export default function AdminDashboard() {
                 <div className="mt-4 flex flex-wrap items-center gap-3 bg-vault-surface-highlight/50 p-3 rounded-lg border border-vault-border">
                   <Filter className="w-4 h-4 text-vault-gold" />
                   <span className="text-vault-text-secondary text-sm font-medium">Filter:</span>
+                  
+                  {/* Active Only Toggle */}
+                  <div className="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-lg border border-vault-border">
+                    <label className="text-vault-text-secondary text-sm cursor-pointer flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={showActiveOnly}
+                        onChange={(e) => setShowActiveOnly(e.target.checked)}
+                        className="w-4 h-4 accent-vault-gold cursor-pointer"
+                        data-testid="show-active-only-toggle"
+                      />
+                      <span className={showActiveOnly ? "text-vault-gold font-medium" : ""}>
+                        In-House Only
+                      </span>
+                    </label>
+                  </div>
+                  
+                  <div className="h-6 w-px bg-vault-border mx-1" />
+                  
                   <Input
                     type="date"
                     value={startDate}
@@ -1215,6 +1235,14 @@ export default function AdminDashboard() {
                     </Button>
                   )}
                 </div>
+                
+                {/* Active guests summary */}
+                {showActiveOnly && (
+                  <div className="mt-2 text-sm text-vault-text-secondary">
+                    Showing <span className="text-vault-gold font-medium">{records.filter(r => !r.is_checked_out).length}</span> in-house guests 
+                    (checked in but not checked out)
+                  </div>
+                )}
               </div>
 
               {/* Company Header Card */}
@@ -1244,14 +1272,22 @@ export default function AdminDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {records.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={12} className="text-center text-vault-text-secondary py-8">
-                              No records found
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          records.map((record, index) => (
+                        {(() => {
+                          const filteredRecords = showActiveOnly 
+                            ? records.filter(r => !r.is_checked_out) 
+                            : records;
+                          
+                          if (filteredRecords.length === 0) {
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={12} className="text-center text-vault-text-secondary py-8">
+                                  {showActiveOnly ? "No in-house guests found" : "No records found"}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }
+                          
+                          return filteredRecords.map((record, index) => (
                             <TableRow key={record.id} className="table-row border-vault-border" data-testid={`signin-row-${record.id}`}>
                               <TableCell className="font-mono text-vault-text">{index + 1}</TableCell>
                               <TableCell className="text-vault-text">Single Stay</TableCell>
@@ -1343,8 +1379,8 @@ export default function AdminDashboard() {
                                 </div>
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
+                          ));
+                        })()}
                       </TableBody>
                     </Table>
                   </div>
