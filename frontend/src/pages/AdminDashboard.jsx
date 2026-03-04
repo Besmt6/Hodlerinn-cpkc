@@ -74,7 +74,8 @@ import {
   Shield,
   FileBarChart,
   Cloud,
-  Upload
+  Upload,
+  UserX
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -141,6 +142,16 @@ export default function AdminDashboard() {
   const [guaranteeReport, setGuaranteeReport] = useState(null);
   const [guaranteeLoading, setGuaranteeLoading] = useState(false);
   const [guaranteeDateRange, setGuaranteeDateRange] = useState({ start: "", end: "" });
+  
+  // Turned Away Guests state
+  const [turnedAwayGuests, setTurnedAwayGuests] = useState([]);
+  const [showTurnedAwayForm, setShowTurnedAwayForm] = useState(false);
+  const [turnedAwayForm, setTurnedAwayForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    guest_name: "Walk-in Guest",
+    reason: "Holding rooms for CPKC",
+    notes: ""
+  });
   
   // Portal Settings state
   const [portalSettings, setPortalSettings] = useState({
@@ -336,6 +347,52 @@ export default function AdminDashboard() {
       toast.success("Guarantee report downloaded!");
     } catch (error) {
       toast.error("Failed to download report");
+    }
+  };
+
+  // Turned Away Guests functions
+  const fetchTurnedAwayGuests = async () => {
+    try {
+      let url = `${API}/admin/turned-away`;
+      const params = [];
+      if (guaranteeDateRange.start) params.push(`start_date=${guaranteeDateRange.start}`);
+      if (guaranteeDateRange.end) params.push(`end_date=${guaranteeDateRange.end}`);
+      if (params.length > 0) url += `?${params.join('&')}`;
+      
+      const response = await axios.get(url);
+      setTurnedAwayGuests(response.data.records || []);
+    } catch (error) {
+      console.error("Failed to fetch turned away guests:", error);
+    }
+  };
+
+  const handleLogTurnedAway = async () => {
+    try {
+      await axios.post(`${API}/admin/turned-away`, turnedAwayForm);
+      toast.success("Turned away guest logged successfully");
+      setShowTurnedAwayForm(false);
+      setTurnedAwayForm({
+        date: new Date().toISOString().split('T')[0],
+        guest_name: "Walk-in Guest",
+        reason: "Holding rooms for CPKC",
+        notes: ""
+      });
+      fetchTurnedAwayGuests();
+      fetchGuaranteeReport(guaranteeDateRange.start, guaranteeDateRange.end);
+    } catch (error) {
+      toast.error("Failed to log turned away guest");
+    }
+  };
+
+  const handleDeleteTurnedAway = async (recordId) => {
+    if (!confirm("Are you sure you want to delete this record?")) return;
+    try {
+      await axios.delete(`${API}/admin/turned-away/${recordId}`);
+      toast.success("Record deleted");
+      fetchTurnedAwayGuests();
+      fetchGuaranteeReport(guaranteeDateRange.start, guaranteeDateRange.end);
+    } catch (error) {
+      toast.error("Failed to delete record");
     }
   };
 
@@ -2351,11 +2408,21 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <Button
-                      onClick={() => fetchGuaranteeReport(guaranteeDateRange.start, guaranteeDateRange.end)}
+                      onClick={() => {
+                        fetchGuaranteeReport(guaranteeDateRange.start, guaranteeDateRange.end);
+                        fetchTurnedAwayGuests();
+                      }}
                       className="bg-vault-gold hover:bg-amber-500 text-black"
                     >
                       <Search className="w-4 h-4 mr-2" />
                       Generate Report
+                    </Button>
+                    <Button
+                      onClick={() => setShowTurnedAwayForm(true)}
+                      className="bg-rose-600 hover:bg-rose-700 text-white"
+                    >
+                      <UserX className="w-4 h-4 mr-2" />
+                      Log Turned Away Guest
                     </Button>
                     {guaranteeReport && (
                       <Button
@@ -2402,7 +2469,61 @@ export default function AdminDashboard() {
                         <p className="text-emerald-400/70 text-xs mt-1">(Not billed to CPKC)</p>
                       </CardContent>
                     </Card>
+                    <Card className="bg-rose-900/30 border-rose-600/50">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-rose-400 text-xs uppercase">Guests Turned Away</p>
+                        <p className="text-3xl font-bold text-rose-400">{guaranteeReport.turned_away_count || 0}</p>
+                        <p className="text-rose-400/70 text-xs mt-1">(To hold for CPKC)</p>
+                      </CardContent>
+                    </Card>
                   </div>
+
+                  {/* Turned Away Guests Section */}
+                  {turnedAwayGuests.length > 0 && (
+                    <Card className="bg-vault-surface-highlight/50 border-vault-border mb-6">
+                      <CardHeader className="border-b border-vault-border pb-4">
+                        <CardTitle className="font-outfit text-lg text-rose-400 flex items-center gap-2">
+                          <UserX className="w-5 h-5" />
+                          Turned Away Guests Log
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <ScrollArea className="h-[200px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-vault-border hover:bg-transparent">
+                                <TableHead className="text-vault-gold font-bold">Date</TableHead>
+                                <TableHead className="text-vault-gold font-bold">Guest</TableHead>
+                                <TableHead className="text-vault-gold font-bold">Reason</TableHead>
+                                <TableHead className="text-vault-gold font-bold">Notes</TableHead>
+                                <TableHead className="text-vault-gold font-bold w-16"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {turnedAwayGuests.map((guest) => (
+                                <TableRow key={guest.id} className="border-vault-border hover:bg-vault-surface">
+                                  <TableCell className="font-mono text-vault-text">{guest.date}</TableCell>
+                                  <TableCell className="text-vault-text">{guest.guest_name}</TableCell>
+                                  <TableCell className="text-vault-text-secondary">{guest.reason}</TableCell>
+                                  <TableCell className="text-vault-text-secondary text-sm">{guest.notes || '-'}</TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteTurnedAway(guest.id)}
+                                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Daily Data Table */}
                   <Card className="bg-vault-surface-highlight/50 border-vault-border">
@@ -2470,6 +2591,74 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Turned Away Guest Form Dialog */}
+              <Dialog open={showTurnedAwayForm} onOpenChange={setShowTurnedAwayForm}>
+                <DialogContent className="bg-vault-surface border-vault-border">
+                  <DialogHeader>
+                    <DialogTitle className="text-vault-gold flex items-center gap-2">
+                      <UserX className="w-5 h-5" />
+                      Log Turned Away Guest
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <p className="text-vault-text-secondary text-sm">
+                      Record when you turn away a walk-in guest to honor the CPKC room guarantee.
+                    </p>
+                    <div>
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Date</label>
+                      <Input
+                        type="date"
+                        value={turnedAwayForm.date}
+                        onChange={(e) => setTurnedAwayForm({...turnedAwayForm, date: e.target.value})}
+                        className="bg-vault-surface-highlight border-vault-border text-vault-text"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Guest Name (Optional)</label>
+                      <Input
+                        value={turnedAwayForm.guest_name}
+                        onChange={(e) => setTurnedAwayForm({...turnedAwayForm, guest_name: e.target.value})}
+                        placeholder="Walk-in Guest"
+                        className="bg-vault-surface-highlight border-vault-border text-vault-text"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Reason</label>
+                      <Input
+                        value={turnedAwayForm.reason}
+                        onChange={(e) => setTurnedAwayForm({...turnedAwayForm, reason: e.target.value})}
+                        placeholder="Holding rooms for CPKC"
+                        className="bg-vault-surface-highlight border-vault-border text-vault-text"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Notes (Optional)</label>
+                      <Input
+                        value={turnedAwayForm.notes}
+                        onChange={(e) => setTurnedAwayForm({...turnedAwayForm, notes: e.target.value})}
+                        placeholder="Additional details..."
+                        className="bg-vault-surface-highlight border-vault-border text-vault-text"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowTurnedAwayForm(false)}
+                      className="border-vault-border text-vault-text"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleLogTurnedAway}
+                      className="bg-rose-600 hover:bg-rose-700 text-white"
+                    >
+                      Log Turned Away
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </>
           )}
 

@@ -1834,14 +1834,95 @@ async def get_guarantee_report(start_date: str = None, end_date: str = None):
     # Sort by date descending
     sorted_data = sorted(daily_data.values(), key=lambda x: x['date'], reverse=True)
     
+    # Get turned away guests count
+    turned_away_count = await db.turned_away_guests.count_documents({})
+    turned_away_in_range = 0
+    if start_date or end_date:
+        ta_query = {}
+        if start_date and end_date:
+            ta_query["date"] = {"$gte": start_date, "$lte": end_date}
+        elif start_date:
+            ta_query["date"] = {"$gte": start_date}
+        elif end_date:
+            ta_query["date"] = {"$lte": end_date}
+        turned_away_in_range = await db.turned_away_guests.count_documents(ta_query)
+    else:
+        turned_away_in_range = turned_away_count
+    
     return {
         "guaranteed_rooms": GUARANTEED_ROOMS,
         "nightly_rate": nightly_rate,
         "total_days": len(sorted_data),
         "total_unused_rooms": total_unused,
         "total_goodwill_amount": total_goodwill,
+        "turned_away_count": turned_away_in_range,
         "daily_data": sorted_data
     }
+
+
+# ==================== Turned Away Guests (Guarantee Goodwill) ====================
+
+class TurnedAwayGuestInput(BaseModel):
+    date: str  # YYYY-MM-DD
+    guest_name: Optional[str] = "Walk-in Guest"
+    reason: Optional[str] = "Holding rooms for CPKC"
+    notes: Optional[str] = ""
+
+
+@api_router.post("/admin/turned-away")
+async def log_turned_away_guest(input: TurnedAwayGuestInput):
+    """Log a guest that was turned away to hold rooms for CPKC - shows goodwill commitment."""
+    doc = {
+        "id": str(uuid.uuid4()),
+        "date": input.date,
+        "guest_name": input.guest_name,
+        "reason": input.reason,
+        "notes": input.notes,
+        "logged_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.turned_away_guests.insert_one(doc)
+    
+    # Remove _id before returning
+    doc.pop('_id', None)
+    return {"message": "Turned away guest logged successfully", "record": doc}
+
+
+@api_router.get("/admin/turned-away")
+async def get_turned_away_guests(start_date: str = None, end_date: str = None):
+    """Get all turned away guests, optionally filtered by date range."""
+    query = {}
+    if start_date and end_date:
+        query["date"] = {"$gte": start_date, "$lte": end_date}
+    elif start_date:
+        query["date"] = {"$gte": start_date}
+    elif end_date:
+        query["date"] = {"$lte": end_date}
+    
+    guests = await db.turned_away_guests.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
+    
+    # Group by date for summary
+    by_date = {}
+    for g in guests:
+        date = g.get('date')
+        if date not in by_date:
+            by_date[date] = 0
+        by_date[date] += 1
+    
+    return {
+        "total_count": len(guests),
+        "by_date": by_date,
+        "records": guests
+    }
+
+
+@api_router.delete("/admin/turned-away/{record_id}")
+async def delete_turned_away_guest(record_id: str):
+    """Delete a turned away guest record."""
+    result = await db.turned_away_guests.delete_one({"id": record_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return {"message": "Record deleted successfully"}
+
 
 @api_router.get("/admin/export-guarantee-report")
 async def export_guarantee_report(start_date: str = None, end_date: str = None):

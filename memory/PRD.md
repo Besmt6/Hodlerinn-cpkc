@@ -77,6 +77,7 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] **Employee name sync to Guest Portal** - Admin employee name changes now sync to `guests` collection
 - [x] **Room Available Alert** - Email notification when rooms become available after sold out
 - [x] **Heads Up Notice** - Email notification when only 4 rooms available (low availability warning)
+- [x] **Turned Away Guests Log** - Track guests turned away to honor CPKC room guarantee in Guarantee Report
 
 ---
 
