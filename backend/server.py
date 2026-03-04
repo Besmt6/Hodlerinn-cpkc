@@ -2563,7 +2563,31 @@ async def update_employee(employee_id: str, input: EmployeeUpdate):
         if existing:
             raise HTTPException(status_code=400, detail="Employee number already exists")
     
+    # Get the current employee_number for syncing to guests collection
+    current_employee_number = employee.get("employee_number")
+    
+    # Update employees collection
     await db.employees.update_one({query_field: employee_id}, {"$set": update_data})
+    
+    # Also sync updated name to guests collection (so Guest Portal shows updated name)
+    if "name" in update_data:
+        guest_update = {
+            "name": update_data["name"],
+            "name_encrypted": encrypt_data(update_data["name"])
+        }
+        # Update guests collection using the employee_number
+        await db.guests.update_one(
+            {"employee_number": current_employee_number},
+            {"$set": guest_update}
+        )
+    
+    # If employee_number changed, also update in guests collection
+    if "employee_number" in update_data and update_data["employee_number"] != current_employee_number:
+        await db.guests.update_one(
+            {"employee_number": current_employee_number},
+            {"$set": {"employee_number": update_data["employee_number"]}}
+        )
+    
     return {"message": "Employee updated successfully"}
 
 @api_router.delete("/admin/employees/{employee_id}")

@@ -74,6 +74,7 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] Telegram test button added to admin panel
 - [x] DatePicker component for calendar pop-up date selection
 - [x] In-House Only filter on sign-in sheets
+- [x] **Employee name sync to Guest Portal** - Admin employee name changes now sync to `guests` collection
 
 ---
 
