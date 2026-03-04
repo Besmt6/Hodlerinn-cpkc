@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_name(name: str) -> str:
-    """Normalize name for matching - remove suffixes, lowercase, etc."""
+    """Normalize name for matching - remove suffixes, lowercase, handle various formats."""
     if not name:
         return ""
     
@@ -25,7 +25,20 @@ def normalize_name(name: str) -> str:
     name = re.sub(r'/[A-Z]{2,4}\s*$', '', name.strip())
     name = re.sub(r'\s+[A-Z]{1,2}\s*$', '', name.strip())  # Remove single letter suffixes like " E"
     
-    # Handle LASTNAME,(FIRSTNAME) format with parentheses
+    # Handle LASTNAME (FIRSTNAME) format - with space before parentheses (NO COMMA)
+    # Example: "SMITH (JOHN)" -> "john smith"
+    paren_space_match = re.match(r'^([A-Za-z]+)\s+\(([^)]+)\)', name.strip())
+    if paren_space_match:
+        lastname = paren_space_match.group(1).strip()
+        firstname = paren_space_match.group(2).strip()
+        # Remove any suffixes from firstname
+        firstname = re.sub(r'[/*].*$', '', firstname).strip()
+        firstname = re.sub(r'\s+[A-Z]+$', '', firstname).strip()
+        logger.info(f"Normalized '{name}' -> '{firstname} {lastname}' (LASTNAME (FIRSTNAME) format)")
+        return f"{firstname} {lastname}".lower()
+    
+    # Handle LASTNAME,(FIRSTNAME) format with comma and parentheses
+    # Example: "SMITH,(JOHN)" -> "john smith"
     paren_match = re.match(r'^([A-Z]+),\s*\(([^)]+)\)', name, re.IGNORECASE)
     if paren_match:
         lastname = paren_match.group(1).strip()
@@ -33,9 +46,11 @@ def normalize_name(name: str) -> str:
         # Remove any suffixes from firstname
         firstname = re.sub(r'[/*].*$', '', firstname).strip()
         firstname = re.sub(r'\s+[A-Z]+$', '', firstname).strip()
+        logger.info(f"Normalized '{name}' -> '{firstname} {lastname}' (LASTNAME,(FIRSTNAME) format)")
         return f"{firstname} {lastname}".lower()
     
     # Handle LASTNAME/FIRSTNAME format with slash
+    # Example: "SMITH/JOHN" -> "john smith"
     parts = name.split('/')
     if len(parts) >= 2:
         # Format: LASTNAME/FIRSTNAME or LASTNAME/FIRSTNAME/SUFFIX
@@ -43,6 +58,7 @@ def normalize_name(name: str) -> str:
         firstname = parts[1].strip()
         # Remove any remaining suffix from firstname
         firstname = re.sub(r'[/*].*$', '', firstname).strip()
+        logger.info(f"Normalized '{name}' -> '{firstname} {lastname}' (LASTNAME/FIRSTNAME format)")
         return f"{firstname} {lastname}".lower()
     
     # Handle "Firstname Lastname" format (already normal)
