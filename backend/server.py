@@ -3103,6 +3103,44 @@ async def delete_employee(employee_id: str):
     await db.employees.delete_one({query_field: employee_id})
     return {"message": "Employee deleted successfully"}
 
+
+@api_router.post("/admin/employees/sync-names-to-guests")
+async def sync_employee_names_to_guests():
+    """
+    Bulk sync all employee names to the guests collection.
+    Use this after updating employee names to match portal format.
+    This makes the sync agent work with current in-house guests immediately.
+    """
+    # Get all employees
+    employees = await db.employees.find({}, {"_id": 0}).to_list(1000)
+    
+    updated_count = 0
+    for emp in employees:
+        employee_number = emp.get("employee_number")
+        employee_name = emp.get("name")
+        
+        if not employee_number or not employee_name:
+            continue
+        
+        # Update the guest record with the new name
+        result = await db.guests.update_one(
+            {"employee_number": employee_number},
+            {"$set": {
+                "name": employee_name,
+                "name_encrypted": encrypt_data(employee_name)
+            }}
+        )
+        
+        if result.modified_count > 0:
+            updated_count += 1
+    
+    return {
+        "message": f"Synced {updated_count} guest records with updated employee names",
+        "updated_count": updated_count,
+        "total_employees": len(employees)
+    }
+
+
 @api_router.get("/employees/verify/{employee_number}")
 async def verify_employee_exists(employee_number: str):
     """Check if an employee number is in the allowed list (public endpoint for check-in)"""

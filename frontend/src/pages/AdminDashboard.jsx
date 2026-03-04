@@ -1914,6 +1914,22 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex gap-2">
                   <Button
+                    onClick={async () => {
+                      try {
+                        const res = await axios.post(`${API}/admin/employees/sync-names-to-guests`);
+                        toast.success(res.data.message);
+                      } catch (error) {
+                        toast.error("Failed to sync names");
+                      }
+                    }}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                    data-testid="sync-names-to-guests-btn"
+                    title="Update guest records with current employee names (for sync agent)"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Sync Names to Guests
+                  </Button>
+                  <Button
                     onClick={handleImportFromGuests}
                     disabled={collectingEmployees}
                     className="bg-green-600 hover:bg-green-700 text-white"
