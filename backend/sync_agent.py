@@ -625,8 +625,19 @@ class APIGlobalSyncAgent:
             
             # === Scroll row into view before interacting ===
             logger.info(f"Scrolling row into view for {search_name}...")
-            await target_row.scroll_into_view_if_needed()
-            await self.page.wait_for_timeout(500)
+            try:
+                # Use JavaScript scrollIntoView for more reliable scrolling
+                await self.page.evaluate('arguments[0].scrollIntoView({block: "center", inline: "nearest"})', await target_row.element_handle())
+            except:
+                await target_row.scroll_into_view_if_needed()
+            await self.page.wait_for_timeout(1000)  # Increased wait for scroll to complete
+            
+            # Verify the row is now visible
+            is_visible = await target_row.is_visible()
+            if not is_visible:
+                logger.warning(f"Row still not visible after scrolling for {search_name}, trying again...")
+                await self.page.evaluate(f'window.scrollBy(0, -200)')  # Scroll up a bit
+                await self.page.wait_for_timeout(500)
             
             # Find Employee ID and Room Number inputs by their position or ID
             emp_input = None
