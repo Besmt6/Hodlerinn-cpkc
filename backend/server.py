@@ -39,7 +39,10 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Telegram configuration
+# Telegram configuration
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+# IMPORTANT: The correct chat ID for Hodler Inn group. Deployment secrets have wrong value.
+TELEGRAM_CHAT_ID_CORRECT = "-1003798795772"
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
 
 # Zoho WorkDrive configuration
@@ -380,13 +383,18 @@ async def shutdown_scheduler():
 # ==================== Telegram Notification ====================
 
 async def get_telegram_chat_id():
-    """Get Telegram Chat ID from database settings, fallback to environment variable"""
-    settings = await db.settings.find_one({}, {"_id": 0})
+    """Get Telegram Chat ID from database settings, fallback to hardcoded correct value"""
+    # First try database settings
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
     if settings and settings.get("telegram_chat_id"):
-        logging.info(f"Using Telegram chat ID from database: {settings.get('telegram_chat_id')}")
-        return settings.get("telegram_chat_id")
-    logging.info(f"Using Telegram chat ID from environment: {TELEGRAM_CHAT_ID}")
-    return TELEGRAM_CHAT_ID
+        db_chat_id = settings.get("telegram_chat_id")
+        logging.info(f"Using Telegram chat ID from database: {db_chat_id}")
+        return db_chat_id
+    
+    # IMPORTANT: The deployment secrets have wrong value (6372960197)
+    # Always use the correct hardcoded value as fallback instead of env variable
+    logging.info(f"Using hardcoded correct Telegram chat ID: {TELEGRAM_CHAT_ID_CORRECT}")
+    return TELEGRAM_CHAT_ID_CORRECT
 
 async def send_telegram_notification(message: str):
     """Send notification to Telegram (supports multiple chat IDs separated by comma)"""
