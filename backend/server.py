@@ -2126,21 +2126,21 @@ async def export_billing_report(
     })
     
     # Company Header
-    worksheet.merge_range('A1:I1', 'Hodler Inn - Billing Report', title_format)
+    worksheet.merge_range('A1:K1', 'Hodler Inn - Billing Report', title_format)
     date_range_text = '820 Hwy 59 N Heavener, OK, 74937 | Phone: 918-653-7801'
     if start_date or end_date:
         date_range_text = f"Date Range: {start_date or 'Start'} to {end_date or 'Present'}"
-    worksheet.merge_range('A2:I2', date_range_text, subtitle_format)
+    worksheet.merge_range('A2:K2', date_range_text, subtitle_format)
     worksheet.set_row(0, 25)
     worksheet.set_row(1, 18)
     
     # Column Headers
     headers = [
         "#", "Name", "Employee ID", "Room #",
-        "Check-In", "Check-Out", "Total Hours", "Nights Billed", "Signed"
+        "Check-In Date", "Check-In Time", "Check-Out Date", "Check-Out Time", "Total Hours", "Nights Billed", "Signed"
     ]
     
-    col_widths = [5, 20, 12, 8, 18, 18, 12, 12, 10]
+    col_widths = [5, 18, 12, 8, 12, 10, 12, 10, 10, 10, 8]
     for col, (header, width) in enumerate(zip(headers, col_widths)):
         worksheet.write(3, col, header, header_format)
         worksheet.set_column(col, col, width)
@@ -2170,19 +2170,21 @@ async def export_billing_report(
             worksheet.write(row, 1, decrypted_name, cell_format)
             worksheet.write(row, 2, booking['employee_number'], cell_format)
             worksheet.write(row, 3, booking['room_number'], cell_format)
-            worksheet.write(row, 4, f"{booking['check_in_date']} {booking['check_in_time']}", cell_format)
-            worksheet.write(row, 5, f"{booking['check_out_date']} {booking['check_out_time']}", cell_format)
-            worksheet.write(row, 6, hours if hours else 0, number_format)
-            worksheet.write(row, 7, nights if nights else 0, cell_format)
-            worksheet.write(row, 8, "Yes" if has_signature else "No", cell_format)
+            worksheet.write(row, 4, booking['check_in_date'], cell_format)
+            worksheet.write(row, 5, booking['check_in_time'], cell_format)
+            worksheet.write(row, 6, booking['check_out_date'], cell_format)
+            worksheet.write(row, 7, booking['check_out_time'], cell_format)
+            worksheet.write(row, 8, hours if hours else 0, number_format)
+            worksheet.write(row, 9, nights if nights else 0, cell_format)
+            worksheet.write(row, 10, "Yes" if has_signature else "No", cell_format)
             row += 1
             row_num += 1
     
     # Total row
     worksheet.write(row, 0, "", total_format)
-    worksheet.merge_range(row, 1, row, 6, "TOTAL NIGHTS BILLED", total_format)
-    worksheet.write(row, 7, total_nights, total_format)
-    worksheet.write(row, 8, "", total_format)
+    worksheet.merge_range(row, 1, row, 8, "TOTAL NIGHTS BILLED", total_format)
+    worksheet.write(row, 9, total_nights, total_format)
+    worksheet.write(row, 10, "", total_format)
     
     workbook.close()
     output.seek(0)
@@ -3384,7 +3386,7 @@ async def upload_daily_reports_to_zoho(target_date: str = None):
             elements.append(Spacer(1, 20))
             
             # Table data with signature images
-            data = [["#", "Employee ID", "Name", "Room", "Check-In", "Check-Out", "Signature"]]
+            data = [["#", "Employee ID", "Name", "Room", "Check-In Date", "Check-In Time", "Check-Out Date", "Check-Out Time", "Signature"]]
             for i, booking in enumerate(bookings, 1):
                 guest = guests_dict.get(booking['employee_number'])
                 name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown'))) if guest else "Unknown"
@@ -3398,7 +3400,7 @@ async def upload_daily_reports_to_zoho(target_date: str = None):
                             base64_data = sig_data.split(',')[1] if ',' in sig_data else sig_data
                             sig_bytes = base64.b64decode(base64_data)
                             sig_buffer = io.BytesIO(sig_bytes)
-                            sig_img = RLImage(sig_buffer, width=70, height=30)
+                            sig_img = RLImage(sig_buffer, width=60, height=25)
                             sig_element = sig_img
                     except Exception as e:
                         logging.warning(f"Could not decode signature: {e}")
@@ -3407,14 +3409,16 @@ async def upload_daily_reports_to_zoho(target_date: str = None):
                 data.append([
                     str(i),
                     booking.get('employee_number', ''),
-                    name[:25],
+                    name[:20],
                     booking.get('room_number', ''),
-                    booking.get('check_in_time', ''),
+                    booking.get('check_in_date', '-'),
+                    booking.get('check_in_time', '-'),
+                    booking.get('check_out_date', '-') if booking.get('is_checked_out') else '-',
                     booking.get('check_out_time', '-') if booking.get('is_checked_out') else '-',
                     sig_element
                 ])
             
-            table = Table(data, colWidths=[0.4*inch, 1.0*inch, 2.0*inch, 0.6*inch, 0.8*inch, 0.8*inch, 1.2*inch])
+            table = Table(data, colWidths=[0.3*inch, 0.8*inch, 1.5*inch, 0.5*inch, 0.8*inch, 0.6*inch, 0.8*inch, 0.6*inch, 1.0*inch])
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fbbf24')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
@@ -3880,7 +3884,7 @@ async def export_billing_pdf(
     elements.append(Spacer(1, 0.3*inch))
     
     # Table data
-    table_data = [['#', 'Name', 'Employee ID', 'Room', 'Check-In', 'Check-Out', 'Hours', 'Nights', 'Signed']]
+    table_data = [['#', 'Name', 'Employee ID', 'Room', 'Check-In Date', 'Check-In Time', 'Check-Out Date', 'Check-Out Time', 'Hours', 'Nights', 'Signed']]
     total_nights = 0
     total_hours = 0
     
@@ -3902,21 +3906,23 @@ async def export_billing_pdf(
             
             table_data.append([
                 str(idx + 1),
-                decrypted_name[:20],
+                decrypted_name[:18],
                 booking['employee_number'],
                 booking['room_number'],
-                f"{booking['check_in_date']} {booking['check_in_time']}",
-                f"{booking['check_out_date']} {booking['check_out_time']}",
+                booking['check_in_date'],
+                booking['check_in_time'],
+                booking['check_out_date'],
+                booking['check_out_time'],
                 f"{hours}h" if hours else '-',
                 str(nights) if nights else '-',
                 'Yes' if has_sig else 'No'
             ])
     
     if len(table_data) == 1:
-        table_data.append(['-', 'No completed stays', '-', '-', '-', '-', '-', '-', '-'])
+        table_data.append(['-', 'No completed stays', '-', '-', '-', '-', '-', '-', '-', '-', '-'])
     else:
         # Add total row
-        table_data.append(['', 'TOTAL', '', '', '', '', f'{total_hours:.1f}h', str(total_nights), ''])
+        table_data.append(['', 'TOTAL', '', '', '', '', '', '', f'{total_hours:.1f}h', str(total_nights), ''])
     
     table = Table(table_data, repeatRows=1)
     table.setStyle(TableStyle([
