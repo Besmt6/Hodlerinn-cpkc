@@ -146,9 +146,12 @@ export default function AdminDashboard() {
   // Turned Away Guests state
   const [turnedAwayGuests, setTurnedAwayGuests] = useState([]);
   const [showTurnedAwayForm, setShowTurnedAwayForm] = useState(false);
+  const [turnedAwayStats, setTurnedAwayStats] = useState({ total_lost_revenue: 0, single_bed_count: 0, double_bed_count: 0 });
   const [turnedAwayForm, setTurnedAwayForm] = useState({
     date: new Date().toISOString().split('T')[0],
     guest_name: "Walk-in Guest",
+    bed_type: "single",
+    room_price: 85.00,
     reason: "Holding rooms for CPKC",
     notes: ""
   });
@@ -362,6 +365,11 @@ export default function AdminDashboard() {
       
       const response = await axios.get(url);
       setTurnedAwayGuests(response.data.records || []);
+      setTurnedAwayStats({
+        total_lost_revenue: response.data.total_lost_revenue || 0,
+        single_bed_count: response.data.single_bed_count || 0,
+        double_bed_count: response.data.double_bed_count || 0
+      });
     } catch (error) {
       console.error("Failed to fetch turned away guests:", error);
     }
@@ -375,6 +383,8 @@ export default function AdminDashboard() {
       setTurnedAwayForm({
         date: new Date().toISOString().split('T')[0],
         guest_name: "Walk-in Guest",
+        bed_type: "single",
+        room_price: 85.00,
         reason: "Holding rooms for CPKC",
         notes: ""
       });
@@ -2568,9 +2578,17 @@ export default function AdminDashboard() {
                   {turnedAwayGuests.length > 0 && (
                     <Card className="bg-vault-surface-highlight/50 border-vault-border mb-6">
                       <CardHeader className="border-b border-vault-border pb-4">
-                        <CardTitle className="font-outfit text-lg text-rose-400 flex items-center gap-2">
-                          <UserX className="w-5 h-5" />
-                          Turned Away Guests Log
+                        <CardTitle className="font-outfit text-lg text-rose-400 flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            <UserX className="w-5 h-5" />
+                            Turned Away Guests Log
+                          </span>
+                          <span className="text-sm font-normal">
+                            Lost Revenue: <span className="text-rose-400 font-bold">${turnedAwayStats.total_lost_revenue.toFixed(2)}</span>
+                            <span className="text-vault-text-secondary ml-3">
+                              (Single: {turnedAwayStats.single_bed_count} | Double: {turnedAwayStats.double_bed_count})
+                            </span>
+                          </span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-0">
@@ -2580,8 +2598,9 @@ export default function AdminDashboard() {
                               <TableRow className="border-vault-border hover:bg-transparent">
                                 <TableHead className="text-vault-gold font-bold">Date</TableHead>
                                 <TableHead className="text-vault-gold font-bold">Guest</TableHead>
+                                <TableHead className="text-vault-gold font-bold">Bed Type</TableHead>
+                                <TableHead className="text-vault-gold font-bold">Price</TableHead>
                                 <TableHead className="text-vault-gold font-bold">Reason</TableHead>
-                                <TableHead className="text-vault-gold font-bold">Notes</TableHead>
                                 <TableHead className="text-vault-gold font-bold w-16"></TableHead>
                               </TableRow>
                             </TableHeader>
@@ -2590,8 +2609,13 @@ export default function AdminDashboard() {
                                 <TableRow key={guest.id} className="border-vault-border hover:bg-vault-surface">
                                   <TableCell className="font-mono text-vault-text">{guest.date}</TableCell>
                                   <TableCell className="text-vault-text">{guest.guest_name}</TableCell>
-                                  <TableCell className="text-vault-text-secondary">{guest.reason}</TableCell>
-                                  <TableCell className="text-vault-text-secondary text-sm">{guest.notes || '-'}</TableCell>
+                                  <TableCell className="text-vault-text">
+                                    <span className={`px-2 py-1 rounded text-xs ${guest.bed_type === 'double' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
+                                      {guest.bed_type === 'double' ? 'Double' : 'Single'}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-rose-400 font-mono">${(guest.room_price || 0).toFixed(2)}</TableCell>
+                                  <TableCell className="text-vault-text-secondary text-sm">{guest.reason}</TableCell>
                                   <TableCell>
                                     <Button
                                       variant="ghost"
@@ -2680,7 +2704,7 @@ export default function AdminDashboard() {
 
               {/* Turned Away Guest Form Dialog */}
               <Dialog open={showTurnedAwayForm} onOpenChange={setShowTurnedAwayForm}>
-                <DialogContent className="bg-vault-surface border-vault-border">
+                <DialogContent className="bg-vault-surface border-vault-border max-w-md">
                   <DialogHeader>
                     <DialogTitle className="text-vault-gold flex items-center gap-2">
                       <UserX className="w-5 h-5" />
@@ -2689,26 +2713,58 @@ export default function AdminDashboard() {
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <p className="text-vault-text-secondary text-sm">
-                      Record when you turn away a walk-in guest to honor the CPKC room guarantee.
+                      Record when you turn away a walk-in guest to honor the CPKC room guarantee. Track lost revenue from non-CPKC rates.
                     </p>
-                    <div>
-                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Date</label>
-                      <Input
-                        type="date"
-                        value={turnedAwayForm.date}
-                        onChange={(e) => setTurnedAwayForm({...turnedAwayForm, date: e.target.value})}
-                        className="bg-vault-surface-highlight border-vault-border text-vault-text"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Date</label>
+                        <Input
+                          type="date"
+                          value={turnedAwayForm.date}
+                          onChange={(e) => setTurnedAwayForm({...turnedAwayForm, date: e.target.value})}
+                          className="bg-vault-surface-highlight border-vault-border text-vault-text"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Guest Name</label>
+                        <Input
+                          value={turnedAwayForm.guest_name}
+                          onChange={(e) => setTurnedAwayForm({...turnedAwayForm, guest_name: e.target.value})}
+                          placeholder="Walk-in Guest"
+                          className="bg-vault-surface-highlight border-vault-border text-vault-text"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Guest Name (Optional)</label>
-                      <Input
-                        value={turnedAwayForm.guest_name}
-                        onChange={(e) => setTurnedAwayForm({...turnedAwayForm, guest_name: e.target.value})}
-                        placeholder="Walk-in Guest"
-                        className="bg-vault-surface-highlight border-vault-border text-vault-text"
-                      />
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Bed Type</label>
+                        <select
+                          value={turnedAwayForm.bed_type}
+                          onChange={(e) => {
+                            const newBedType = e.target.value;
+                            const defaultPrice = newBedType === 'single' ? 85.00 : 95.00;
+                            setTurnedAwayForm({...turnedAwayForm, bed_type: newBedType, room_price: defaultPrice});
+                          }}
+                          className="w-full h-10 px-3 rounded-md bg-vault-surface-highlight border border-vault-border text-vault-text"
+                        >
+                          <option value="single">Single Bed</option>
+                          <option value="double">Double Bed</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Price ($)</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={turnedAwayForm.room_price}
+                          onChange={(e) => setTurnedAwayForm({...turnedAwayForm, room_price: parseFloat(e.target.value) || 0})}
+                          className="bg-vault-surface-highlight border-vault-border text-vault-text"
+                        />
+                      </div>
                     </div>
+                    
                     <div>
                       <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Reason</label>
                       <Input

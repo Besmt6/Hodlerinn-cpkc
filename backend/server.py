@@ -2009,6 +2009,8 @@ async def get_guarantee_report(start_date: str = None, end_date: str = None):
 class TurnedAwayGuestInput(BaseModel):
     date: str  # YYYY-MM-DD
     guest_name: Optional[str] = "Walk-in Guest"
+    bed_type: str = "single"  # "single" or "double"
+    room_price: float = 0.0  # Price for the room (higher than CPKC rate)
     reason: Optional[str] = "Holding rooms for CPKC"
     notes: Optional[str] = ""
 
@@ -2020,6 +2022,8 @@ async def log_turned_away_guest(input: TurnedAwayGuestInput):
         "id": str(uuid.uuid4()),
         "date": input.date,
         "guest_name": input.guest_name,
+        "bed_type": input.bed_type,
+        "room_price": input.room_price,
         "reason": input.reason,
         "notes": input.notes,
         "logged_at": datetime.now(timezone.utc).isoformat()
@@ -2046,14 +2050,26 @@ async def get_turned_away_guests(start_date: str = None, end_date: str = None):
     
     # Group by date for summary
     by_date = {}
+    total_lost_revenue = 0.0
+    single_bed_count = 0
+    double_bed_count = 0
+    
     for g in guests:
         date = g.get('date')
         if date not in by_date:
             by_date[date] = 0
         by_date[date] += 1
+        total_lost_revenue += g.get('room_price', 0)
+        if g.get('bed_type') == 'single':
+            single_bed_count += 1
+        else:
+            double_bed_count += 1
     
     return {
         "total_count": len(guests),
+        "total_lost_revenue": total_lost_revenue,
+        "single_bed_count": single_bed_count,
+        "double_bed_count": double_bed_count,
         "by_date": by_date,
         "records": guests
     }
