@@ -371,7 +371,7 @@ class APIGlobalSyncAgent:
                     logger.warning(f"Could not get first employee name: {e}")
                 
                 # === STEP 2: Click "Load More" until no more entries ===
-                logger.info("Looking for 'Load More' button to load all entries...")
+                logger.info("Looking for 'Load More' button (blue tab on left side below records)...")
                 load_more_clicks = 0
                 max_load_more = 20  # Maximum number of "Load More" clicks
                 
@@ -380,33 +380,72 @@ class APIGlobalSyncAgent:
                     await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
                     await self.page.wait_for_timeout(1000)
                     
-                    # Look for "Load More" button with various selectors
-                    load_more_button = self.page.locator('button:has-text("Load More"), input[value*="Load More"], a:has-text("Load More"), .load-more, [class*="load-more"]').first
+                    # Look for "Load More" button - blue tab on left side
+                    # Try multiple selectors for blue button/tab with "Load More" text
+                    load_more_selectors = [
+                        'a:has-text("Load More")',
+                        'button:has-text("Load More")',
+                        'span:has-text("Load More")',
+                        'div:has-text("Load More")',
+                        '[class*="blue"]:has-text("Load More")',
+                        '[class*="load"]:has-text("More")',
+                        '[style*="blue"]:has-text("Load More")',
+                        '.ui-button:has-text("Load More")',
+                        'input[value*="Load More"]',
+                        '[class*="tab"]:has-text("Load More")',
+                        # PrimeNG/Angular specific selectors
+                        '.ui-paginator-next',
+                        '.p-paginator-next',
+                        '[class*="paginator"]:has-text("Load")',
+                        '[class*="more"]',
+                    ]
                     
-                    if await load_more_button.count() > 0:
+                    load_more_button = None
+                    for selector in load_more_selectors:
                         try:
-                            is_visible = await load_more_button.is_visible()
-                            if is_visible:
-                                logger.info(f"Found 'Load More' button - clicking (attempt {load_more_clicks + 1})")
-                                await load_more_button.click()
-                                await self.page.wait_for_timeout(2000)  # Wait for new content to load
-                                load_more_clicks += 1
-                            else:
-                                logger.info("Load More button exists but not visible - reached end")
+                            btn = self.page.locator(selector).first
+                            if await btn.count() > 0 and await btn.is_visible():
+                                load_more_button = btn
+                                logger.info(f"Found Load More with selector: {selector}")
                                 break
                         except:
-                            logger.info("Could not click Load More button - may have reached end")
+                            continue
+                    
+                    if load_more_button:
+                        try:
+                            logger.info(f"Clicking 'Load More' button (attempt {load_more_clicks + 1})")
+                            await load_more_button.scroll_into_view_if_needed()
+                            await self.page.wait_for_timeout(500)
+                            await load_more_button.click()
+                            await self.page.wait_for_timeout(2000)  # Wait for new content to load
+                            load_more_clicks += 1
+                        except Exception as e:
+                            logger.info(f"Could not click Load More button: {e} - may have reached end")
                             break
                     else:
-                        # Also try text-based search
+                        # Check if "Load More" text exists anywhere on page
                         page_text = await self.page.inner_text('body')
-                        if 'Load More' in page_text or 'load more' in page_text.lower():
-                            logger.info("Found 'Load More' text but couldn't locate button, trying scroll...")
-                            await self.page.evaluate('window.scrollBy(0, 300)')
-                            await self.page.wait_for_timeout(1000)
-                            load_more_clicks += 1
+                        if 'Load More' in page_text:
+                            logger.info("Found 'Load More' text but couldn't click it, trying to scroll and find...")
+                            # Try clicking by coordinates - left side, bottom of records
+                            try:
+                                # Find the element containing "Load More" text
+                                load_more_element = self.page.get_by_text('Load More', exact=False).first
+                                if await load_more_element.count() > 0:
+                                    await load_more_element.scroll_into_view_if_needed()
+                                    await self.page.wait_for_timeout(500)
+                                    await load_more_element.click()
+                                    await self.page.wait_for_timeout(2000)
+                                    load_more_clicks += 1
+                                    logger.info("Clicked Load More using text search")
+                                else:
+                                    logger.info("Could not find clickable Load More element")
+                                    break
+                            except:
+                                logger.info("Failed to click Load More via text search")
+                                break
                         else:
-                            logger.info("No 'Load More' button/text found - all entries loaded")
+                            logger.info("No 'Load More' text found on page - all entries loaded")
                             break
                 
                 logger.info(f"Clicked 'Load More' {load_more_clicks} times")
