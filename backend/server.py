@@ -2018,8 +2018,22 @@ async def export_guarantee_report(start_date: str = None, end_date: str = None):
 
 # Admin - Export Billing Report
 @api_router.get("/admin/export-billing")
-async def export_billing_report():
-    bookings = await db.bookings.find({"is_checked_out": True}, {"_id": 0}).to_list(1000)
+async def export_billing_report(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None)
+):
+    """Export billing report as Excel with optional date filtering"""
+    query = {"is_checked_out": True}
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date
+        if date_filter:
+            query["check_in_date"] = date_filter
+    
+    bookings = await db.bookings.find(query, {"_id": 0}).sort("check_in_date", 1).to_list(1000)
     
     # Batch fetch all guests to avoid N+1 query
     employee_numbers = [b['employee_number'] for b in bookings]
@@ -2071,7 +2085,10 @@ async def export_billing_report():
     
     # Company Header
     worksheet.merge_range('A1:I1', 'Hodler Inn - Billing Report', title_format)
-    worksheet.merge_range('A2:I2', '820 Hwy 59 N Heavener, OK, 74937 | Phone: 918-653-7801', subtitle_format)
+    date_range_text = '820 Hwy 59 N Heavener, OK, 74937 | Phone: 918-653-7801'
+    if start_date or end_date:
+        date_range_text = f"Date Range: {start_date or 'Start'} to {end_date or 'Present'}"
+    worksheet.merge_range('A2:I2', date_range_text, subtitle_format)
     worksheet.set_row(0, 25)
     worksheet.set_row(1, 18)
     
@@ -2257,8 +2274,22 @@ async def export_signin_png():
 
 # Admin - Export Billing Report as PNG
 @api_router.get("/admin/export-billing-png")
-async def export_billing_png():
-    bookings = await db.bookings.find({"is_checked_out": True}, {"_id": 0}).to_list(1000)
+async def export_billing_png(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None)
+):
+    """Export billing report as PNG with optional date filtering"""
+    query = {"is_checked_out": True}
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date
+        if date_filter:
+            query["check_in_date"] = date_filter
+    
+    bookings = await db.bookings.find(query, {"_id": 0}).sort("check_in_date", 1).to_list(1000)
     
     # Batch fetch all guests
     employee_numbers = [b['employee_number'] for b in bookings]
@@ -3163,21 +3194,25 @@ async def test_zoho_connection():
     return {"success": True, "message": f"Zoho WorkDrive connected! Folder: {ZOHO_FOLDER_ID}"}
 
 @api_router.post("/admin/upload-to-zoho")
-async def upload_daily_reports_to_zoho():
-    """Manually trigger upload of today's reports to Zoho Drive"""
-    today = datetime.now().strftime("%Y-%m-%d")
+async def upload_daily_reports_to_zoho(target_date: str = None):
+    """Upload reports to Zoho Drive. If target_date provided, uploads for that date. Otherwise uploads today's."""
+    report_date = target_date if target_date else datetime.now().strftime("%Y-%m-%d")
     results = []
     
-    # Generate and upload sign-in sheet PDF
+    # Generate and upload sign-in sheet PDF with signatures
     try:
-        # Get today's bookings
+        # Get bookings for the specified date
         bookings = await db.bookings.find({
-            "check_in_date": today,
-            "is_checked_out": False
+            "check_in_date": report_date
         }, {"_id": 0}).to_list(100)
         
         if bookings:
-            # Generate PDF
+            # Get guests for name lookup
+            employee_numbers = [b['employee_number'] for b in bookings]
+            guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(100)
+            guests_dict = {g['employee_number']: g for g in guests_list}
+            
+            # Generate PDF with signatures
             output = io.BytesIO()
             doc = SimpleDocTemplate(output, pagesize=landscape(letter), 
                                    rightMargin=30, leftMargin=30, 
@@ -3191,56 +3226,91 @@ async def upload_daily_reports_to_zoho():
                 parent=styles['Heading1'],
                 fontSize=18,
                 alignment=TA_CENTER,
-                spaceAfter=20
+                spaceAfter=10
+            )
+            subtitle_style = ParagraphStyle(
+                'Subtitle',
+                parent=styles['Normal'],
+                fontSize=10,
+                alignment=TA_CENTER,
+                textColor=colors.gray
             )
             elements.append(Paragraph(f"HODLER INN - SIGN IN SHEET", title_style))
-            elements.append(Paragraph(f"Date: {today}", styles['Normal']))
+            elements.append(Paragraph("820 Hwy 59 N Heavener, OK, 74937 | Phone: 918-653-7801", subtitle_style))
+            elements.append(Paragraph(f"Date: {report_date}", styles['Normal']))
             elements.append(Spacer(1, 20))
             
-            # Table data
-            data = [["#", "Employee ID", "Name", "Room", "Check-In Time"]]
+            # Table data with signature images
+            data = [["#", "Employee ID", "Name", "Room", "Check-In", "Check-Out", "Signature"]]
             for i, booking in enumerate(bookings, 1):
-                guest = await db.guests.find_one({"employee_number": booking['employee_number']}, {"_id": 0})
+                guest = guests_dict.get(booking['employee_number'])
                 name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown'))) if guest else "Unknown"
+                
+                # Get signature image
+                sig_element = '-'
+                if booking.get('signature_encrypted'):
+                    try:
+                        sig_data = decrypt_data(booking['signature_encrypted'])
+                        if sig_data and sig_data.startswith('data:image'):
+                            base64_data = sig_data.split(',')[1] if ',' in sig_data else sig_data
+                            sig_bytes = base64.b64decode(base64_data)
+                            sig_buffer = io.BytesIO(sig_bytes)
+                            sig_img = RLImage(sig_buffer, width=70, height=30)
+                            sig_element = sig_img
+                    except Exception as e:
+                        logging.warning(f"Could not decode signature: {e}")
+                        sig_element = 'Signed'
+                
                 data.append([
                     str(i),
                     booking.get('employee_number', ''),
-                    name,
+                    name[:25],
                     booking.get('room_number', ''),
-                    booking.get('check_in_time', '')
+                    booking.get('check_in_time', ''),
+                    booking.get('check_out_time', '-') if booking.get('is_checked_out') else '-',
+                    sig_element
                 ])
             
-            table = Table(data, colWidths=[0.5*inch, 1.2*inch, 2.5*inch, 0.8*inch, 1.2*inch])
+            table = Table(data, colWidths=[0.4*inch, 1.0*inch, 2.0*inch, 0.6*inch, 0.8*inch, 0.8*inch, 1.2*inch])
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fbbf24')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 10),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 1), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.white),
                 ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 1), (-1, -1), 9),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ]))
             elements.append(table)
+            
+            # Add summary
+            elements.append(Spacer(1, 20))
+            checked_out = sum(1 for b in bookings if b.get('is_checked_out'))
+            in_house = len(bookings) - checked_out
+            summary_style = ParagraphStyle('Summary', parent=styles['Normal'], fontSize=10)
+            elements.append(Paragraph(f"Total Check-Ins: {len(bookings)} | In-House: {in_house} | Checked Out: {checked_out}", summary_style))
             
             doc.build(elements)
             pdf_bytes = output.getvalue()
             
             # Upload to Zoho
-            result = await upload_to_zoho_drive(pdf_bytes, f"SignInSheet_{today}.pdf")
-            results.append({"file": "Sign-In Sheet", "result": result})
+            result = await upload_to_zoho_drive(pdf_bytes, f"SignInSheet_{report_date}.pdf")
+            results.append({"file": f"Sign-In Sheet ({report_date})", "result": result})
         else:
-            results.append({"file": "Sign-In Sheet", "result": {"success": True, "message": "No bookings for today"}})
+            results.append({"file": f"Sign-In Sheet ({report_date})", "result": {"success": True, "message": f"No bookings for {report_date}"}})
             
     except Exception as e:
         logging.error(f"Failed to generate/upload sign-in sheet: {e}")
-        results.append({"file": "Sign-In Sheet", "result": {"success": False, "error": str(e)}})
+        results.append({"file": f"Sign-In Sheet ({report_date})", "result": {"success": False, "error": str(e)}})
     
-    return {"results": results}
+    return {"results": results, "date": report_date}
 
 # Sync status storage (in-memory for now)
 sync_status = {

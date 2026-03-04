@@ -78,6 +78,8 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] **Room Available Alert** - Email notification when rooms become available after sold out
 - [x] **Heads Up Notice** - Email notification when only 4 rooms available (low availability warning)
 - [x] **Turned Away Guests Log** - Track guests turned away to honor CPKC room guarantee in Guarantee Report
+- [x] **Zoho Backup Date Picker** - Select any date for manual backup upload with signatures
+- [x] **Export Date Filtering** - All billing exports (Excel, PNG, PDF) support date range filtering
 
 ---
 

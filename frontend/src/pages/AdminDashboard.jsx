@@ -179,6 +179,7 @@ export default function AdminDashboard() {
   const [testingEmail, setTestingEmail] = useState(false);
   const [testingZoho, setTestingZoho] = useState(false);
   const [uploadingZoho, setUploadingZoho] = useState(false);
+  const [zohoUploadDate, setZohoUploadDate] = useState(new Date().toISOString().split('T')[0]);
   const [syncStatus, setSyncStatus] = useState({ running: false, progress: "", last_results: null });
   const [runningSyncTest, setRunningSyncTest] = useState(false);
   const [syncTargetDate, setSyncTargetDate] = useState("");
@@ -705,17 +706,26 @@ export default function AdminDashboard() {
 
   const handleExportBilling = async () => {
     try {
-      const response = await axios.get(`${API}/admin/export-billing`, {
+      let url = `${API}/admin/export-billing`;
+      const params = new URLSearchParams();
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      if (params.toString()) url += `?${params.toString()}`;
+      
+      const response = await axios.get(url, {
         responseType: "blob"
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", "hodler_inn_billing_report.xlsx");
+      link.href = blobUrl;
+      const filename = startDate || endDate 
+        ? `hodler_inn_billing_${startDate || 'start'}_to_${endDate || 'end'}.xlsx`
+        : "hodler_inn_billing_report.xlsx";
+      link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blobUrl);
       toast.success("Billing Report (Excel) exported!");
     } catch (error) {
       toast.error("Failed to export");
@@ -724,17 +734,26 @@ export default function AdminDashboard() {
 
   const handleExportBillingPng = async () => {
     try {
-      const response = await axios.get(`${API}/admin/export-billing-png`, {
+      let url = `${API}/admin/export-billing-png`;
+      const params = new URLSearchParams();
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      if (params.toString()) url += `?${params.toString()}`;
+      
+      const response = await axios.get(url, {
         responseType: "blob"
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", "hodler_inn_billing_report.png");
+      link.href = blobUrl;
+      const filename = startDate || endDate 
+        ? `hodler_inn_billing_${startDate || 'start'}_to_${endDate || 'end'}.png`
+        : "hodler_inn_billing_report.png";
+      link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blobUrl);
       toast.success("Billing Report (PNG) exported!");
     } catch (error) {
       toast.error("Failed to export");
@@ -3584,10 +3603,19 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                     </span>
                   </div>
                   <p className="text-vault-text-secondary text-sm">
-                    Upload sign-in sheets and reports directly to your Zoho WorkDrive for backup.
+                    Upload sign-in sheets with signatures to your Zoho WorkDrive. Select a date to upload missed reports.
                   </p>
                   
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div>
+                      <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Report Date</label>
+                      <Input
+                        type="date"
+                        value={zohoUploadDate}
+                        onChange={(e) => setZohoUploadDate(e.target.value)}
+                        className="bg-vault-surface border-vault-border text-vault-text w-40"
+                      />
+                    </div>
                     <Button
                       onClick={async () => {
                         setTestingZoho(true);
@@ -3615,8 +3643,8 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       onClick={async () => {
                         setUploadingZoho(true);
                         try {
-                          const res = await axios.post(`${API}/admin/upload-to-zoho`);
-                          toast.success("Reports uploaded to Zoho Drive!");
+                          const res = await axios.post(`${API}/admin/upload-to-zoho?target_date=${zohoUploadDate}`);
+                          toast.success(`Reports for ${zohoUploadDate} uploaded to Zoho Drive!`);
                           console.log(res.data);
                         } catch (error) {
                           toast.error("Failed to upload to Zoho Drive");
@@ -3629,9 +3657,12 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       data-testid="upload-zoho-btn"
                     >
                       <Upload className="w-4 h-4" />
-                      {uploadingZoho ? "Uploading..." : "Upload Today's Reports"}
+                      {uploadingZoho ? "Uploading..." : "Upload Report"}
                     </Button>
                   </div>
+                  <p className="text-vault-text-secondary text-xs">
+                    Reports include signature images and check-in/out times.
+                  </p>
                 </CardContent>
               </Card>
 
