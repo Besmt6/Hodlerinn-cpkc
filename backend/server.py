@@ -692,6 +692,215 @@ async def register_guest_pending(input: GuestRegistrationCreate):
 
 # Track if sold-out notification was already sent today
 sold_out_notification_sent_date = None
+# Track if heads-up notice was already sent today
+heads_up_notification_sent_date = None
+
+# CPKC Email Recipients
+CPKC_EMAIL_RECIPIENTS = ["crewtravel@cpkcr.com", "crewmanagers@cpkcr.com"]
+
+
+async def get_room_availability_details():
+    """Get detailed room availability information for notifications."""
+    # Get total rooms count
+    total_rooms = await db.rooms.count_documents({})
+    if total_rooms == 0:
+        total_rooms = 28  # Default to 28 if rooms not configured
+    
+    # Get occupied rooms count (railroad guests in-house)
+    occupied_by_railroad = await db.bookings.count_documents({"is_checked_out": False})
+    
+    # Get blocked rooms count (other guests)
+    blocked_rooms = await db.blocked_rooms.count_documents({"is_active": True})
+    
+    # Total occupied = railroad guests + other guests
+    total_occupied = occupied_by_railroad + blocked_rooms
+    
+    # Get available rooms
+    available_rooms = total_rooms - total_occupied
+    
+    # Get dirty rooms count (rooms needing cleaning)
+    dirty_rooms = await db.rooms.count_documents({"status": "dirty"})
+    
+    # Get rooms in maintenance
+    maintenance_rooms = await db.rooms.count_documents({"status": "maintenance"})
+    
+    # Clean available rooms (ready to use)
+    clean_available = available_rooms - dirty_rooms - maintenance_rooms
+    if clean_available < 0:
+        clean_available = 0
+    
+    return {
+        "total_rooms": total_rooms,
+        "occupied_by_railroad": occupied_by_railroad,
+        "blocked_rooms": blocked_rooms,
+        "total_occupied": total_occupied,
+        "available_rooms": available_rooms,
+        "dirty_rooms": dirty_rooms,
+        "maintenance_rooms": maintenance_rooms,
+        "clean_available": clean_available
+    }
+
+
+async def send_email_notification(subject: str, body: str):
+    """Send email notification to CPKC using configured SMTP settings."""
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    
+    if not settings or not settings.get("email_sender") or not settings.get("email_password_encrypted"):
+        logging.warning("Email settings not configured - cannot send notification")
+        return False
+    
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        smtp_host = settings.get("email_smtp_host", "smtp.zoho.com")
+        smtp_port = settings.get("email_smtp_port", 587)
+        sender = settings.get("email_sender")
+        password = decrypt_data(settings.get("email_password_encrypted"))
+        
+        # Create email
+        msg = MIMEMultipart()
+        msg['From'] = sender
+        msg['To'] = ", ".join(CPKC_EMAIL_RECIPIENTS)
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Send email
+        server = smtplib.SMTP(smtp_host, smtp_port)
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, CPKC_EMAIL_RECIPIENTS, msg.as_string())
+        server.quit()
+        
+        logging.info(f"Email notification sent: {subject}")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Failed to send email notification: {e}")
+        return False
+
+
+async def send_room_available_notification():
+    """Send notification when rooms become available after being sold out."""
+    global sold_out_notification_sent_date
+    
+    # Only send if we were sold out earlier today
+    today = datetime.now().strftime("%Y-%m-%d")
+    if sold_out_notification_sent_date != today:
+        return  # We weren't sold out today, no need to notify
+    
+    room_info = await get_room_availability_details()
+    
+    # Don't send if still sold out
+    if room_info["available_rooms"] <= 0:
+        return
+    
+    subject = f"Hodler Inn - Rooms Now Available ({today})"
+    
+    body = f"""Hello,
+
+This is an automated notification from Hodler Inn.
+
+GOOD NEWS! Rooms are now available after being at 100% capacity.
+
+ROOM AVAILABILITY:
+- Total Rooms Available: {room_info['available_rooms']}
+- Clean & Ready: {room_info['clean_available']}
+- Being Cleaned: {room_info['dirty_rooms']}
+
+CURRENT OCCUPANCY:
+- Railroad Crew In-House: {room_info['occupied_by_railroad']}
+- Other Guests: {room_info['blocked_rooms']}
+- Total Occupied: {room_info['total_occupied']}/{room_info['total_rooms']}
+
+Thank you,
+Hodler Inn
+
+---
+This is an automated message. Please do not reply to this email.
+"""
+    
+    if await send_email_notification(subject, body):
+        # Reset sold-out flag so we can send it again if we hit 100% again
+        sold_out_notification_sent_date = None
+        
+        # Also send Telegram notification
+        await send_telegram_notification(
+            f"📧 <b>ROOM AVAILABLE ALERT SENT</b>\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"✅ Email sent to CPKC\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"🏨 Available: {room_info['available_rooms']} rooms\n"
+            f"✨ Clean & Ready: {room_info['clean_available']}\n"
+            f"🧹 Being Cleaned: {room_info['dirty_rooms']}\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"🚂 Railroad: {room_info['occupied_by_railroad']}\n"
+            f"👤 Other: {room_info['blocked_rooms']}"
+        )
+
+
+async def check_and_send_heads_up_notification():
+    """Send heads-up notice when only 4 rooms are available."""
+    global heads_up_notification_sent_date
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Only send once per day
+    if heads_up_notification_sent_date == today:
+        return
+    
+    room_info = await get_room_availability_details()
+    
+    # Send heads-up when exactly 4 or fewer rooms available (but more than 0)
+    if room_info["available_rooms"] > 4 or room_info["available_rooms"] <= 0:
+        return
+    
+    subject = f"Hodler Inn - HEADS UP: Low Room Availability ({today})"
+    
+    body = f"""Hello,
+
+This is a HEADS UP notice from Hodler Inn.
+
+We have limited room availability. Please prepare for incoming crews.
+
+ROOM STATUS:
+- Rooms Available: {room_info['available_rooms']}
+- Clean & Ready: {room_info['clean_available']}
+- Being Cleaned: {room_info['dirty_rooms']}
+
+CURRENT OCCUPANCY:
+- Railroad Crew In-House: {room_info['occupied_by_railroad']}
+- Other Guests (Blocked Rooms): {room_info['blocked_rooms']}
+- Total Occupied: {room_info['total_occupied']}/{room_info['total_rooms']}
+
+Please plan accordingly for any additional crew arrivals.
+
+Thank you,
+Hodler Inn
+
+---
+This is an automated message. Please do not reply to this email.
+"""
+    
+    if await send_email_notification(subject, body):
+        heads_up_notification_sent_date = today
+        
+        # Also send Telegram notification
+        await send_telegram_notification(
+            f"📧 <b>HEADS UP NOTICE SENT</b>\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"⚠️ Low Room Availability\n"
+            f"✅ Email sent to CPKC\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"🏨 Available: {room_info['available_rooms']} rooms\n"
+            f"✨ Clean & Ready: {room_info['clean_available']}\n"
+            f"🧹 Being Cleaned: {room_info['dirty_rooms']}\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"🚂 Railroad In-House: {room_info['occupied_by_railroad']}\n"
+            f"👤 Other Guests: {room_info['blocked_rooms']}"
+        )
+
 
 async def check_and_send_sold_out_notification():
     """Check if all rooms are occupied and send notification to railroad company"""
@@ -1196,6 +1405,9 @@ async def check_in(input: CheckInCreate):
     # Check if we're now at 100% capacity and send notification to railroad company
     await check_and_send_sold_out_notification()
     
+    # Check if we're low on rooms (4 or fewer) and send heads-up notice
+    await check_and_send_heads_up_notification()
+    
     return checkin
 
 # Verify Check-Out - Verify room and employee number match before checkout
@@ -1329,6 +1541,9 @@ async def check_out(input: CheckOutCreate):
         {"room_number": input.room_number},
         {"$set": {"status": "dirty"}}
     )
+    
+    # Check if rooms are now available after being sold out (send notification to CPKC)
+    await send_room_available_notification()
     
     return {"message": "Check-out successful", "booking_id": booking['id']}
 
@@ -2464,6 +2679,9 @@ async def block_room_other_guest(input: BlockRoomInput):
     # Check if we're now at 100% capacity
     await check_and_send_sold_out_notification()
     
+    # Check if we're low on rooms (4 or fewer) and send heads-up notice
+    await check_and_send_heads_up_notification()
+    
     return {"message": f"Room {input.room_number} blocked for other guest", "block": block_doc}
 
 @api_router.post("/admin/rooms/unblock/{room_number}")
@@ -2481,6 +2699,9 @@ async def unblock_room(room_number: str):
         {"room_number": room_number, "is_active": True},
         {"$set": {"is_active": False, "unblocked_at": datetime.now(timezone.utc).isoformat()}}
     )
+    
+    # Check if rooms are now available after being sold out
+    await send_room_available_notification()
     
     return {"message": f"Room {room_number} unblocked"}
 

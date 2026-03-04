@@ -75,6 +75,8 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] DatePicker component for calendar pop-up date selection
 - [x] In-House Only filter on sign-in sheets
 - [x] **Employee name sync to Guest Portal** - Admin employee name changes now sync to `guests` collection
+- [x] **Room Available Alert** - Email notification when rooms become available after sold out
+- [x] **Heads Up Notice** - Email notification when only 4 rooms available (low availability warning)
 
 ---
 
