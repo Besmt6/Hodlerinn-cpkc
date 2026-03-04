@@ -80,6 +80,9 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] **Turned Away Guests Log** - Track guests turned away to honor CPKC room guarantee in Guarantee Report
 - [x] **Zoho Backup Date Picker** - Select any date for manual backup upload with signatures
 - [x] **Export Date Filtering** - All billing exports (Excel, PNG, PDF) support date range filtering
+- [x] **Guest Block/Unblock** - Admin can block guests from checking in again
+- [x] **Guest Remove** - Admin can remove unverified guests from system
+- [x] **Second Check-in Prevention** - Unverified guests cannot check in twice
 
 ---
 

@@ -2290,7 +2290,20 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         <p className="text-vault-text-secondary text-sm">Pending</p>
-                        <p className="text-2xl font-bold text-amber-500 font-mono">{registeredGuests.filter(g => !g.is_verified).length}</p>
+                        <p className="text-2xl font-bold text-amber-500 font-mono">{registeredGuests.filter(g => !g.is_verified && !g.is_blocked).length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-vault-surface border-vault-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-red-500/20 rounded-lg">
+                        <XCircle className="w-5 h-5 text-red-500" />
+                      </div>
+                      <div>
+                        <p className="text-vault-text-secondary text-sm">Blocked</p>
+                        <p className="text-2xl font-bold text-red-500 font-mono">{registeredGuests.filter(g => g.is_blocked).length}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -2333,9 +2346,14 @@ export default function AdminDashboard() {
                           </TableRow>
                         ) : (
                           registeredGuests.map((guest) => (
-                            <TableRow key={guest.id} className={`table-row border-vault-border ${guest.is_flagged ? 'bg-red-900/20' : !guest.is_verified ? 'bg-amber-900/20' : ''}`}>
+                            <TableRow key={guest.id} className={`table-row border-vault-border ${guest.is_blocked ? 'bg-red-900/30' : guest.is_flagged ? 'bg-red-900/20' : !guest.is_verified ? 'bg-amber-900/20' : ''}`}>
                               <TableCell>
-                                {guest.is_flagged ? (
+                                {guest.is_blocked ? (
+                                  <span className="flex items-center gap-1 text-red-500">
+                                    <XCircle className="w-4 h-4" />
+                                    Blocked
+                                  </span>
+                                ) : guest.is_flagged ? (
                                   <span className="flex items-center gap-1 text-red-400">
                                     <Flag className="w-4 h-4" />
                                     Flagged
@@ -2359,8 +2377,8 @@ export default function AdminDashboard() {
                                 {new Date(guest.created_at).toLocaleDateString()}
                               </TableCell>
                               <TableCell>
-                                <div className="flex gap-1">
-                                  {!guest.is_verified && (
+                                <div className="flex gap-1 flex-wrap">
+                                  {!guest.is_verified && !guest.is_blocked && (
                                     <Button 
                                       variant="ghost" 
                                       size="sm"
@@ -2372,16 +2390,65 @@ export default function AdminDashboard() {
                                       Verify
                                     </Button>
                                   )}
-                                  {!guest.is_flagged && (
+                                  {!guest.is_blocked ? (
                                     <Button 
                                       variant="ghost" 
                                       size="sm"
                                       className="text-red-400 hover:text-red-300 hover:bg-red-500/20 h-8 px-2"
-                                      onClick={() => handleFlagGuest(guest.employee_number)}
-                                      title="Flag guest"
+                                      onClick={async () => {
+                                        if (!confirm(`Block ${guest.name}? They won't be able to check in again.`)) return;
+                                        try {
+                                          await axios.post(`${API}/admin/guests/${guest.employee_number}/block`);
+                                          toast.success(`${guest.name} has been blocked`);
+                                          fetchRegisteredGuests();
+                                        } catch (error) {
+                                          toast.error("Failed to block guest");
+                                        }
+                                      }}
+                                      title="Block guest"
                                     >
-                                      <Flag className="w-4 h-4 mr-1" />
-                                      Flag
+                                      <XCircle className="w-4 h-4 mr-1" />
+                                      Block
+                                    </Button>
+                                  ) : (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 h-8 px-2"
+                                      onClick={async () => {
+                                        try {
+                                          await axios.post(`${API}/admin/guests/${guest.employee_number}/unblock`);
+                                          toast.success(`${guest.name} has been unblocked`);
+                                          fetchRegisteredGuests();
+                                        } catch (error) {
+                                          toast.error("Failed to unblock guest");
+                                        }
+                                      }}
+                                      title="Unblock guest"
+                                    >
+                                      <CheckCircle className="w-4 h-4 mr-1" />
+                                      Unblock
+                                    </Button>
+                                  )}
+                                  {!guest.is_verified && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/20 h-8 px-2"
+                                      onClick={async () => {
+                                        if (!confirm(`Remove ${guest.name} from system? This cannot be undone.`)) return;
+                                        try {
+                                          await axios.delete(`${API}/admin/guests/${guest.employee_number}`);
+                                          toast.success(`${guest.name} removed from system`);
+                                          fetchRegisteredGuests();
+                                        } catch (error) {
+                                          toast.error("Failed to remove guest");
+                                        }
+                                      }}
+                                      title="Remove guest"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-1" />
+                                      Remove
                                     </Button>
                                   )}
                                 </div>

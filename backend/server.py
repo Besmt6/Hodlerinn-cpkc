@@ -1359,6 +1359,94 @@ async def flag_guest(employee_number: str):
     
     return {"message": f"Guest {name} flagged for review"}
 
+
+@api_router.post("/admin/guests/{employee_number}/block")
+async def block_guest(employee_number: str):
+    """Block a guest from checking in again"""
+    guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
+    if not guest:
+        raise HTTPException(status_code=404, detail="Guest not found")
+    
+    await db.guests.update_one(
+        {"employee_number": employee_number},
+        {"$set": {"is_blocked": True, "blocked_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Also mark in employees collection
+    await db.employees.update_one(
+        {"employee_number": employee_number},
+        {"$set": {"is_blocked": True}}
+    )
+    
+    name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown')))
+    
+    await send_telegram_notification(
+        f"🚫 <b>GUEST BLOCKED</b>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"👤 {name}\n"
+        f"🆔 {employee_number}\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"❌ Cannot check in again"
+    )
+    
+    return {"message": f"Guest {name} has been blocked"}
+
+
+@api_router.post("/admin/guests/{employee_number}/unblock")
+async def unblock_guest(employee_number: str):
+    """Unblock a previously blocked guest"""
+    guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
+    if not guest:
+        raise HTTPException(status_code=404, detail="Guest not found")
+    
+    await db.guests.update_one(
+        {"employee_number": employee_number},
+        {"$set": {"is_blocked": False, "unblocked_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Also update in employees collection
+    await db.employees.update_one(
+        {"employee_number": employee_number},
+        {"$set": {"is_blocked": False}}
+    )
+    
+    name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown')))
+    
+    return {"message": f"Guest {name} has been unblocked"}
+
+
+@api_router.delete("/admin/guests/{employee_number}")
+async def remove_guest(employee_number: str):
+    """Remove an unverified guest from the system"""
+    guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
+    if not guest:
+        raise HTTPException(status_code=404, detail="Guest not found")
+    
+    name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown')))
+    
+    # Check if guest has any bookings
+    booking_count = await db.bookings.count_documents({"employee_number": employee_number})
+    
+    # Remove from guests collection
+    await db.guests.delete_one({"employee_number": employee_number})
+    
+    # Remove from employees collection if pending verification
+    await db.employees.delete_one({
+        "employee_number": employee_number,
+        "pending_verification": True
+    })
+    
+    await send_telegram_notification(
+        f"🗑️ <b>GUEST REMOVED</b>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"👤 {name}\n"
+        f"🆔 {employee_number}\n"
+        f"📋 Had {booking_count} booking(s)"
+    )
+    
+    return {"message": f"Guest {name} removed from system", "had_bookings": booking_count}
+
+
 # Check-In (signature captured here)
 @api_router.post("/checkin", response_model=CheckIn)
 async def check_in(input: CheckInCreate):
@@ -1366,6 +1454,20 @@ async def check_in(input: CheckInCreate):
     guest = await db.guests.find_one({"employee_number": input.employee_number}, {"_id": 0})
     if not guest:
         raise HTTPException(status_code=404, detail="Employee not registered. Please register first.")
+    
+    # Check if guest is blocked
+    if guest.get('is_blocked'):
+        raise HTTPException(status_code=403, detail="This employee has been blocked. Please contact front desk.")
+    
+    # Check if this is a returning unverified guest (not allowed for 2nd check-in)
+    previous_checkins = await db.bookings.count_documents({"employee_number": input.employee_number})
+    is_unverified = guest.get('pending_verification') or not guest.get('is_verified', True)
+    
+    if previous_checkins > 0 and is_unverified:
+        raise HTTPException(
+            status_code=403, 
+            detail="Cannot check in again until verified by admin. Please contact front desk."
+        )
     
     # Decrypt guest name for notification
     guest_name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown')))
