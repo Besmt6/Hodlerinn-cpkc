@@ -31,7 +31,8 @@ import {
   ClipboardList,
   Maximize,
   Minimize,
-  HelpCircle
+  HelpCircle,
+  Filter
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -1241,6 +1242,8 @@ function SignInSheetView({ setView }) {
   const [accessCode, setAccessCode] = useState("");
   const [isVerified, setIsVerified] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [showActiveOnly, setShowActiveOnly] = useState(true);  // Default to showing only in-house guests
+  const [filterDate, setFilterDate] = useState("");  // Date filter
 
   const handleVerifyAccess = async () => {
     if (!accessCode) {
@@ -1368,6 +1371,57 @@ function SignInSheetView({ setView }) {
             <p className="text-vault-text-secondary text-sm mt-1">820 Hwy 59 N Heavener, OK, 74937</p>
             <p className="text-vault-text-secondary text-sm">Phone: 918-653-7801</p>
           </div>
+          
+          {/* Filter Controls */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 bg-black/30 p-3 rounded-lg border border-vault-border">
+            <Filter className="w-4 h-4 text-vault-gold" />
+            
+            {/* In-House Only Toggle */}
+            <label className="text-vault-text-secondary text-sm cursor-pointer flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={showActiveOnly}
+                onChange={(e) => setShowActiveOnly(e.target.checked)}
+                className="w-4 h-4 accent-vault-gold cursor-pointer"
+                data-testid="guest-show-active-only-toggle"
+              />
+              <span className={showActiveOnly ? "text-vault-gold font-medium" : ""}>
+                In-House Only
+              </span>
+            </label>
+            
+            <div className="h-5 w-px bg-vault-border mx-1" />
+            
+            {/* Date Filter */}
+            <input
+              type="date"
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="bg-black/50 border border-vault-border rounded px-2 py-1 text-vault-text text-sm"
+              data-testid="guest-filter-date"
+            />
+            {filterDate && (
+              <button
+                onClick={() => setFilterDate("")}
+                className="text-vault-text-secondary hover:text-vault-gold text-sm"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          
+          {/* Summary */}
+          <div className="mt-2 text-center text-sm text-vault-text-secondary">
+            {showActiveOnly ? (
+              <span>Showing <span className="text-vault-gold font-medium">
+                {records.filter(r => !r.is_checked_out && (!filterDate || r.check_in_date === filterDate)).length}
+              </span> in-house guests</span>
+            ) : (
+              <span>Showing <span className="text-vault-gold font-medium">
+                {records.filter(r => !filterDate || r.check_in_date === filterDate).length}
+              </span> total records</span>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
@@ -1391,14 +1445,27 @@ function SignInSheetView({ setView }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {records.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={11} className="text-center text-vault-text-secondary py-8">
-                        No records found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    records.map((record, index) => (
+                  {(() => {
+                    // Apply filters
+                    let filteredRecords = records;
+                    if (showActiveOnly) {
+                      filteredRecords = filteredRecords.filter(r => !r.is_checked_out);
+                    }
+                    if (filterDate) {
+                      filteredRecords = filteredRecords.filter(r => r.check_in_date === filterDate);
+                    }
+                    
+                    if (filteredRecords.length === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={11} className="text-center text-vault-text-secondary py-8">
+                            {showActiveOnly ? "No in-house guests found" : "No records found"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    
+                    return filteredRecords.map((record, index) => (
                       <TableRow key={record.id} className="table-row border-vault-border">
                         <TableCell className="font-mono text-vault-text">{index + 1}</TableCell>
                         <TableCell className="text-vault-text">Single Stay</TableCell>
@@ -1416,8 +1483,8 @@ function SignInSheetView({ setView }) {
                         <TableCell className="font-mono text-vault-text">{record.check_out_time || "—"}</TableCell>
                         <TableCell className="font-mono text-vault-gold font-bold">{record.room_number}</TableCell>
                       </TableRow>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </TableBody>
               </Table>
             </div>
