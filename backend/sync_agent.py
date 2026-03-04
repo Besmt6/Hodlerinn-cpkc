@@ -336,12 +336,15 @@ class APIGlobalSyncAgent:
             # If a target date is provided, set it before clicking Load
             if target_date:
                 # Convert YYYY-MM-DD to "DD Mon YYYY" format (e.g., "01 Mar 2026")
+                # PrimeFaces date picker expects this format
                 if '-' in target_date and len(target_date) == 10:
                     from datetime import datetime as dt
                     date_obj = dt.strptime(target_date, "%Y-%m-%d")
-                    target_date = date_obj.strftime("%d %b %Y")  # e.g., "01 Mar 2026"
+                    formatted_date = date_obj.strftime("%d %b %Y")  # e.g., "01 Mar 2026"
+                else:
+                    formatted_date = target_date
                 
-                logger.info(f"Setting date to: {target_date}")
+                logger.info(f"Setting date to: {formatted_date}")
                 
                 # Find the date input field - look for common patterns in JSF/PrimeFaces
                 date_selectors = [
@@ -354,30 +357,155 @@ class APIGlobalSyncAgent:
                 ]
                 
                 date_input = None
+                date_input_selector = None
                 for selector in date_selectors:
                     try:
                         date_input = self.page.locator(selector).first
                         if await date_input.count() > 0:
                             logger.info(f"Found date input with selector: {selector}")
+                            date_input_selector = selector
                             break
                     except:
                         continue
                 
                 if date_input:
                     try:
-                        # Clear and set the date with triple-click to select all
-                        await date_input.click(click_count=3)
-                        await self.page.wait_for_timeout(200)
-                        await date_input.fill(target_date)
-                        await self.page.wait_for_timeout(500)
-                        # Press Enter or Tab to confirm
-                        await date_input.press('Enter')
-                        await self.page.wait_for_timeout(500)
-                        logger.info(f"Date set to {target_date}")
+                        # === CRITICAL FIX: Use JavaScript to properly set date and trigger events ===
+                        # PrimeFaces/JSF date pickers require JavaScript events to be triggered
+                        # Simply using fill() doesn't trigger the necessary change events
+                        
+                        # Get the input element's ID for JavaScript interaction
+                        input_id = await date_input.get_attribute('id')
+                        logger.info(f"Date input ID: {input_id}")
+                        
+                        # Method 1: Try using JavaScript to set value and trigger all necessary events
+                        date_set_success = await self.page.evaluate(f'''
+                            (formattedDate) => {{
+                                // Try to find the input element
+                                let input = document.querySelector('{date_input_selector}');
+                                if (!input && '{input_id}') {{
+                                    input = document.getElementById('{input_id}');
+                                }}
+                                
+                                if (!input) {{
+                                    console.log('Date input not found');
+                                    return false;
+                                }}
+                                
+                                console.log('Found date input:', input.id);
+                                
+                                // Clear and set the value
+                                input.value = formattedDate;
+                                
+                                // Trigger all necessary events for JSF/PrimeFaces
+                                // Order matters: focus -> input -> change -> blur
+                                input.dispatchEvent(new Event('focus', {{ bubbles: true }}));
+                                input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                                input.dispatchEvent(new Event('blur', {{ bubbles: true }}));
+                                
+                                // For PrimeFaces, also try to trigger the dateSelect event
+                                if (typeof PrimeFaces !== 'undefined') {{
+                                    try {{
+                                        // Find the widget associated with this input
+                                        var widgetVar = input.getAttribute('data-p-widget') || 
+                                                       input.parentElement.getAttribute('data-p-widget');
+                                        if (widgetVar && PrimeFaces.widgets[widgetVar]) {{
+                                            PrimeFaces.widgets[widgetVar].setDate(new Date(formattedDate));
+                                        }}
+                                    }} catch(e) {{
+                                        console.log('PrimeFaces widget trigger failed:', e);
+                                    }}
+                                }}
+                                
+                                return true;
+                            }}
+                        ''', formatted_date)
+                        
+                        logger.info(f"JavaScript date set result: {date_set_success}")
+                        await self.page.wait_for_timeout(1000)
+                        
+                        # Verify the value was actually set
+                        current_value = await date_input.input_value()
+                        logger.info(f"Date input current value after JS: '{current_value}'")
+                        
+                        # If JavaScript method didn't work, try clicking the calendar button
+                        if not current_value or formatted_date not in current_value:
+                            logger.info("JavaScript date set may not have worked, trying calendar UI interaction...")
+                            
+                            # Look for calendar button/icon next to the input
+                            calendar_button_selectors = [
+                                'button[class*="ui-datepicker-trigger"]',
+                                'span[class*="ui-datepicker-trigger"]',
+                                'button[class*="calendar"]',
+                                '.ui-calendar button',
+                                '.ui-calendar .ui-button',
+                                '[id*="reservationDate"] + button',
+                                '[id*="date"] ~ button'
+                            ]
+                            
+                            for cal_selector in calendar_button_selectors:
+                                try:
+                                    cal_btn = self.page.locator(cal_selector).first
+                                    if await cal_btn.count() > 0:
+                                        logger.info(f"Found calendar button with: {cal_selector}")
+                                        await cal_btn.click()
+                                        await self.page.wait_for_timeout(500)
+                                        
+                                        # Now try to select the date from the calendar popup
+                                        # Parse the target date
+                                        from datetime import datetime as dt
+                                        if '-' in target_date:
+                                            tgt_date = dt.strptime(target_date, "%Y-%m-%d")
+                                        else:
+                                            tgt_date = dt.strptime(formatted_date, "%d %b %Y")
+                                        
+                                        day = tgt_date.day
+                                        month = tgt_date.strftime("%B")  # Full month name
+                                        year = tgt_date.year
+                                        
+                                        logger.info(f"Selecting date: {day} {month} {year}")
+                                        
+                                        # Click the day in the calendar
+                                        day_selector = f'td[data-month] a:text-is("{day}")'
+                                        day_link = self.page.locator(day_selector).first
+                                        if await day_link.count() > 0:
+                                            await day_link.click()
+                                            logger.info(f"Clicked day {day} in calendar")
+                                        else:
+                                            # Try alternative day selector
+                                            day_links = self.page.locator(f'a:text-is("{day}")').all()
+                                            for dl in await day_links:
+                                                parent_class = await dl.evaluate('el => el.parentElement.className')
+                                                if 'ui-datepicker' in parent_class or 'calendar' in parent_class.lower():
+                                                    await dl.click()
+                                                    logger.info(f"Clicked day {day} via alternative selector")
+                                                    break
+                                        
+                                        await self.page.wait_for_timeout(500)
+                                        break
+                                except Exception as cal_err:
+                                    logger.info(f"Calendar button selector {cal_selector} failed: {cal_err}")
+                                    continue
+                            
+                            # Final fallback: Triple-click, clear, type, and tab out
+                            logger.info("Trying final fallback: direct input with Tab key...")
+                            await date_input.click(click_count=3)
+                            await self.page.wait_for_timeout(200)
+                            await date_input.fill(formatted_date)
+                            await self.page.wait_for_timeout(300)
+                            await date_input.press('Tab')  # Tab triggers blur event
+                            await self.page.wait_for_timeout(500)
+                        
+                        # Final verification
+                        final_value = await date_input.input_value()
+                        logger.info(f"Final date input value: '{final_value}'")
+                        
                     except Exception as date_err:
-                        logger.warning(f"Could not set date input: {date_err}")
+                        logger.error(f"Failed to set date input: {date_err}")
+                        # Don't just warn - this is critical, but we'll check after Load click
                 else:
-                    logger.warning("Could not find date input field")
+                    logger.warning("Could not find date input field - will use portal default date")
             
             # Click the Load button
             logger.info(f"Current URL before Load: {self.page.url}")
@@ -422,6 +550,25 @@ class APIGlobalSyncAgent:
                 logger.info("Page shows 'No records'")
             if 'error' in page_text.lower():
                 logger.warning("Page might contain an error")
+            
+            # === CRITICAL ERROR CHECK: Verify data actually loaded ===
+            # Check for portal error message that indicates data load failure
+            portal_error_patterns = [
+                'Unable to enter sign-in sheets',
+                'Unable to enter sign in sheets',
+                'No sign-in sheets available',
+                'Error loading',
+                'Access denied',
+                'Session expired',
+                'Invalid date'
+            ]
+            
+            for error_pattern in portal_error_patterns:
+                if error_pattern.lower() in page_text.lower():
+                    error_msg = f"Portal error detected: '{error_pattern}' - The date picker interaction likely failed. Portal did not load data for the requested date."
+                    logger.error(error_msg)
+                    self.results["errors"].append(error_msg)
+                    raise Exception(error_msg)
             
             # Check if "Scheduled Arrivals" section appeared
             try:
@@ -563,9 +710,23 @@ class APIGlobalSyncAgent:
                 await self.page.wait_for_timeout(1000)
                 
                 return True
-            except:
-                logger.warning("Could not find Scheduled Arrivals - page may be empty or different structure")
-                return True
+            except Exception as e:
+                # === CRITICAL FIX: DO NOT mask this error! ===
+                # If "Scheduled Arrivals" is not found, the date selection failed
+                # and we should NOT proceed as if everything is fine
+                error_msg = f"CRITICAL: 'Scheduled Arrivals' table not found on page. This means the date picker interaction failed and the portal did not load data for the requested date. The page may be showing a different date's data or an error. Original error: {str(e)}"
+                logger.error(error_msg)
+                self.results["errors"].append(error_msg)
+                
+                # Take a debug screenshot
+                try:
+                    await self.page.screenshot(path="/tmp/sync_scheduled_arrivals_missing.png")
+                    logger.info("Debug screenshot saved to /tmp/sync_scheduled_arrivals_missing.png")
+                except:
+                    pass
+                
+                # RAISE the exception instead of silently continuing
+                raise Exception(error_msg)
             
         except Exception as e:
             logger.error(f"Load error: {str(e)}")

@@ -3894,6 +3894,12 @@ async def count_portal_entries(target_date: str = "2026-03-03"):
             await agent.stop()
             return {"success": False, "error": "Failed to login to portal"}
         
+        # Navigate to Sign-in Sheets page first (CRITICAL - was missing before!)
+        nav_success = await agent.navigate_to_signin_sheets()
+        if not nav_success:
+            await agent.stop()
+            return {"success": False, "error": "Failed to navigate to Sign-in Sheets page"}
+        
         # Load sign-in sheet for target date
         load_success = await agent.load_signin_sheet(target_date)
         if not load_success:
@@ -3927,6 +3933,104 @@ async def count_portal_entries(target_date: str = "2026-03-03"):
         
     except Exception as e:
         logging.error(f"Count entries failed: {e}")
+        import traceback
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+
+
+@api_router.get("/admin/sync/test-date-picker")
+async def test_date_picker(target_date: str = "2026-03-03"):
+    """
+    Diagnostic: Test only the date picker interaction without running full sync.
+    Returns detailed info about what happened during date selection.
+    
+    Use this to verify the date picker fix is working before running full sync.
+    """
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    
+    if not settings or not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
+        raise HTTPException(status_code=400, detail="Portal credentials not configured")
+    
+    username = settings.get("api_global_username")
+    password = decrypt_data(settings.get("api_global_password_encrypted"))
+    
+    try:
+        from sync_agent import APIGlobalSyncAgent
+        
+        agent = APIGlobalSyncAgent(username, password)
+        results = {
+            "target_date": target_date,
+            "steps": [],
+            "final_status": "unknown"
+        }
+        
+        # Step 1: Initialize browser
+        results["steps"].append("1. Starting browser...")
+        await agent.start()
+        results["steps"].append("   Browser started successfully")
+        
+        # Step 2: Login
+        results["steps"].append("2. Logging in...")
+        login_success = await agent.login()
+        if not login_success:
+            results["steps"].append("   ❌ Login FAILED")
+            results["final_status"] = "failed_login"
+            await agent.stop()
+            return {"success": False, "results": results}
+        results["steps"].append("   ✓ Login successful")
+        
+        # Step 3: Navigate to Sign-in Sheets
+        results["steps"].append("3. Navigating to Sign-in Sheets...")
+        nav_success = await agent.navigate_to_signin_sheets()
+        if not nav_success:
+            results["steps"].append("   ❌ Navigation FAILED")
+            results["final_status"] = "failed_navigation"
+            await agent.stop()
+            return {"success": False, "results": results}
+        results["steps"].append("   ✓ Navigation successful")
+        
+        # Step 4: Load sign-in sheet with date
+        results["steps"].append(f"4. Loading sign-in sheet for date: {target_date}...")
+        try:
+            load_success = await agent.load_signin_sheet(target_date)
+            if load_success:
+                results["steps"].append("   ✓ Load successful - 'Scheduled Arrivals' found")
+            else:
+                results["steps"].append("   ❌ Load returned False")
+                results["final_status"] = "load_returned_false"
+        except Exception as load_err:
+            results["steps"].append(f"   ❌ Load raised exception: {str(load_err)}")
+            results["final_status"] = "load_exception"
+            results["error_details"] = str(load_err)
+            await agent.stop()
+            return {"success": False, "results": results}
+        
+        # Step 5: Count entries found
+        results["steps"].append("5. Counting entries found on page...")
+        entries = await agent.get_signin_sheet_entries()
+        entry_count = len(entries)
+        results["steps"].append(f"   Found {entry_count} entries")
+        results["entry_count"] = entry_count
+        
+        # Get first few entry names for verification
+        if entries:
+            first_entries = [e.get("name") for e in entries[:5]]
+            results["first_5_entries"] = first_entries
+            results["steps"].append(f"   First entries: {first_entries}")
+        
+        await agent.stop()
+        
+        # Determine final status
+        if entry_count > 0:
+            results["final_status"] = "success"
+            results["steps"].append(f"✅ SUCCESS: Date picker worked! Found {entry_count} entries for {target_date}")
+            return {"success": True, "results": results}
+        else:
+            results["final_status"] = "no_entries"
+            results["steps"].append(f"⚠️ WARNING: Date picker may have worked but no entries found for {target_date}")
+            return {"success": True, "results": results, "warning": "No entries found - verify this date has data on portal"}
+        
+    except Exception as e:
+        logging.error(f"Date picker test failed: {e}")
         import traceback
         return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
 
