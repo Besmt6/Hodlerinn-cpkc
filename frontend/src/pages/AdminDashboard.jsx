@@ -2558,21 +2558,46 @@ export default function AdminDashboard() {
                     <label className="text-xs text-vault-gold uppercase tracking-wider mb-2 block font-medium">
                       Telegram Chat ID (Group)
                     </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
-                      <Input
-                        type="text"
-                        value={portalSettings.telegram_chat_id}
-                        onChange={(e) => setPortalSettings({...portalSettings, telegram_chat_id: e.target.value})}
-                        placeholder="e.g. -1001234567890"
-                        className="bg-black/50 border-vault-border text-vault-text pl-10"
-                        data-testid="telegram-chat-id-input"
-                      />
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                        <Input
+                          type="text"
+                          value={portalSettings.telegram_chat_id}
+                          onChange={(e) => setPortalSettings({...portalSettings, telegram_chat_id: e.target.value})}
+                          placeholder="e.g. -1001234567890"
+                          className="bg-black/50 border-vault-border text-vault-text pl-10"
+                          data-testid="telegram-chat-id-input"
+                        />
+                      </div>
+                      <Button
+                        onClick={async () => {
+                          try {
+                            // First save the settings
+                            await axios.post(`${API}/admin/settings`, { 
+                              telegram_chat_id: portalSettings.telegram_chat_id 
+                            });
+                            // Then test
+                            const response = await axios.post(`${API}/admin/settings/test-telegram`);
+                            if (response.data.success) {
+                              toast.success(`✅ ${response.data.message}`);
+                            } else {
+                              toast.error(`❌ ${response.data.message}`);
+                            }
+                          } catch (error) {
+                            toast.error("Failed to test Telegram");
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+                        data-testid="test-telegram-btn"
+                      >
+                        Test Telegram
+                      </Button>
                     </div>
                     <p className="text-vault-text-secondary text-xs mt-1">
                       All check-in/check-out alerts will be sent to this Telegram group.
                       <br />
-                      <span className="text-vault-gold">Your group ID: -1003798795772</span>
+                      <span className="text-vault-gold">Correct group ID: -1003798795772</span>
                     </p>
                   </div>
 

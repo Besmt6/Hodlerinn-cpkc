@@ -2778,6 +2778,44 @@ async def test_email_connection():
         logging.error(f"Email test failed: {e}")
         return {"success": False, "message": f"Email test failed: {str(e)}"}
 
+@api_router.post("/admin/settings/test-telegram")
+async def test_telegram_connection():
+    """Test Telegram notification by sending a test message"""
+    chat_id = await get_telegram_chat_id()
+    
+    if not TELEGRAM_BOT_TOKEN:
+        return {"success": False, "message": "Telegram bot token not configured", "chat_id_used": None}
+    
+    if not chat_id:
+        return {"success": False, "message": "Telegram chat ID not configured", "chat_id_used": None}
+    
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json={
+                "chat_id": chat_id,
+                "text": "🔔 <b>Test Notification</b>\n\nThis is a test from Hodler Inn Admin Panel.\nIf you see this, Telegram notifications are working!",
+                "parse_mode": "HTML"
+            })
+            
+            result = response.json()
+            
+            if result.get("ok"):
+                return {
+                    "success": True, 
+                    "message": f"Test notification sent to chat ID: {chat_id}",
+                    "chat_id_used": chat_id
+                }
+            else:
+                return {
+                    "success": False, 
+                    "message": f"Telegram API error: {result.get('description', 'Unknown error')}",
+                    "chat_id_used": chat_id
+                }
+    except Exception as e:
+        logging.error(f"Telegram test failed: {e}")
+        return {"success": False, "message": f"Telegram test failed: {str(e)}", "chat_id_used": chat_id}
+
 @api_router.post("/admin/settings/test-zoho")
 async def test_zoho_connection():
     """Test Zoho WorkDrive connection"""
