@@ -343,12 +343,12 @@ class APIGlobalSyncAgent:
                 logger.info("Scrolling to load all entries...")
                 last_height = 0
                 scroll_attempts = 0
-                max_scrolls = 10
+                max_scrolls = 20  # Increased for larger lists
                 
                 while scroll_attempts < max_scrolls:
                     # Scroll down
                     await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                    await self.page.wait_for_timeout(1500)
+                    await self.page.wait_for_timeout(1000)  # Reduced wait time
                     
                     # Check new height
                     new_height = await self.page.evaluate('document.body.scrollHeight')
@@ -566,6 +566,11 @@ class APIGlobalSyncAgent:
             if not target_row:
                 logger.warning(f"Could not find row for: {search_name}")
                 return False
+            
+            # === Scroll row into view before interacting ===
+            logger.info(f"Scrolling row into view for {search_name}...")
+            await target_row.scroll_into_view_if_needed()
+            await self.page.wait_for_timeout(500)
             
             # Find Employee ID and Room Number inputs by their position or ID
             emp_input = None
