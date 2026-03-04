@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Table,
   TableBody,
@@ -1393,12 +1394,11 @@ function SignInSheetView({ setView }) {
             <div className="h-5 w-px bg-vault-border mx-1" />
             
             {/* Date Filter */}
-            <input
-              type="date"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              className="bg-black/50 border border-vault-border rounded px-2 py-1 text-vault-text text-sm"
-              data-testid="guest-filter-date"
+            <DatePicker
+              date={filterDate}
+              onDateChange={setFilterDate}
+              placeholder="Filter by date"
+              className="h-8 text-sm"
             />
             {filterDate && (
               <button

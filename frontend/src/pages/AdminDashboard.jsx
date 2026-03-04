@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Table,
   TableBody,
@@ -1201,22 +1202,18 @@ export default function AdminDashboard() {
                   
                   <div className="h-6 w-px bg-vault-border mx-1" />
                   
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-40 bg-black/50 border-vault-border text-vault-text text-sm h-9"
+                  <DatePicker
+                    date={startDate}
+                    onDateChange={setStartDate}
                     placeholder="Start Date"
-                    data-testid="filter-start-date"
+                    className="h-9"
                   />
                   <span className="text-vault-text-secondary">to</span>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-40 bg-black/50 border-vault-border text-vault-text text-sm h-9"
+                  <DatePicker
+                    date={endDate}
+                    onDateChange={setEndDate}
                     placeholder="End Date"
-                    data-testid="filter-end-date"
+                    className="h-9"
                   />
                   <Button
                     onClick={handleApplyFilter}
@@ -1438,20 +1435,18 @@ export default function AdminDashboard() {
                 <div className="mt-4 flex flex-wrap items-center gap-3 bg-vault-surface-highlight/50 p-3 rounded-lg border border-vault-border">
                   <Filter className="w-4 h-4 text-vault-gold" />
                   <span className="text-vault-text-secondary text-sm font-medium">Filter:</span>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-40 bg-black/50 border-vault-border text-vault-text text-sm h-9"
+                  <DatePicker
+                    date={startDate}
+                    onDateChange={setStartDate}
                     placeholder="Start Date"
+                    className="h-9"
                   />
                   <span className="text-vault-text-secondary">to</span>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-40 bg-black/50 border-vault-border text-vault-text text-sm h-9"
+                  <DatePicker
+                    date={endDate}
+                    onDateChange={setEndDate}
                     placeholder="End Date"
+                    className="h-9"
                   />
                   <Button
                     onClick={handleApplyFilter}
@@ -2341,20 +2336,18 @@ export default function AdminDashboard() {
                   <div className="flex flex-wrap items-end gap-4">
                     <div>
                       <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Start Date</label>
-                      <Input
-                        type="date"
-                        value={guaranteeDateRange.start}
-                        onChange={(e) => setGuaranteeDateRange({...guaranteeDateRange, start: e.target.value})}
-                        className="bg-black/50 border-vault-border text-vault-text w-40"
+                      <DatePicker
+                        date={guaranteeDateRange.start}
+                        onDateChange={(date) => setGuaranteeDateRange({...guaranteeDateRange, start: date})}
+                        placeholder="Select start"
                       />
                     </div>
                     <div>
                       <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">End Date</label>
-                      <Input
-                        type="date"
-                        value={guaranteeDateRange.end}
-                        onChange={(e) => setGuaranteeDateRange({...guaranteeDateRange, end: e.target.value})}
-                        className="bg-black/50 border-vault-border text-vault-text w-40"
+                      <DatePicker
+                        date={guaranteeDateRange.end}
+                        onDateChange={(date) => setGuaranteeDateRange({...guaranteeDateRange, end: date})}
+                        placeholder="Select end"
                       />
                     </div>
                     <Button
@@ -2914,12 +2907,10 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                     {portalSettings.auto_sync_enabled && (
                       <div className="mt-3 flex items-center gap-3 bg-black/30 p-3 rounded-lg border border-vault-border">
                         <label className="text-vault-text-secondary text-sm whitespace-nowrap">Start Date:</label>
-                        <Input
-                          type="date"
-                          value={portalSettings.auto_sync_start_date}
-                          onChange={(e) => setPortalSettings({...portalSettings, auto_sync_start_date: e.target.value})}
-                          className="bg-black/50 border-vault-border text-vault-text w-44"
-                          data-testid="auto-sync-start-date"
+                        <DatePicker
+                          date={portalSettings.auto_sync_start_date}
+                          onDateChange={(date) => setPortalSettings({...portalSettings, auto_sync_start_date: date})}
+                          placeholder="Select start date"
                         />
                         <Button
                           onClick={async () => {
@@ -2952,12 +2943,10 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                     {/* Date Picker for Manual Sync */}
                     <div className="flex items-center gap-3 bg-black/30 p-3 rounded-lg border border-vault-border">
                       <label className="text-vault-text-secondary text-sm whitespace-nowrap">Sync Date:</label>
-                      <Input
-                        type="date"
-                        value={syncTargetDate}
-                        onChange={(e) => setSyncTargetDate(e.target.value)}
-                        className="bg-black/50 border-vault-border text-vault-text w-44"
-                        data-testid="sync-date-picker"
+                      <DatePicker
+                        date={syncTargetDate}
+                        onDateChange={setSyncTargetDate}
+                        placeholder="Select sync date"
                       />
                       <span className="text-vault-text-secondary text-xs">
                         {syncTargetDate ? `Selected: ${syncTargetDate}` : "Leave empty for yesterday/today"}
