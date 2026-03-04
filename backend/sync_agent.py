@@ -81,16 +81,35 @@ def match_names(api_name: str, hodler_name: str, threshold: float = 0.6) -> bool
     # STRICT MATCHING: Both first AND last name must match closely
     # Last names must match exactly or be very similar
     last_name_match = (api_last == hodler_last) or (
-        SequenceMatcher(None, api_last, hodler_last).ratio() >= 0.9
+        SequenceMatcher(None, api_last, hodler_last).ratio() >= 0.85
     )
     
     # First names must match exactly or be very similar
     first_name_match = (api_first == hodler_first) or (
-        SequenceMatcher(None, api_first, hodler_first).ratio() >= 0.85
+        SequenceMatcher(None, api_first, hodler_first).ratio() >= 0.80
     )
     
     if last_name_match and first_name_match:
         logger.info(f"STRICT MATCH: first='{api_first}'=='{hodler_first}', last='{api_last}'=='{hodler_last}'")
+        return True
+    
+    # FALLBACK: Try comparing with last name first, first name second (reverse order)
+    # This handles cases where portal shows "Last First" and DB has "First Last"
+    reversed_first_match = (api_first == hodler_last) or (
+        SequenceMatcher(None, api_first, hodler_last).ratio() >= 0.80
+    )
+    reversed_last_match = (api_last == hodler_first) or (
+        SequenceMatcher(None, api_last, hodler_first).ratio() >= 0.85
+    )
+    
+    if reversed_first_match and reversed_last_match:
+        logger.info(f"REVERSED MATCH: '{api_first}'=='{hodler_last}', '{api_last}'=='{hodler_first}'")
+        return True
+    
+    # FALLBACK 2: Overall string similarity (for edge cases)
+    overall_ratio = SequenceMatcher(None, norm_api, norm_hodler).ratio()
+    if overall_ratio >= 0.85:
+        logger.info(f"OVERALL SIMILARITY MATCH: {overall_ratio:.2f}")
         return True
     
     # Log why it didn't match
@@ -1176,18 +1195,29 @@ class APIGlobalSyncAgent:
                     logger.info("All entries have blue checkmarks - sync complete!")
                     break
                 
-                # Step 5: Process each RED entry
+                # Step 5: Process each entry that needs verification
                 entries_processed_this_pass = 0
                 for entry in entries:
                     # SKIP if already verified (BLUE ✓ checkmark)
                     if entry.get("verified") or entry.get("has_blue_status"):
+                        logger.info(f"SKIPPING (already verified): {entry['name']}")
                         continue
                     
-                    # ONLY process RED ✗ status rows
-                    if not entry.get("has_red_status") and entry.get("current_emp_id"):
+                    # Process entries that:
+                    # 1. Have red status (definitely unverified)
+                    # 2. OR don't have an employee ID filled in yet
+                    # 3. OR explicitly marked as not verified
+                    needs_processing = (
+                        entry.get("has_red_status") or 
+                        not entry.get("current_emp_id") or
+                        not entry.get("verified")
+                    )
+                    
+                    if not needs_processing:
+                        logger.info(f"SKIPPING (appears complete): {entry['name']}")
                         continue
                     
-                    logger.info(f"PROCESSING (RED ✗ status): {entry['name']}")
+                    logger.info(f"PROCESSING: {entry['name']} (red={entry.get('has_red_status')}, emp_id={entry.get('current_emp_id')})")
                     entries_processed_this_pass += 1
                     
                     api_name = entry["name"]
