@@ -383,28 +383,40 @@ async def get_telegram_chat_id():
     """Get Telegram Chat ID from database settings, fallback to environment variable"""
     settings = await db.settings.find_one({}, {"_id": 0})
     if settings and settings.get("telegram_chat_id"):
+        logging.info(f"Using Telegram chat ID from database: {settings.get('telegram_chat_id')}")
         return settings.get("telegram_chat_id")
+    logging.info(f"Using Telegram chat ID from environment: {TELEGRAM_CHAT_ID}")
     return TELEGRAM_CHAT_ID
 
 async def send_telegram_notification(message: str):
     """Send notification to Telegram (supports multiple chat IDs separated by comma)"""
     chat_id = await get_telegram_chat_id()
     
-    if not TELEGRAM_BOT_TOKEN or not chat_id:
+    if not TELEGRAM_BOT_TOKEN:
+        logging.warning("Telegram notification skipped: No bot token configured")
+        return
+    if not chat_id:
+        logging.warning("Telegram notification skipped: No chat ID configured")
         return
     
     # Support multiple chat IDs separated by comma
     chat_ids = [cid.strip() for cid in chat_id.split(',') if cid.strip()]
     
+    logging.info(f"Sending Telegram notification to {len(chat_ids)} chat(s): {chat_ids}")
+    
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         async with httpx.AsyncClient() as client:
             for cid in chat_ids:
-                await client.post(url, json={
+                response = await client.post(url, json={
                     "chat_id": cid,
                     "text": message,
                     "parse_mode": "HTML"
                 })
+                if response.status_code != 200:
+                    logging.error(f"Telegram API error for chat {cid}: {response.text}")
+                else:
+                    logging.info(f"Telegram notification sent successfully to {cid}")
     except Exception as e:
         logging.error(f"Failed to send Telegram notification: {e}")
 
