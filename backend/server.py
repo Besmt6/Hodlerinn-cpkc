@@ -3792,8 +3792,13 @@ async def debug_sync_records(target_date: str = None):
             else:
                 decrypted_name = guest.get('name', '')
             
+            # Also show normalized version
+            from sync_agent import normalize_name
+            normalized = normalize_name(decrypted_name)
+            
             hodler_records.append({
                 "employee_name": decrypted_name,
+                "employee_name_normalized": normalized,
                 "employee_number": booking['employee_number'],
                 "room_number": booking['room_number']
             })
@@ -3802,6 +3807,24 @@ async def debug_sync_records(target_date: str = None):
         "target_date": target_date,
         "total_records": len(hodler_records),
         "records": hodler_records
+    }
+
+
+@api_router.get("/admin/sync/test-matching")
+async def test_name_matching(portal_name: str, hodler_name: str):
+    """Test if two names would match in the sync agent."""
+    from sync_agent import normalize_name, match_names
+    
+    norm_portal = normalize_name(portal_name)
+    norm_hodler = normalize_name(hodler_name)
+    matches = match_names(portal_name, hodler_name)
+    
+    return {
+        "portal_name": portal_name,
+        "portal_normalized": norm_portal,
+        "hodler_name": hodler_name,
+        "hodler_normalized": norm_hodler,
+        "would_match": matches
     }
 
 
