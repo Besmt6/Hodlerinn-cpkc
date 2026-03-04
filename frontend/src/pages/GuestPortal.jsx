@@ -72,6 +72,21 @@ const getTimePeriod = () => {
 
 // Track current playing audio to prevent overlap
 let currentAudio = null;
+let audioPlaying = false;
+
+// Stop all audio immediately
+const stopAllAudio = () => {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio.src = '';
+    currentAudio = null;
+  }
+  audioPlaying = false;
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+};
 
 // Audio player for voice messages (works on Fully Kiosk)
 const playVoiceMessage = (messageId, onEnd = null) => {
@@ -81,111 +96,151 @@ const playVoiceMessage = (messageId, onEnd = null) => {
     return;
   }
   
-  // Stop any currently playing audio
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio = null;
-  }
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-  }
+  // Stop any currently playing audio first
+  stopAllAudio();
   
-  const audio = new Audio(`${API}/voice/${messageId}`);
-  audio.volume = voiceSettings.volume;
-  currentAudio = audio;
-  if (onEnd) {
-    audio.onended = onEnd;
-  }
-  audio.play().catch(err => {
-    console.log("Audio play failed:", err);
-    // Fallback to Web Speech API if audio fails
-    if ('speechSynthesis' in window) {
-      const messages = {
-        "register_welcome": "Welcome to Hodler Inn. If you are first time here, please register your employee number and name, then go to check in.",
-        "checkin_welcome_morning": "Good morning. Welcome back to Hodler Inn.",
-        "checkin_welcome_afternoon": "Good afternoon. Welcome back to Hodler Inn.",
-        "checkin_welcome_evening": "Good evening. Welcome back to Hodler Inn.",
-        "checkin_welcome_night": "Good night. Welcome back to Hodler Inn.",
-        "checkin_complete": "Have a good rest.",
-        "checkout_morning": "Good morning! Thank you for staying at Hodler Inn. Have a safe journey.",
-        "checkout_afternoon": "Good afternoon! Thank you for staying at Hodler Inn. Have a safe journey.",
-        "checkout_evening": "Good evening! Thank you for staying at Hodler Inn. Have a safe journey.",
-        "checkout_night": "Good night! Thank you for staying at Hodler Inn. Have a safe journey.",
-        "signature_reminder": "Please sign your full name legibly.",
-        "room_reminder": "Please select the room number from key on desk.",
-        "checkout_found": "Booking found. Please enter your on duty time and press Complete check out."
-      };
-      const text = messages[messageId];
-      if (text) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.volume = voiceSettings.volume;
-        utterance.rate = voiceSettings.speed || 0.9;
-        if (onEnd) utterance.onend = onEnd;
-        window.speechSynthesis.speak(utterance);
+  // Small delay to ensure previous audio is fully stopped
+  setTimeout(() => {
+    const audio = new Audio(`${API}/voice/${messageId}`);
+    audio.volume = voiceSettings.volume;
+    currentAudio = audio;
+    audioPlaying = true;
+    
+    audio.onended = () => {
+      audioPlaying = false;
+      currentAudio = null;
+      if (onEnd) onEnd();
+    };
+    
+    audio.onerror = () => {
+      audioPlaying = false;
+      currentAudio = null;
+      // Fallback to Web Speech API if audio fails
+      if ('speechSynthesis' in window) {
+        const messages = {
+          "register_welcome": "Welcome to Hodler Inn. If you are first time here, please register your employee number and name, then go to check in.",
+          "checkin_welcome_morning": "Good morning. Welcome back to Hodler Inn.",
+          "checkin_welcome_afternoon": "Good afternoon. Welcome back to Hodler Inn.",
+          "checkin_welcome_evening": "Good evening. Welcome back to Hodler Inn.",
+          "checkin_welcome_night": "Good night. Welcome back to Hodler Inn.",
+          "checkin_complete": "Have a good rest.",
+          "checkout_morning": "Good morning! Thank you for staying at Hodler Inn. Have a safe journey.",
+          "checkout_afternoon": "Good afternoon! Thank you for staying at Hodler Inn. Have a safe journey.",
+          "checkout_evening": "Good evening! Thank you for staying at Hodler Inn. Have a safe journey.",
+          "checkout_night": "Good night! Thank you for staying at Hodler Inn. Have a safe journey.",
+          "signature_reminder": "Please sign your full name legibly.",
+          "room_reminder": "Please select the room number from key on desk.",
+          "checkout_found": "Booking found. Please enter your on duty time and press Complete check out."
+        };
+        const text = messages[messageId];
+        if (text) {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.volume = voiceSettings.volume;
+          utterance.rate = voiceSettings.speed || 0.9;
+          if (onEnd) utterance.onend = onEnd;
+          window.speechSynthesis.speak(utterance);
+        }
       }
-    }
-  });
+    };
+    
+    audio.play().catch(err => {
+      console.log("Audio play failed:", err);
+      audio.onerror();
+    });
+  }, 100);
 };
 
 // Play personalized welcome with name (using dynamic audio generation)
 const playWelcomeWithName = (name, isNewEmployee = false) => {
   if (!voiceSettings.enabled) return;
   
-  // Stop any currently playing audio
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio = null;
-  }
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
+  // Prevent playing if audio is already playing
+  if (audioPlaying) {
+    console.log("Audio already playing, skipping...");
+    return;
   }
   
-  const messageType = isNewEmployee ? "checkin_new" : "checkin";
-  const encodedName = encodeURIComponent(name);
-  const greeting = encodeURIComponent(getTimeBasedGreeting());
-  const audio = new Audio(`${API}/voice-dynamic/${messageType}/${encodedName}?greeting=${greeting}`);
-  audio.volume = voiceSettings.volume;
-  currentAudio = audio;
-  audio.play().catch(err => {
-    console.log("Dynamic audio failed, falling back to speech:", err);
-    // Fallback to Web Speech API
-    if ('speechSynthesis' in window) {
-      const greetingText = getTimeBasedGreeting();
-      const utterance = new SpeechSynthesisUtterance(`${greetingText}, ${name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
-      utterance.volume = voiceSettings.volume;
-      utterance.rate = voiceSettings.speed || 0.85;
-      window.speechSynthesis.speak(utterance);
-    }
-  });
+  // Stop any currently playing audio first
+  stopAllAudio();
+  
+  // Small delay to ensure previous audio is fully stopped
+  setTimeout(() => {
+    const messageType = isNewEmployee ? "checkin_new" : "checkin";
+    const encodedName = encodeURIComponent(name);
+    const greeting = encodeURIComponent(getTimeBasedGreeting());
+    const audio = new Audio(`${API}/voice-dynamic/${messageType}/${encodedName}?greeting=${greeting}`);
+    audio.volume = voiceSettings.volume;
+    currentAudio = audio;
+    audioPlaying = true;
+    
+    audio.onended = () => {
+      audioPlaying = false;
+      currentAudio = null;
+    };
+    
+    audio.onerror = () => {
+      audioPlaying = false;
+      currentAudio = null;
+      // Fallback to Web Speech API
+      if ('speechSynthesis' in window) {
+        const greetingText = getTimeBasedGreeting();
+        const utterance = new SpeechSynthesisUtterance(`${greetingText}, ${name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
+        utterance.volume = voiceSettings.volume;
+        utterance.rate = voiceSettings.speed || 0.85;
+        window.speechSynthesis.speak(utterance);
+      }
+    };
+    
+    audio.play().catch(err => {
+      console.log("Dynamic audio failed, falling back to speech:", err);
+      audio.onerror();
+    });
+  }, 100);
 };
 
 // Play checkout found with employee name (using dynamic audio generation)
 const playCheckoutFoundWithName = (name) => {
   if (!voiceSettings.enabled) return;
   
-  // Stop any currently playing audio
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio = null;
-  }
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
+  // Prevent playing if audio is already playing
+  if (audioPlaying) {
+    console.log("Audio already playing, skipping checkout message...");
+    return;
   }
   
-  const encodedName = encodeURIComponent(name);
-  const audio = new Audio(`${API}/voice-dynamic/checkout_found/${encodedName}`);
-  audio.volume = voiceSettings.volume;
-  currentAudio = audio;
-  audio.play().catch(err => {
-    console.log("Dynamic audio failed, falling back to speech:", err);
-    // Fallback to Web Speech API
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(`Booking found for ${name}. Please enter your on duty time and press Complete check out.`);
-      utterance.volume = voiceSettings.volume;
-      utterance.rate = voiceSettings.speed || 0.85;
-      window.speechSynthesis.speak(utterance);
-    }
-  });
+  // Stop any currently playing audio first
+  stopAllAudio();
+  
+  // Small delay to ensure previous audio is fully stopped
+  setTimeout(() => {
+    const encodedName = encodeURIComponent(name);
+    const audio = new Audio(`${API}/voice-dynamic/checkout_found/${encodedName}`);
+    audio.volume = voiceSettings.volume;
+    currentAudio = audio;
+    audioPlaying = true;
+    
+    audio.onended = () => {
+      audioPlaying = false;
+      currentAudio = null;
+    };
+    
+    audio.onerror = () => {
+      audioPlaying = false;
+      currentAudio = null;
+      // Fallback to Web Speech API
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(`Booking found for ${name}. Please enter your on duty time and press Complete check out.`);
+        utterance.volume = voiceSettings.volume;
+        utterance.rate = voiceSettings.speed || 0.85;
+        window.speechSynthesis.speak(utterance);
+      }
+    };
+    
+    audio.play().catch(err => {
+      console.log("Dynamic audio failed, falling back to speech:", err);
+      audio.onerror();
+    });
+  }, 100);
 };
 
 // Legacy speakMessage function (now uses audio files)
