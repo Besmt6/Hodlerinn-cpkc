@@ -3921,12 +3921,14 @@ async def count_portal_entries(target_date: str = "2026-03-03"):
             "already_verified": verified_count,
             "red_status_unverified": red_count,
             "needs_verification": needs_verification,
-            "entries": entry_names
+            "entries": entry_names,
+            "debug_note": "If all entries show verified=False but you see blue checkmarks on portal, the status detection needs fixing"
         }
         
     except Exception as e:
         logging.error(f"Count entries failed: {e}")
-        return {"success": False, "error": str(e)}
+        import traceback
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
 
 
 # ==================== Name Alias/Mapping for Sync Agent ====================
