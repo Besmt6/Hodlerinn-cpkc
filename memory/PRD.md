@@ -20,6 +20,10 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 7. Bulk verification system for pending guests
 8. Employee names auto-update to match railroad portal format during sync
 9. AI Phone Agent to handle wake-up calls from CPKC
+10. Automatic daily data backups (to email or cloud storage)
+11. Automatic "sold out" email notifications to the railroad company
+12. Room management (blocking, dirty/clean status tracking)
+13. "Guarantee Report" for unused guaranteed rooms
 
 ---
 
@@ -29,13 +33,14 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] Check-in flow with employee verification
 - [x] Check-out flow by room number lookup
 - [x] Unverified guest check-in with company name validation (CPKC only)
-- [x] Voice guidance using Web Speech API (configurable speed from admin)
-- [x] Help page with video tutorial
-- [x] Sign-in sheet view for guests
+- [x] Voice guidance using OpenAI TTS-1 (configurable speed from admin)
+- [x] Help page with video tutorial (Loom: b0647a5a59e34f42826cd2a16a5ab233)
+- [x] Sign-in sheet view for guests (with In-House Only filter)
 - [x] Kiosk mode / fullscreen support
 - [x] Auto-idle reset to menu
 - [x] Larger signature box (200px) with thicker pen strokes for tablet use
 - [x] Security: "Call Help Phone" message after 2 wrong company name attempts
+- [x] Audio management to prevent voice overlap/echo (audioPlaying flag)
 
 ### Admin Dashboard (Completed)
 - [x] Employee management (CRUD)
@@ -43,9 +48,14 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] Booking records management
 - [x] Reporting (Excel, PNG, PDF export)
 - [x] Guest verification section with bulk approve
-- [x] Room management
-- [x] Telegram notification settings
-- [x] Voice settings: Enable/disable, volume control, **speed control** (0.5-1.2)
+- [x] Room management (dirty/clean status, room blocking)
+- [x] Telegram notification settings (with test button)
+- [x] Voice settings: Enable/disable, volume control, speed control (0.5-1.2)
+- [x] Email settings for sold-out notifications
+- [x] Zoho WorkDrive backup configuration
+- [x] Guarantee Report page
+- [x] Sign-in sheet with date picker and In-House Only filter
+- [x] Auto-sync start date configuration
 
 ### AI Sync Agent (Completed)
 - [x] Playwright automation for railroad portal
@@ -53,22 +63,25 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] Skip already-verified entries (blue checkmark)
 - [x] Auto-sync employee names to portal format
 - [x] Scheduled daily sync at 3 PM Central
+- [x] **NEW:** "Load More" pagination handling (up to 20 clicks)
+- [x] **NEW:** Stricter name matching (first+last name, 0.85-0.9 threshold)
 
 ### Latest Updates (March 2026)
-- [x] Check-out screen: "On Duty Time" label (removed confusing 24hr format text)
-- [x] Voice message: Full instructions for check-in flow
-- [x] New employee: Company name field with CPKC validation (case-insensitive)
-- [x] Security: Help phone message after 2 failed company name attempts
-- [x] Admin: Voice speed control slider (Slow/Normal/Fast)
-- [x] Signature box: Bigger + thicker for Fully Kiosk Browser compatibility
+- [x] How to Use video updated to new Loom embed
+- [x] Audio management overhaul to prevent voice echo/overlap
+- [x] AI sync agent pagination ("Load More") and name matching fixes
+- [x] Employee CRUD bug fixes (lookup by employee_number fallback)
+- [x] Telegram test button added to admin panel
+- [x] DatePicker component for calendar pop-up date selection
+- [x] In-House Only filter on sign-in sheets
 
 ---
 
 ## Pending/In Progress
 
-### P0 - Critical
-- [x] **Conflicting Toast Bug Fix (Dec 2025)** - Fixed `loadSettings()` → `fetchSettings()` in email settings save handler
-- [ ] **AI Daily Sync Confirmation** - Awaiting user feedback on 3 PM auto-sync results
+### P0 - Critical (User Verification Required)
+- [ ] **Voice Echo/Overlap** - Code fix deployed, awaiting user testing on Fully Kiosk Browser
+- [ ] **AI Sync Agent Accuracy** - Pagination and name matching fixes deployed, awaiting user testing against railroad portal
 
 ### P1 - High Priority
 - [ ] **AI Phone Agent Implementation** - Blocked on Virtual PBX provider info
@@ -83,6 +96,9 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [ ] Smart Lock Integration (blocked on vendor API research)
 - [ ] White-Label SaaS Version (multi-tenant)
 - [ ] Blockchain Integration (immutable ledger)
+- [ ] **Refactoring:** 
+  - `server.py` (1600+ lines) → Split into routers
+  - `AdminDashboard.jsx` (2000+ lines) → Split into components
 
 ---
 
@@ -94,21 +110,25 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 ├── backend/
 │   ├── .env
 │   ├── requirements.txt
-│   ├── server.py          # FastAPI endpoints, voice_speed setting added
-│   └── sync_agent.py      # Playwright portal automation
+│   ├── server.py          # FastAPI endpoints (monolith, needs refactoring)
+│   └── sync_agent.py      # Playwright portal automation with pagination
 └── frontend/
     └── src/
-        ├── index.css
+        ├── components/
+        │   ├── ui/
+        │   │   ├── calendar.jsx
+        │   │   └── popover.jsx
+        │   └── DatePicker.jsx    # Reusable calendar date picker
         └── pages/
-            ├── AdminDashboard.jsx  # Voice speed slider added
-            └── GuestPortal.jsx     # Company name field, bigger signature
+            ├── AdminDashboard.jsx  # Main admin UI (needs refactoring)
+            └── GuestPortal.jsx     # Guest UI with audio management
 ```
 
 ### Tech Stack
 - **Frontend:** React, Tailwind CSS, Shadcn/UI
 - **Backend:** FastAPI, pymongo, apscheduler, playwright
 - **Database:** MongoDB
-- **Integrations:** OpenAI TTS-1, Telegram Bot, Railroad Portal (Playwright)
+- **Integrations:** OpenAI TTS-1, Telegram Bot, Zoho WorkDrive, Railroad Portal (Playwright)
 
 ### Key API Endpoints
 - `/api/checkin` - Guest check-in
@@ -116,8 +136,17 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - `/api/guests/register-pending` - Register unverified guest
 - `/api/admin/guests/bulk-verify` - Bulk approve pending guests
 - `/api/admin/sync/run` - Trigger AI sync agent
+- `/api/admin/employees/{id}` - Employee CRUD (with employee_number fallback)
+- `/api/admin/settings/telegram/test` - Test Telegram notification
+- `/api/admin/settings/auto-sync-start-date` - Set sync start date
 - `/api/voice-settings` - Get voice settings (enabled, volume, speed)
-- `/api/admin/settings` - Update portal settings including voice_speed
+- `/api/voice-dynamic/{type}/{name}` - Dynamic TTS generation
+
+### Key Database Collections
+- `settings` - App configuration (voice, email, Zoho, Telegram, auto-sync)
+- `employees` - Employee records (id, employee_number, name)
+- `bookings` - Guest booking records
+- `sync_history` - AI sync results log
 
 ---
 
@@ -127,6 +156,7 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 ---
 
 ## Critical Notes
-- **AI Sync Agent:** Uses `keyboard.type()`, clicks at (100, 100) to blur, 5-second wait between fields
+- **Voice Audio:** Uses `audioPlaying` flag and `stopAllAudio()` to prevent overlap
+- **AI Sync Agent:** Clicks "Load More" up to 20 times, uses strict first+last name matching
 - **Company Validation:** Only "CPKC" (case-insensitive) allowed for new employee check-ins
-- **Voice Speed:** Configurable from Admin → Portal Settings (0.5 to 1.2)
+- **Deployment:** Custom domain (`cpkc.hodlerinn.com`) may need re-linking after deploys

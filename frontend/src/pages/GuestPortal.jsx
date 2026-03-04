@@ -1584,15 +1584,15 @@ function HelpView({ setView }) {
             <h3 className="font-outfit text-lg font-bold text-vault-gold mb-3 flex items-center gap-2">
               🎥 Video Tutorial
             </h3>
-            <video 
-              controls 
-              className="w-full rounded-lg"
-              poster=""
-              data-testid="help-video"
-            >
-              <source src="https://customer-assets.emergentagent.com/job_8e63b3ed-49af-4684-8c2d-bb694ad7e6af/artifacts/t2459xk0_Screen_Recording_20260301_063143_Chrome.mp4" type="video/mp4" />
-              Your browser does not support the video tag.
-            </video>
+            <div className="relative w-full" style={{ paddingBottom: '56.25%', height: 0 }}>
+              <iframe
+                src="https://www.loom.com/embed/b0647a5a59e34f42826cd2a16a5ab233"
+                frameBorder="0"
+                allowFullScreen
+                className="absolute top-0 left-0 w-full h-full rounded-lg"
+                data-testid="help-video"
+              />
+            </div>
             <p className="text-vault-text-secondary text-xs mt-2 text-center">
               Watch how to Check-In and Check-Out
             </p>

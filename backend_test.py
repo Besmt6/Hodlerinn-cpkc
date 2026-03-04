@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import base64
 
 class HodlerInnAPITester:
-    def __init__(self, base_url="https://hodler-inn.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://rail-portal-verify.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
