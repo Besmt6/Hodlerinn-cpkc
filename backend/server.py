@@ -2194,22 +2194,80 @@ def format_name_for_speech(name: str) -> str:
     if match:
         last_name = match.group(1).strip()
         first_name = match.group(2).strip()
-        return f"{first_name.title()} {last_name.title()}"
-    
-    # Handle format: "LASTNAME,FIRSTNAME" or "LASTNAME, FIRSTNAME"
-    if ',' in name:
+        formatted = f"{first_name.title()} {last_name.title()}"
+    elif ',' in name:
+        # Handle format: "LASTNAME,FIRSTNAME" or "LASTNAME, FIRSTNAME"
         parts = name.split(',', 1)
         last_name = parts[0].strip()
         first_name = parts[1].strip() if len(parts) > 1 else ""
         # Remove parentheses if present
         first_name = re.sub(r'[()]', '', first_name).strip()
         if first_name and last_name:
-            return f"{first_name.title()} {last_name.title()}"
+            formatted = f"{first_name.title()} {last_name.title()}"
         elif last_name:
-            return last_name.title()
+            formatted = last_name.title()
+        else:
+            formatted = name.title()
+    else:
+        # If no comma, assume it's already in normal format
+        formatted = name.title()
     
-    # If no comma, assume it's already in normal format
-    return name.title()
+    # Fix common TTS pronunciation issues
+    formatted = fix_pronunciation(formatted)
+    
+    return formatted
+
+def fix_pronunciation(name: str) -> str:
+    """
+    Fix common TTS mispronunciations by replacing names with phonetic versions.
+    """
+    # Dictionary of names that TTS commonly mispronounces
+    # Key: lowercase name, Value: phonetically-friendly spelling
+    pronunciation_fixes = {
+        # First names
+        'brian': 'Bryan',      # Prevents "brain" pronunciation
+        'Brain': 'Bryan',      # In case it's already capitalized wrong
+        'shawn': 'Shaun',      # Some TTS struggle with Shawn
+        'sean': 'Shaun',       # Irish spelling
+        'siobhan': 'Shivawn',  # Irish name
+        'niamh': 'Neev',       # Irish name
+        'caoimhe': 'Keeva',    # Irish name
+        'saoirse': 'Seersha',  # Irish name
+        'deidre': 'Deedra',    # Can be mispronounced
+        'leigh': 'Lee',        # Silent gh
+        'geoff': 'Jeff',       # Silent o
+        'geoffrey': 'Jeffrey', # Silent o
+        'jorge': 'Horhay',     # Spanish pronunciation
+        'jose': 'Hosay',       # Spanish pronunciation
+        'jesus': 'Heysoos',    # Spanish pronunciation
+        'nguyen': 'Win',       # Vietnamese name
+        'phoebe': 'Feebee',    # Greek spelling
+        'chloe': 'Klowee',     # Greek spelling
+        'zoe': 'Zowee',        # Greek spelling
+        'megan': 'Meggan',     # Can be mispronounced as "meegan"
+        'colin': 'Collin',     # Can be mispronounced
+        'stephen': 'Steven',   # ph = v sound
+        'ralph': 'Ralf',       # Silent l for some
+        # Add more as needed
+    }
+    
+    words = name.split()
+    fixed_words = []
+    
+    for word in words:
+        word_lower = word.lower()
+        if word_lower in pronunciation_fixes:
+            # Preserve the original capitalization style
+            fixed = pronunciation_fixes[word_lower]
+            if word.isupper():
+                fixed = fixed.upper()
+            elif word[0].isupper():
+                fixed = fixed.capitalize()
+            fixed_words.append(fixed)
+        else:
+            fixed_words.append(word)
+    
+    return ' '.join(fixed_words)
 
 @api_router.get("/voice-dynamic/{message_type}/{name}")
 async def get_dynamic_voice(message_type: str, name: str, greeting: str = None):
