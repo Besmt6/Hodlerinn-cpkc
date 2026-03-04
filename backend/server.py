@@ -3663,6 +3663,9 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
         "target": target_date or target
     }
     
+    # Get name aliases for matching
+    name_aliases = await db.name_aliases.find({}, {"_id": 0}).to_list(100)
+    
     # Run sync in background using asyncio.create_task
     async def run_sync_task_wrapper():
         global sync_status
@@ -3673,7 +3676,7 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
             from sync_agent import APIGlobalSyncAgent
             
             agent = APIGlobalSyncAgent(sync_params["username"], sync_params["password"])
-            results = await agent.run_sync(sync_params["hodler_records"], sync_params["target"])
+            results = await agent.run_sync(sync_params["hodler_records"], sync_params["target"], name_aliases)
             
             sync_status["last_results"] = results
             sync_status["last_run"] = datetime.now(timezone.utc).isoformat()
@@ -3726,6 +3729,62 @@ async def get_sync_history():
     """Get sync history"""
     history = await db.sync_history.find({}, {"_id": 0}).sort("timestamp", -1).to_list(20)
     return history
+
+
+# ==================== Name Alias/Mapping for Sync Agent ====================
+
+class NameAliasInput(BaseModel):
+    portal_name: str  # Name as it appears on API Global portal
+    employee_number: str  # Employee number in Hodler Inn
+
+
+@api_router.get("/admin/sync/name-aliases")
+async def get_name_aliases():
+    """Get all name aliases for sync agent matching."""
+    aliases = await db.name_aliases.find({}, {"_id": 0}).to_list(100)
+    return aliases
+
+
+@api_router.post("/admin/sync/name-aliases")
+async def add_name_alias(input: NameAliasInput):
+    """Add a name alias so sync agent can match portal names to employees."""
+    # Check if employee exists
+    employee = await db.employees.find_one({"employee_number": input.employee_number}, {"_id": 0})
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found with that number")
+    
+    # Check if alias already exists
+    existing = await db.name_aliases.find_one({"portal_name": input.portal_name.lower()}, {"_id": 0})
+    if existing:
+        # Update existing alias
+        await db.name_aliases.update_one(
+            {"portal_name": input.portal_name.lower()},
+            {"$set": {"employee_number": input.employee_number, "employee_name": employee.get("name")}}
+        )
+        return {"message": f"Updated alias: '{input.portal_name}' → {employee.get('name')} ({input.employee_number})"}
+    
+    # Create new alias
+    doc = {
+        "id": str(uuid.uuid4()),
+        "portal_name": input.portal_name.lower(),  # Normalized for matching
+        "employee_number": input.employee_number,
+        "employee_name": employee.get("name"),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.name_aliases.insert_one(doc)
+    doc.pop('_id', None)
+    
+    return {"message": f"Added alias: '{input.portal_name}' → {employee.get('name')} ({input.employee_number})", "alias": doc}
+
+
+@api_router.delete("/admin/sync/name-aliases/{alias_id}")
+async def delete_name_alias(alias_id: str):
+    """Delete a name alias."""
+    result = await db.name_aliases.delete_one({"id": alias_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Alias not found")
+    return {"message": "Alias deleted"}
+
 
 @api_router.post("/admin/import-from-guests")
 async def import_employees_from_guests():

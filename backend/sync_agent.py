@@ -102,6 +102,47 @@ def match_names(api_name: str, hodler_name: str, threshold: float = 0.6) -> bool
     return False
 
 
+def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> list:
+    """Find the best possible matches for a name, even if they don't meet threshold."""
+    norm_api = normalize_name(api_name)
+    if not norm_api:
+        return []
+    
+    scores = []
+    for emp in hodler_employees:
+        hodler_name = emp.get("name", "")
+        norm_hodler = normalize_name(hodler_name)
+        if not norm_hodler:
+            continue
+        
+        # Calculate overall similarity
+        overall = SequenceMatcher(None, norm_api, norm_hodler).ratio()
+        
+        # Also check part-by-part matching
+        api_parts = norm_api.split()
+        hodler_parts = norm_hodler.split()
+        
+        first_score = 0
+        last_score = 0
+        if len(api_parts) >= 2 and len(hodler_parts) >= 2:
+            first_score = SequenceMatcher(None, api_parts[0], hodler_parts[0]).ratio()
+            last_score = SequenceMatcher(None, api_parts[-1], hodler_parts[-1]).ratio()
+        
+        scores.append({
+            "employee_number": emp.get("employee_number"),
+            "name": hodler_name,
+            "normalized": norm_hodler,
+            "overall_score": overall,
+            "first_name_score": first_score,
+            "last_name_score": last_score,
+            "combined_score": (first_score + last_score) / 2
+        })
+    
+    # Sort by combined score (first + last name matching)
+    scores.sort(key=lambda x: x["combined_score"], reverse=True)
+    return scores[:top_n]
+
+
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
         self.username = username
@@ -1051,17 +1092,21 @@ class APIGlobalSyncAgent:
             logger.error(f"Error saving changes: {str(e)}")
             return False
     
-    async def run_sync(self, hodler_records: list, target_date: str = None) -> dict:
+    async def run_sync(self, hodler_records: list, target_date: str = None, name_aliases: list = None) -> dict:
         """
         Run the full sync process.
         
         Args:
             hodler_records: List of dicts with 'employee_name', 'employee_number', 'room_number'
             target_date: Optional date in format 'YYYY-MM-DD' to sync for a specific date
+            name_aliases: Optional list of name mappings from portal names to employee IDs
         
         Returns:
             Results dict with verified, no_bill, missing entries
         """
+        if name_aliases is None:
+            name_aliases = []
+        
         try:
             await self.start()
             
@@ -1174,13 +1219,58 @@ class APIGlobalSyncAgent:
                             matched = True
                             break
                     
+                    # If no match, check name aliases
+                    if not matched and name_aliases:
+                        norm_api = normalize_name(api_name).lower()
+                        for alias in name_aliases:
+                            alias_name = alias.get("portal_name", "").lower()
+                            if norm_api == alias_name or api_name.lower() == alias_name:
+                                # Found alias match!
+                                employee_id = alias.get("employee_number")
+                                # Find the hodler record with this employee ID
+                                for record in hodler_records:
+                                    if record.get("employee_number") == employee_id:
+                                        logger.info(f"*** ALIAS MATCH: {api_name} -> {alias.get('employee_name')} ({employee_id}) ***")
+                                        try:
+                                            success = await self.verify_entry(
+                                                entry,
+                                                employee_id,
+                                                record.get("room_number", "")
+                                            )
+                                            if success:
+                                                self.results["verified"].append({
+                                                    "api_name": api_name,
+                                                    "hodler_name": alias.get("employee_name"),
+                                                    "employee_id": employee_id,
+                                                    "room": record.get("room_number"),
+                                                    "matched_via": "alias"
+                                                })
+                                        except Exception as ve:
+                                            logger.error(f"Error in verify_entry (alias): {str(ve)}")
+                                        matched = True
+                                        break
+                                break
+                    
                     if not matched:
-                        # No match found - mark as No Bill
-                        logger.info(f"No match for {api_name} - marking No Bill")
+                        # No match found - try to find closest matches for debugging
+                        best_matches = find_best_matches(api_name, hodler_records, top_n=3)
+                        logger.info(f"No match for '{api_name}' - Best possible matches:")
+                        for bm in best_matches:
+                            logger.info(f"  - {bm['name']} (ID: {bm['employee_number']}) - Score: {bm['combined_score']:.2f}")
+                        
+                        # Mark as No Bill
+                        logger.info(f"Marking {api_name} as No Bill")
                         if await self.mark_no_bill(entry):
-                            self.results["no_bill"].append({"name": api_name})
+                            self.results["no_bill"].append({
+                                "name": api_name,
+                                "best_matches": best_matches
+                            })
                         else:
-                            self.results["missing_in_hodler"].append({"name": api_name})
+                            self.results["missing_in_hodler"].append({
+                                "name": api_name,
+                                "reason": "Could not find matching employee and No Bill failed",
+                                "best_matches": best_matches
+                            })
                     
                     # After each entry, wait a moment for page to stabilize
                     await self.page.wait_for_timeout(500)
