@@ -352,30 +352,98 @@ class APIGlobalSyncAgent:
                 await self.page.wait_for_selector('text=Scheduled Arrivals', timeout=10000)
                 logger.info("Sign-in sheet data loaded successfully")
                 
-                # Scroll down to load all entries (lazy loading)
-                logger.info("Scrolling to load all entries...")
-                last_height = 0
-                scroll_attempts = 0
-                max_scrolls = 20  # Increased for larger lists
+                # === STEP 1: Record first employee name on page ===
+                first_employee = None
+                try:
+                    # Find the first employee name in the table
+                    first_row = self.page.locator('tr').filter(has=self.page.locator('input[type="text"]')).first
+                    if await first_row.count() > 0:
+                        first_text = await first_row.inner_text()
+                        logger.info(f"First employee row text: {first_text[:100]}")
+                        # Extract name from the row
+                        for part in first_text.split('\t'):
+                            part = part.strip()
+                            if ('/' in part or '(' in part) and len(part) > 5:
+                                first_employee = part
+                                break
+                        logger.info(f"First employee name: {first_employee}")
+                except Exception as e:
+                    logger.warning(f"Could not get first employee name: {e}")
                 
-                while scroll_attempts < max_scrolls:
-                    # Scroll down
+                # === STEP 2: Click "Load More" until no more entries ===
+                logger.info("Looking for 'Load More' button to load all entries...")
+                load_more_clicks = 0
+                max_load_more = 20  # Maximum number of "Load More" clicks
+                
+                while load_more_clicks < max_load_more:
+                    # Scroll to bottom to see if there's a "Load More" button
                     await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                    await self.page.wait_for_timeout(1000)  # Reduced wait time
+                    await self.page.wait_for_timeout(1000)
                     
-                    # Check new height
-                    new_height = await self.page.evaluate('document.body.scrollHeight')
+                    # Look for "Load More" button with various selectors
+                    load_more_button = self.page.locator('button:has-text("Load More"), input[value*="Load More"], a:has-text("Load More"), .load-more, [class*="load-more"]').first
                     
-                    if new_height == last_height:
-                        # No more content to load
-                        logger.info(f"Finished scrolling after {scroll_attempts + 1} scrolls")
-                        break
-                    
-                    last_height = new_height
-                    scroll_attempts += 1
-                    logger.info(f"Scroll {scroll_attempts}: page height = {new_height}")
+                    if await load_more_button.count() > 0:
+                        try:
+                            is_visible = await load_more_button.is_visible()
+                            if is_visible:
+                                logger.info(f"Found 'Load More' button - clicking (attempt {load_more_clicks + 1})")
+                                await load_more_button.click()
+                                await self.page.wait_for_timeout(2000)  # Wait for new content to load
+                                load_more_clicks += 1
+                            else:
+                                logger.info("Load More button exists but not visible - reached end")
+                                break
+                        except:
+                            logger.info("Could not click Load More button - may have reached end")
+                            break
+                    else:
+                        # Also try text-based search
+                        page_text = await self.page.inner_text('body')
+                        if 'Load More' in page_text or 'load more' in page_text.lower():
+                            logger.info("Found 'Load More' text but couldn't locate button, trying scroll...")
+                            await self.page.evaluate('window.scrollBy(0, 300)')
+                            await self.page.wait_for_timeout(1000)
+                            load_more_clicks += 1
+                        else:
+                            logger.info("No 'Load More' button/text found - all entries loaded")
+                            break
                 
-                # Scroll back to top to reset view
+                logger.info(f"Clicked 'Load More' {load_more_clicks} times")
+                
+                # === STEP 3: Record last employee name on page ===
+                last_employee = None
+                try:
+                    # Scroll to bottom to find last employee
+                    await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                    await self.page.wait_for_timeout(1000)
+                    
+                    # Find all rows with inputs and get the last one
+                    all_data_rows = self.page.locator('tr').filter(has=self.page.locator('input[type="text"]'))
+                    row_count = await all_data_rows.count()
+                    logger.info(f"Total data rows found: {row_count}")
+                    
+                    if row_count > 0:
+                        last_row = all_data_rows.nth(row_count - 1)
+                        last_text = await last_row.inner_text()
+                        logger.info(f"Last employee row text: {last_text[:100]}")
+                        # Extract name from the row
+                        for part in last_text.split('\t'):
+                            part = part.strip()
+                            if ('/' in part or '(' in part) and len(part) > 5:
+                                last_employee = part
+                                break
+                        logger.info(f"Last employee name: {last_employee}")
+                except Exception as e:
+                    logger.warning(f"Could not get last employee name: {e}")
+                
+                # Log summary of what was found
+                logger.info(f"=== LOAD SUMMARY ===")
+                logger.info(f"First employee: {first_employee}")
+                logger.info(f"Last employee: {last_employee}")
+                logger.info(f"Total Load More clicks: {load_more_clicks}")
+                
+                # Scroll back to top to start processing
                 await self.page.evaluate('window.scrollTo(0, 0)')
                 await self.page.wait_for_timeout(1000)
                 
