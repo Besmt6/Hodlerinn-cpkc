@@ -3670,28 +3670,43 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
     
     bookings = await db.bookings.find(query, {"_id": 0}).sort([("check_in_date", 1), ("check_in_time", 1)]).to_list(1000)
     
-    # Get guest names
+    # Get employee names from EMPLOYEES collection (Admin updated names)
+    # This ensures sync agent uses the portal-format names you've updated
     employee_numbers = [b['employee_number'] for b in bookings]
+    employees_list = await db.employees.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+    employees_dict = {e['employee_number']: e for e in employees_list}
+    
+    # Fallback to guests if employee not found
     guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
     guests_dict = {g['employee_number']: g for g in guests_list}
     
-    # Build records for sync agent
+    # Build records for sync agent - PRIORITIZE employee list names
     hodler_records = []
     for booking in bookings:
+        employee = employees_dict.get(booking['employee_number'])
         guest = guests_dict.get(booking['employee_number'])
-        if guest:
+        
+        # Use employee list name first (the one you updated to match portal)
+        # Fallback to guest name if employee not in list
+        if employee and employee.get('name'):
+            name_to_use = employee.get('name')
+            logging.info(f"Using EMPLOYEE name for {booking['employee_number']}: {name_to_use}")
+        elif guest:
             # Handle both encrypted and non-encrypted names
             name_encrypted = guest.get('name_encrypted')
             if name_encrypted:
-                decrypted_name = decrypt_data(name_encrypted)
+                name_to_use = decrypt_data(name_encrypted)
             else:
-                decrypted_name = guest.get('name', '')
-            
-            hodler_records.append({
-                "employee_name": decrypted_name,
-                "employee_number": booking['employee_number'],
-                "room_number": booking['room_number']
-            })
+                name_to_use = guest.get('name', '')
+            logging.info(f"Using GUEST name for {booking['employee_number']}: {name_to_use}")
+        else:
+            continue
+        
+        hodler_records.append({
+            "employee_name": name_to_use,
+            "employee_number": booking['employee_number'],
+            "room_number": booking['room_number']
+        })
     
     # Store sync params for background task
     sync_params = {
@@ -3776,36 +3791,52 @@ async def debug_sync_records(target_date: str = None):
         "is_checked_out": False
     }, {"_id": 0}).to_list(100)
     
-    # Get guests for name lookup
+    # Get employee names from EMPLOYEES collection (Admin updated names)
     employee_numbers = [b['employee_number'] for b in bookings]
-    guests = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(100)
-    guests_dict = {g['employee_number']: g for g in guests}
+    employees_list = await db.employees.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(100)
+    employees_dict = {e['employee_number']: e for e in employees_list}
     
-    # Build records exactly as sync agent sees them
+    # Get guests for comparison
+    guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(100)
+    guests_dict = {g['employee_number']: g for g in guests_list}
+    
+    # Build records showing both names
+    from sync_agent import normalize_name
+    
     hodler_records = []
     for booking in bookings:
+        employee = employees_dict.get(booking['employee_number'])
         guest = guests_dict.get(booking['employee_number'])
+        
+        # Get employee list name
+        employee_name = employee.get('name', '') if employee else ''
+        
+        # Get guest check-in name
+        guest_name = ''
         if guest:
             name_encrypted = guest.get('name_encrypted')
             if name_encrypted:
-                decrypted_name = decrypt_data(name_encrypted)
+                guest_name = decrypt_data(name_encrypted)
             else:
-                decrypted_name = guest.get('name', '')
-            
-            # Also show normalized version
-            from sync_agent import normalize_name
-            normalized = normalize_name(decrypted_name)
-            
-            hodler_records.append({
-                "employee_name": decrypted_name,
-                "employee_name_normalized": normalized,
-                "employee_number": booking['employee_number'],
-                "room_number": booking['room_number']
-            })
+                guest_name = guest.get('name', '')
+        
+        # Name that will be used for matching (employee list takes priority)
+        name_for_sync = employee_name if employee_name else guest_name
+        normalized = normalize_name(name_for_sync)
+        
+        hodler_records.append({
+            "employee_number": booking['employee_number'],
+            "room_number": booking['room_number'],
+            "employee_list_name": employee_name,
+            "guest_checkin_name": guest_name,
+            "name_used_for_sync": name_for_sync,
+            "normalized": normalized
+        })
     
     return {
         "target_date": target_date,
         "total_records": len(hodler_records),
+        "note": "Sync agent now uses 'employee_list_name' if available (you updated these to match portal)",
         "records": hodler_records
     }
 
