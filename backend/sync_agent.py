@@ -1077,72 +1077,156 @@ class APIGlobalSyncAgent:
             if not await self.load_signin_sheet(target_date):
                 return self.results
             
-            # Step 4: Get all entries from the table
-            entries = await self.get_signin_sheet_entries()
+            # Step 4-6: LOOP until all entries verified (handles page refresh)
+            max_sync_passes = 5  # Maximum number of full passes
+            sync_pass = 0
             
-            if not entries:
-                logger.info("No entries found to process")
-                self.results["errors"].append("No entries found on the sign-in sheet")
-                return self.results
-            
-            # Step 5: Process each entry - ONLY RED ✗ status rows
-            for entry in entries:
-                # SKIP if already verified (BLUE ✓ checkmark)
-                if entry.get("verified") or entry.get("has_blue_status"):
-                    logger.info(f"SKIPPING (BLUE ✓ - already done): {entry['name']}")
-                    continue
+            while sync_pass < max_sync_passes:
+                sync_pass += 1
+                logger.info(f"=== SYNC PASS {sync_pass}/{max_sync_passes} ===")
                 
-                # ONLY process RED ✗ status rows
-                if not entry.get("has_red_status") and entry.get("current_emp_id"):
-                    logger.info(f"SKIPPING (has Employee ID): {entry['name']}")
-                    continue
-                
-                logger.info(f"PROCESSING (RED ✗ status): {entry['name']}")
-                
-                api_name = entry["name"]
-                matched = False
-                
-                # Try to match with Hodler Inn records
-                for record in hodler_records:
-                    hodler_name = record.get("employee_name", "")
-                    logger.info(f"Comparing: '{api_name}' with '{hodler_name}'")
-                    if match_names(api_name, hodler_name):
-                        # Found a match - fill in the details
-                        logger.info(f"*** MATCH FOUND: {api_name} <-> {hodler_name} ***")
-                        logger.info(f"Will fill: EmpID={record.get('employee_number')}, Room={record.get('room_number')}")
-                        try:
-                            success = await self.verify_entry(
-                                entry,
-                                record.get("employee_number", ""),
-                                record.get("room_number", "")
-                            )
-                            logger.info(f"verify_entry returned: {success}")
-                            if success:
-                                self.results["verified"].append({
-                                    "api_name": api_name,
-                                    "hodler_name": hodler_name,
-                                    "employee_id": record.get("employee_number"),
-                                    "room": record.get("room_number"),
-                                    "portal_name": api_name,  # Store portal name for syncing
-                                    "update_name": api_name != hodler_name  # Flag to update if names differ
-                                })
-                        except Exception as ve:
-                            logger.error(f"Error in verify_entry: {str(ve)}")
-                        matched = True
+                # Step 4a: Click "Load More" until all entries are visible
+                logger.info("Loading all entries (clicking Load More if needed)...")
+                load_more_clicks = 0
+                while load_more_clicks < 20:
+                    await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                    await self.page.wait_for_timeout(1000)
+                    
+                    # Look for "Load More" button/link
+                    load_more = self.page.get_by_text('Load More', exact=False).first
+                    try:
+                        if await load_more.count() > 0 and await load_more.is_visible():
+                            logger.info(f"Clicking 'Load More' (click {load_more_clicks + 1})")
+                            await load_more.click()
+                            await self.page.wait_for_timeout(2000)
+                            load_more_clicks += 1
+                        else:
+                            break
+                    except:
                         break
                 
-                if not matched:
-                    # No match found in Hodler Inn records - mark as No Bill
-                    logger.info(f"No match for {api_name} - marking No Bill")
-                    if await self.mark_no_bill(entry):
-                        self.results["no_bill"].append({"name": api_name})
-                    else:
-                        self.results["missing_in_hodler"].append({"name": api_name})
+                logger.info(f"Load More clicked {load_more_clicks} times in pass {sync_pass}")
+                
+                # Scroll back to top
+                await self.page.evaluate('window.scrollTo(0, 0)')
+                await self.page.wait_for_timeout(1000)
+                
+                # Step 4b: Get all entries from the table
+                entries = await self.get_signin_sheet_entries()
+                
+                if not entries:
+                    logger.info("No entries found to process")
+                    if sync_pass == 1:
+                        self.results["errors"].append("No entries found on the sign-in sheet")
+                    break
+                
+                # Count red (unverified) entries
+                red_entries = [e for e in entries if e.get("has_red_status") and not e.get("verified")]
+                blue_entries = [e for e in entries if e.get("has_blue_status") or e.get("verified")]
+                
+                logger.info(f"Pass {sync_pass}: Total entries={len(entries)}, Red (unverified)={len(red_entries)}, Blue (verified)={len(blue_entries)}")
+                
+                # If all entries are blue (verified), we're done!
+                if len(red_entries) == 0:
+                    logger.info("All entries have blue checkmarks - sync complete!")
+                    break
+                
+                # Step 5: Process each RED entry
+                entries_processed_this_pass = 0
+                for entry in entries:
+                    # SKIP if already verified (BLUE ✓ checkmark)
+                    if entry.get("verified") or entry.get("has_blue_status"):
+                        continue
+                    
+                    # ONLY process RED ✗ status rows
+                    if not entry.get("has_red_status") and entry.get("current_emp_id"):
+                        continue
+                    
+                    logger.info(f"PROCESSING (RED ✗ status): {entry['name']}")
+                    entries_processed_this_pass += 1
+                    
+                    api_name = entry["name"]
+                    matched = False
+                    
+                    # Try to match with Hodler Inn records
+                    for record in hodler_records:
+                        hodler_name = record.get("employee_name", "")
+                        if match_names(api_name, hodler_name):
+                            # Found a match - fill in the details
+                            logger.info(f"*** MATCH FOUND: {api_name} <-> {hodler_name} ***")
+                            try:
+                                success = await self.verify_entry(
+                                    entry,
+                                    record.get("employee_number", ""),
+                                    record.get("room_number", "")
+                                )
+                                if success:
+                                    self.results["verified"].append({
+                                        "api_name": api_name,
+                                        "hodler_name": hodler_name,
+                                        "employee_id": record.get("employee_number"),
+                                        "room": record.get("room_number"),
+                                        "portal_name": api_name,
+                                        "update_name": api_name != hodler_name
+                                    })
+                            except Exception as ve:
+                                logger.error(f"Error in verify_entry: {str(ve)}")
+                            matched = True
+                            break
+                    
+                    if not matched:
+                        # No match found - mark as No Bill
+                        logger.info(f"No match for {api_name} - marking No Bill")
+                        if await self.mark_no_bill(entry):
+                            self.results["no_bill"].append({"name": api_name})
+                        else:
+                            self.results["missing_in_hodler"].append({"name": api_name})
+                    
+                    # After each entry, wait a moment for page to stabilize
+                    await self.page.wait_for_timeout(500)
+                
+                logger.info(f"Pass {sync_pass} completed: Processed {entries_processed_this_pass} entries")
+                
+                # If we didn't process any entries this pass, something's wrong - stop
+                if entries_processed_this_pass == 0:
+                    logger.info("No entries processed in this pass - stopping")
+                    break
+                
+                # Wait for any page updates/refreshes
+                await self.page.wait_for_timeout(2000)
+                
+                # Scroll to bottom to check if more entries appeared (page may have refreshed)
+                await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                await self.page.wait_for_timeout(1000)
             
-            # Check for Hodler records not found in API Global (guests who stayed but not in system)
+            # Final check: Scroll through entire page to count blue checkmarks
+            logger.info("=== FINAL VERIFICATION ===")
+            await self.page.evaluate('window.scrollTo(0, 0)')
+            await self.page.wait_for_timeout(1000)
+            
+            # Load all entries one more time
+            while True:
+                await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                await self.page.wait_for_timeout(1000)
+                load_more = self.page.get_by_text('Load More', exact=False).first
+                try:
+                    if await load_more.count() > 0 and await load_more.is_visible():
+                        await load_more.click()
+                        await self.page.wait_for_timeout(2000)
+                    else:
+                        break
+                except:
+                    break
+            
+            final_entries = await self.get_signin_sheet_entries()
+            final_red = len([e for e in final_entries if e.get("has_red_status") and not e.get("verified")])
+            final_blue = len([e for e in final_entries if e.get("has_blue_status") or e.get("verified")])
+            logger.info(f"Final count: Total={len(final_entries)}, Red={final_red}, Blue={final_blue}")
+            
+            # Check for Hodler records not found in API Global
             for record in hodler_records:
                 hodler_name = record.get("employee_name", "")
-                found = any(match_names(e["name"], hodler_name) for e in entries)
+                found = any(match_names(e["name"], hodler_name) for e in final_entries)
                 if not found:
                     self.results["missing_in_hodler"].append({
                         "name": hodler_name,
@@ -1150,10 +1234,6 @@ class APIGlobalSyncAgent:
                         "room": record.get("room_number"),
                         "note": "Guest checked in at Hodler Inn but not listed in API Global portal"
                     })
-            
-            # Portal auto-saves when checkboxes are clicked - no Save button needed
-            # Wait a moment for any final auto-saves to complete
-            await self.page.wait_for_timeout(2000)
             
             logger.info(f"Sync completed. Verified: {len(self.results['verified'])}, No Bill: {len(self.results['no_bill'])}")
             return self.results
