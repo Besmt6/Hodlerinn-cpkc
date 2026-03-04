@@ -3731,6 +3731,69 @@ async def get_sync_history():
     return history
 
 
+@api_router.get("/admin/sync/count-entries")
+async def count_portal_entries(target_date: str = "2026-03-03"):
+    """
+    Diagnostic: Count how many entries the sync agent can see on the portal for a given date.
+    This helps verify that scrolling/pagination is working correctly.
+    """
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    
+    if not settings or not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
+        raise HTTPException(status_code=400, detail="Portal credentials not configured")
+    
+    username = settings.get("api_global_username")
+    password = decrypt_data(settings.get("api_global_password_encrypted"))
+    
+    try:
+        from sync_agent import APIGlobalSyncAgent
+        
+        agent = APIGlobalSyncAgent(username, password)
+        
+        # Initialize browser
+        await agent.start()
+        
+        # Login
+        login_success = await agent.login()
+        if not login_success:
+            await agent.stop()
+            return {"success": False, "error": "Failed to login to portal"}
+        
+        # Load sign-in sheet for target date
+        load_success = await agent.load_signin_sheet(target_date)
+        if not load_success:
+            await agent.stop()
+            return {"success": False, "error": f"Failed to load sign-in sheet for {target_date}"}
+        
+        # Get entries
+        entries = await agent.get_signin_sheet_entries()
+        
+        # Count by status
+        total = len(entries)
+        verified_count = len([e for e in entries if e.get("verified") or e.get("has_blue_status")])
+        red_count = len([e for e in entries if e.get("has_red_status") and not e.get("verified")])
+        needs_verification = len([e for e in entries if not e.get("verified") and not e.get("has_blue_status")])
+        
+        # Get names for debugging
+        entry_names = [{"name": e.get("name"), "verified": e.get("verified"), "red": e.get("has_red_status"), "blue": e.get("has_blue_status"), "emp_id": e.get("current_emp_id")} for e in entries]
+        
+        await agent.stop()
+        
+        return {
+            "success": True,
+            "target_date": target_date,
+            "total_entries": total,
+            "already_verified": verified_count,
+            "red_status_unverified": red_count,
+            "needs_verification": needs_verification,
+            "entries": entry_names
+        }
+        
+    except Exception as e:
+        logging.error(f"Count entries failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
 # ==================== Name Alias/Mapping for Sync Agent ====================
 
 class NameAliasInput(BaseModel):
