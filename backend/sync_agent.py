@@ -50,7 +50,7 @@ def normalize_name(name: str) -> str:
 
 
 def match_names(api_name: str, hodler_name: str, threshold: float = 0.6) -> bool:
-    """Check if two names match using fuzzy matching."""
+    """Check if two names match using strict matching to avoid wrong employee ID assignment."""
     norm_api = normalize_name(api_name)
     norm_hodler = normalize_name(hodler_name)
     
@@ -64,27 +64,40 @@ def match_names(api_name: str, hodler_name: str, threshold: float = 0.6) -> bool
         logger.info(f"EXACT MATCH: {norm_api}")
         return True
     
-    # Check if one contains the other
-    if norm_api in norm_hodler or norm_hodler in norm_api:
-        logger.info(f"CONTAINS MATCH: {norm_api} / {norm_hodler}")
+    # Split into parts for comparison
+    api_parts = norm_api.split()
+    hodler_parts = norm_hodler.split()
+    
+    if len(api_parts) < 2 or len(hodler_parts) < 2:
+        # If either name has less than 2 parts, require exact match
+        return norm_api == norm_hodler
+    
+    # Get first and last names (first word = first name, last word = last name after normalization)
+    api_first = api_parts[0]
+    api_last = api_parts[-1]
+    hodler_first = hodler_parts[0]
+    hodler_last = hodler_parts[-1]
+    
+    # STRICT MATCHING: Both first AND last name must match closely
+    # Last names must match exactly or be very similar
+    last_name_match = (api_last == hodler_last) or (
+        SequenceMatcher(None, api_last, hodler_last).ratio() >= 0.9
+    )
+    
+    # First names must match exactly or be very similar
+    first_name_match = (api_first == hodler_first) or (
+        SequenceMatcher(None, api_first, hodler_first).ratio() >= 0.85
+    )
+    
+    if last_name_match and first_name_match:
+        logger.info(f"STRICT MATCH: first='{api_first}'=='{hodler_first}', last='{api_last}'=='{hodler_last}'")
         return True
     
-    # Check individual name parts - BOTH first and last name must match
-    api_parts = set(norm_api.split())
-    hodler_parts = set(norm_hodler.split())
-    if api_parts and hodler_parts:
-        common_parts = api_parts & hodler_parts
-        # Require at least 2 common parts (first AND last name)
-        if len(common_parts) >= 2:
-            logger.info(f"PARTS MATCH (2+): {common_parts} for {norm_api} / {norm_hodler}")
-            return True
-        # Single match is NOT enough - too many false positives (e.g., same first name)
-    
-    # Fuzzy match - use higher threshold and require more similarity
-    ratio = SequenceMatcher(None, norm_api, norm_hodler).ratio()
-    if ratio >= 0.85:  # Much stricter threshold
-        logger.info(f"FUZZY MATCH: ratio={ratio} for {norm_api} / {norm_hodler}")
-        return True
+    # Log why it didn't match
+    if last_name_match and not first_name_match:
+        logger.info(f"NO MATCH: Last name matched but first name didn't: '{api_first}' != '{hodler_first}'")
+    elif first_name_match and not last_name_match:
+        logger.info(f"NO MATCH: First name matched but last name didn't: '{api_last}' != '{hodler_last}'")
     
     return False
 
