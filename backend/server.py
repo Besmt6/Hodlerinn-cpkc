@@ -2227,6 +2227,8 @@ def fix_pronunciation(name: str) -> str:
         # First names
         'brian': 'Bryan',      # Prevents "brain" pronunciation
         'Brain': 'Bryan',      # In case it's already capitalized wrong
+        'gerald': 'Jerald',    # Prevents "gayr-ad" pronunciation, should be "jer-ald"
+        'gerard': 'Jerard',    # Similar issue
         'shawn': 'Shaun',      # Some TTS struggle with Shawn
         'sean': 'Shaun',       # Irish spelling
         'siobhan': 'Shivawn',  # Irish name
@@ -2237,6 +2239,7 @@ def fix_pronunciation(name: str) -> str:
         'leigh': 'Lee',        # Silent gh
         'geoff': 'Jeff',       # Silent o
         'geoffrey': 'Jeffrey', # Silent o
+        'george': 'Jorj',      # Hard G issue
         'jorge': 'Horhay',     # Spanish pronunciation
         'jose': 'Hosay',       # Spanish pronunciation
         'jesus': 'Heysoos',    # Spanish pronunciation
