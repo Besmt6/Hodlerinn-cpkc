@@ -2474,11 +2474,10 @@ async def update_employee(employee_id: str, input: EmployeeUpdate):
     if not update_data:
         raise HTTPException(status_code=400, detail="No data to update")
     
-    # If updating employee_number, check for duplicates
-    if "employee_number" in update_data:
+    # If updating employee_number to a DIFFERENT value, check for duplicates
+    if "employee_number" in update_data and update_data["employee_number"] != employee.get("employee_number"):
         existing = await db.employees.find_one({
-            "employee_number": update_data["employee_number"],
-            query_field: {"$ne": employee_id}
+            "employee_number": update_data["employee_number"]
         }, {"_id": 0})
         if existing:
             raise HTTPException(status_code=400, detail="Employee number already exists")
