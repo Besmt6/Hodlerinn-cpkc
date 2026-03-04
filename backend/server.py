@@ -3724,6 +3724,49 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
     
     return {"message": "Sync started", "hodler_records_count": len(hodler_records)}
 
+
+@api_router.get("/admin/sync/debug-records")
+async def debug_sync_records(target_date: str = None):
+    """Debug: Show what records the sync agent will use for matching."""
+    today = datetime.now()
+    if not target_date:
+        target_date = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    # Get bookings for target date (in-house)
+    bookings = await db.bookings.find({
+        "check_in_date": target_date,
+        "is_checked_out": False
+    }, {"_id": 0}).to_list(100)
+    
+    # Get guests for name lookup
+    employee_numbers = [b['employee_number'] for b in bookings]
+    guests = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(100)
+    guests_dict = {g['employee_number']: g for g in guests}
+    
+    # Build records exactly as sync agent sees them
+    hodler_records = []
+    for booking in bookings:
+        guest = guests_dict.get(booking['employee_number'])
+        if guest:
+            name_encrypted = guest.get('name_encrypted')
+            if name_encrypted:
+                decrypted_name = decrypt_data(name_encrypted)
+            else:
+                decrypted_name = guest.get('name', '')
+            
+            hodler_records.append({
+                "employee_name": decrypted_name,
+                "employee_number": booking['employee_number'],
+                "room_number": booking['room_number']
+            })
+    
+    return {
+        "target_date": target_date,
+        "total_records": len(hodler_records),
+        "records": hodler_records
+    }
+
+
 @api_router.get("/admin/sync/history")
 async def get_sync_history():
     """Get sync history"""
