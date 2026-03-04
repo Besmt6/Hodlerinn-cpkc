@@ -3586,6 +3586,54 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       {testingEmail ? "Sending..." : "Send Test Email"}
                     </Button>
                   </div>
+                  
+                  {/* CPKC Email Notification Test Buttons */}
+                  <div className="border-t border-vault-border pt-4 mt-4">
+                    <h4 className="text-sm font-semibold text-vault-gold mb-3">Test CPKC Notifications</h4>
+                    <p className="text-vault-text-secondary text-xs mb-3">
+                      Test the automated email notifications sent to CPKC (crewtravel@cpkcr.com, crewmanagers@cpkcr.com)
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const res = await axios.post(`${API}/admin/settings/test-room-available`);
+                            if (res.data.success) {
+                              toast.success(res.data.message);
+                            } else {
+                              toast.error(res.data.message);
+                            }
+                          } catch (error) {
+                            toast.error("Failed to send test notification");
+                          }
+                        }}
+                        disabled={!portalSettings.email_sender}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm"
+                        data-testid="test-room-available-btn"
+                      >
+                        Test Room Available Alert
+                      </Button>
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const res = await axios.post(`${API}/admin/settings/test-heads-up`);
+                            if (res.data.success) {
+                              toast.success(res.data.message);
+                            } else {
+                              toast.error(res.data.message);
+                            }
+                          } catch (error) {
+                            toast.error("Failed to send test notification");
+                          }
+                        }}
+                        disabled={!portalSettings.email_sender}
+                        className="bg-amber-600 hover:bg-amber-700 text-white text-sm"
+                        data-testid="test-heads-up-btn"
+                      >
+                        Test Heads-Up Notice
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 

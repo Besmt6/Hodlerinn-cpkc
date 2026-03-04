@@ -699,6 +699,37 @@ heads_up_notification_sent_date = None
 CPKC_EMAIL_RECIPIENTS = ["crewtravel@cpkcr.com", "crewmanagers@cpkcr.com"]
 
 
+async def get_notification_state():
+    """Get notification state from database (persists across server restarts)."""
+    state = await db.notification_state.find_one({"id": "email_notifications"}, {"_id": 0})
+    if not state:
+        state = {
+            "id": "email_notifications",
+            "sold_out_date": None,
+            "heads_up_date": None,
+            "was_sold_out": False
+        }
+    return state
+
+
+async def set_sold_out_state(date: str, was_sold_out: bool):
+    """Set sold-out state in database."""
+    await db.notification_state.update_one(
+        {"id": "email_notifications"},
+        {"$set": {"sold_out_date": date, "was_sold_out": was_sold_out}},
+        upsert=True
+    )
+
+
+async def set_heads_up_state(date: str):
+    """Set heads-up notification date in database."""
+    await db.notification_state.update_one(
+        {"id": "email_notifications"},
+        {"$set": {"heads_up_date": date}},
+        upsert=True
+    )
+
+
 async def get_room_availability_details():
     """Get detailed room availability information for notifications."""
     # Get total rooms count
@@ -783,18 +814,22 @@ async def send_email_notification(subject: str, body: str):
 
 async def send_room_available_notification():
     """Send notification when rooms become available after being sold out."""
-    global sold_out_notification_sent_date
-    
-    # Only send if we were sold out earlier today
     today = datetime.now().strftime("%Y-%m-%d")
-    if sold_out_notification_sent_date != today:
-        return  # We weren't sold out today, no need to notify
+    
+    # Check if we were sold out (from database - persists across restarts)
+    state = await get_notification_state()
+    if not state.get("was_sold_out"):
+        logging.info("Room available check: Not in sold-out state, skipping notification")
+        return  # We weren't sold out, no need to notify
     
     room_info = await get_room_availability_details()
     
     # Don't send if still sold out
     if room_info["available_rooms"] <= 0:
+        logging.info(f"Room available check: Still at 0 available rooms")
         return
+    
+    logging.info(f"Room available check: Was sold out, now have {room_info['available_rooms']} rooms available - sending notification")
     
     subject = f"Hodler Inn - Rooms Now Available ({today})"
     
@@ -823,7 +858,8 @@ This is an automated message. Please do not reply to this email.
     
     if await send_email_notification(subject, body):
         # Reset sold-out flag so we can send it again if we hit 100% again
-        sold_out_notification_sent_date = None
+        await set_sold_out_state(None, False)
+        logging.info("Room available notification sent successfully, reset sold-out state")
         
         # Also send Telegram notification
         await send_telegram_notification(
@@ -838,23 +874,26 @@ This is an automated message. Please do not reply to this email.
             f"🚂 Railroad: {room_info['occupied_by_railroad']}\n"
             f"👤 Other: {room_info['blocked_rooms']}"
         )
+    else:
+        logging.error("Failed to send room available notification email")
 
 
 async def check_and_send_heads_up_notification():
     """Send heads-up notice when only 4 rooms are available."""
-    global heads_up_notification_sent_date
-    
     today = datetime.now().strftime("%Y-%m-%d")
     
-    # Only send once per day
-    if heads_up_notification_sent_date == today:
-        return
+    # Check if already sent today (from database - persists across restarts)
+    state = await get_notification_state()
+    if state.get("heads_up_date") == today:
+        return  # Already sent today
     
     room_info = await get_room_availability_details()
     
     # Send heads-up when exactly 4 or fewer rooms available (but more than 0)
     if room_info["available_rooms"] > 4 or room_info["available_rooms"] <= 0:
         return
+    
+    logging.info(f"Heads-up check: Only {room_info['available_rooms']} rooms available - sending notification")
     
     subject = f"Hodler Inn - HEADS UP: Low Room Availability ({today})"
     
@@ -884,7 +923,8 @@ This is an automated message. Please do not reply to this email.
 """
     
     if await send_email_notification(subject, body):
-        heads_up_notification_sent_date = today
+        await set_heads_up_state(today)
+        logging.info("Heads-up notification sent successfully")
         
         # Also send Telegram notification
         await send_telegram_notification(
@@ -904,7 +944,7 @@ This is an automated message. Please do not reply to this email.
 
 async def check_and_send_sold_out_notification():
     """Check if all rooms are occupied and send notification to railroad company"""
-    global sold_out_notification_sent_date
+    today = datetime.now().strftime("%Y-%m-%d")
     
     # Get total rooms count
     total_rooms = await db.rooms.count_documents({})
@@ -922,34 +962,35 @@ async def check_and_send_sold_out_notification():
     
     # Check if we're at 100% capacity
     if total_occupied >= total_rooms:
-        today = datetime.now().strftime("%Y-%m-%d")
+        # Check if already sent today (from database - persists across restarts)
+        state = await get_notification_state()
+        if state.get("sold_out_date") == today:
+            return  # Already sent today
         
-        # Only send once per day when we hit 100%
-        if sold_out_notification_sent_date != today:
-            # Get email settings
-            settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
-            
-            if settings and settings.get("email_sender") and settings.get("email_password_encrypted"):
-                try:
-                    import smtplib
-                    from email.mime.text import MIMEText
-                    from email.mime.multipart import MIMEMultipart
-                    
-                    smtp_host = settings.get("email_smtp_host", "smtp.zoho.com")
-                    smtp_port = settings.get("email_smtp_port", 587)
-                    sender = settings.get("email_sender")
-                    password = decrypt_data(settings.get("email_password_encrypted"))
-                    
-                    # Railroad company emails
-                    recipients = ["crewtravel@cpkcr.com", "crewmanagers@cpkcr.com"]
-                    
-                    # Create email
-                    msg = MIMEMultipart()
-                    msg['From'] = sender
-                    msg['To'] = ", ".join(recipients)
-                    msg['Subject'] = f"Hodler Inn - 100% Occupied ({today})"
-                    
-                    body = f"""Hello,
+        # Get email settings
+        settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+        
+        if settings and settings.get("email_sender") and settings.get("email_password_encrypted"):
+            try:
+                import smtplib
+                from email.mime.text import MIMEText
+                from email.mime.multipart import MIMEMultipart
+                
+                smtp_host = settings.get("email_smtp_host", "smtp.zoho.com")
+                smtp_port = settings.get("email_smtp_port", 587)
+                sender = settings.get("email_sender")
+                password = decrypt_data(settings.get("email_password_encrypted"))
+                
+                # Railroad company emails
+                recipients = ["crewtravel@cpkcr.com", "crewmanagers@cpkcr.com"]
+                
+                # Create email
+                msg = MIMEMultipart()
+                msg['From'] = sender
+                msg['To'] = ", ".join(recipients)
+                msg['Subject'] = f"Hodler Inn - 100% Occupied ({today})"
+                
+                body = f"""Hello,
 
 This is an automated notification from Hodler Inn.
 
@@ -963,35 +1004,36 @@ Hodler Inn
 ---
 This is an automated message. Please do not reply to this email.
 """
-                    msg.attach(MIMEText(body, 'plain'))
-                    
-                    # Send email
-                    server = smtplib.SMTP(smtp_host, smtp_port)
-                    server.starttls()
-                    server.login(sender, password)
-                    server.sendmail(sender, recipients, msg.as_string())
-                    server.quit()
-                    
-                    sold_out_notification_sent_date = today
-                    logging.info(f"Sold-out notification sent to railroad company: {recipients}")
-                    
-                    # Also send Telegram notification
-                    await send_telegram_notification(
-                        f"📧 <b>SOLD OUT NOTIFICATION SENT</b>\n"
-                        f"━━━━━━━━━━━━━━━\n"
-                        f"✅ Email sent to:\n"
-                        f"• crewtravel@cpkcr.com\n"
-                        f"• crewmanagers@cpkcr.com\n"
-                        f"━━━━━━━━━━━━━━━\n"
-                        f"🏨 {total_occupied}/{total_rooms} rooms occupied\n"
-                        f"🚂 Railroad: {occupied_by_railroad}\n"
-                        f"👤 Other: {blocked_rooms}"
-                    )
-                    
-                except Exception as e:
-                    logging.error(f"Failed to send sold-out notification: {e}")
-            else:
-                logging.warning("Email settings not configured - cannot send sold-out notification")
+                msg.attach(MIMEText(body, 'plain'))
+                
+                # Send email
+                server = smtplib.SMTP(smtp_host, smtp_port)
+                server.starttls()
+                server.login(sender, password)
+                server.sendmail(sender, recipients, msg.as_string())
+                server.quit()
+                
+                # Set sold-out state in database (persists across restarts)
+                await set_sold_out_state(today, True)
+                logging.info(f"Sold-out notification sent to railroad company: {recipients}")
+                
+                # Also send Telegram notification
+                await send_telegram_notification(
+                    f"📧 <b>SOLD OUT NOTIFICATION SENT</b>\n"
+                    f"━━━━━━━━━━━━━━━\n"
+                    f"✅ Email sent to:\n"
+                    f"• crewtravel@cpkcr.com\n"
+                    f"• crewmanagers@cpkcr.com\n"
+                    f"━━━━━━━━━━━━━━━\n"
+                    f"🏨 {total_occupied}/{total_rooms} rooms occupied\n"
+                    f"🚂 Railroad: {occupied_by_railroad}\n"
+                    f"👤 Other: {blocked_rooms}"
+                )
+                
+            except Exception as e:
+                logging.error(f"Failed to send sold-out notification: {e}")
+        else:
+            logging.warning("Email settings not configured - cannot send sold-out notification")
 
 @api_router.get("/guests/{employee_number}")
 async def get_guest(employee_number: str):
@@ -3180,6 +3222,107 @@ async def test_telegram_connection():
     except Exception as e:
         logging.error(f"Telegram test failed: {e}")
         return {"success": False, "message": f"Telegram test failed: {str(e)}", "chat_id_used": chat_id}
+
+
+@api_router.post("/admin/settings/test-room-available")
+async def test_room_available_notification():
+    """Test Room Available email notification - simulates the notification that would be sent after a checkout"""
+    room_info = await get_room_availability_details()
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    subject = f"[TEST] Hodler Inn - Rooms Now Available ({today})"
+    
+    body = f"""Hello,
+
+THIS IS A TEST NOTIFICATION from Hodler Inn Admin Panel.
+
+GOOD NEWS! Rooms are now available after being at 100% capacity.
+
+ROOM AVAILABILITY:
+- Total Rooms Available: {room_info['available_rooms']}
+- Clean & Ready: {room_info['clean_available']}
+- Being Cleaned: {room_info['dirty_rooms']}
+
+CURRENT OCCUPANCY:
+- Railroad Crew In-House: {room_info['occupied_by_railroad']}
+- Other Guests: {room_info['blocked_rooms']}
+- Total Occupied: {room_info['total_occupied']}/{room_info['total_rooms']}
+
+Thank you,
+Hodler Inn
+
+---
+This is a TEST message. Please ignore.
+"""
+    
+    result = await send_email_notification(subject, body)
+    if result:
+        return {"success": True, "message": "Room Available test email sent!", "room_info": room_info}
+    else:
+        return {"success": False, "message": "Failed to send test email. Check email settings."}
+
+
+@api_router.post("/admin/settings/test-heads-up")
+async def test_heads_up_notification():
+    """Test Heads-Up email notification - simulates the low availability warning"""
+    room_info = await get_room_availability_details()
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    subject = f"[TEST] Hodler Inn - HEADS UP: Low Room Availability ({today})"
+    
+    body = f"""Hello,
+
+THIS IS A TEST NOTIFICATION from Hodler Inn Admin Panel.
+
+We have limited room availability. Please prepare for incoming crews.
+
+ROOM STATUS:
+- Rooms Available: {room_info['available_rooms']}
+- Clean & Ready: {room_info['clean_available']}
+- Being Cleaned: {room_info['dirty_rooms']}
+
+CURRENT OCCUPANCY:
+- Railroad Crew In-House: {room_info['occupied_by_railroad']}
+- Other Guests (Blocked Rooms): {room_info['blocked_rooms']}
+- Total Occupied: {room_info['total_occupied']}/{room_info['total_rooms']}
+
+Please plan accordingly for any additional crew arrivals.
+
+Thank you,
+Hodler Inn
+
+---
+This is a TEST message. Please ignore.
+"""
+    
+    result = await send_email_notification(subject, body)
+    if result:
+        return {"success": True, "message": "Heads-Up test email sent!", "room_info": room_info}
+    else:
+        return {"success": False, "message": "Failed to send test email. Check email settings."}
+
+
+@api_router.get("/admin/notification-state")
+async def get_notification_status():
+    """Get current notification state (for debugging)"""
+    state = await get_notification_state()
+    room_info = await get_room_availability_details()
+    return {
+        "notification_state": state,
+        "current_room_info": room_info
+    }
+
+
+@api_router.post("/admin/notification-state/reset")
+async def reset_notification_state():
+    """Reset notification state (for testing)"""
+    await db.notification_state.update_one(
+        {"id": "email_notifications"},
+        {"$set": {"sold_out_date": None, "heads_up_date": None, "was_sold_out": False}},
+        upsert=True
+    )
+    return {"message": "Notification state reset"}
+
 
 @api_router.post("/admin/settings/test-zoho")
 async def test_zoho_connection():
