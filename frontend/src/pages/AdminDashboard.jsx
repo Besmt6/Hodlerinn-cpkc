@@ -147,6 +147,7 @@ export default function AdminDashboard() {
     api_global_password: "",
     alert_email: "",
     auto_sync_enabled: false,
+    auto_sync_start_date: "",
     api_global_password_set: false,
     voice_enabled: true,
     voice_volume: 1.0,
@@ -498,6 +499,7 @@ export default function AdminDashboard() {
         api_global_password: "",
         alert_email: settingsRes.data.alert_email || "",
         auto_sync_enabled: settingsRes.data.auto_sync_enabled || false,
+        auto_sync_start_date: settingsRes.data.auto_sync_start_date || "",
         api_global_password_set: settingsRes.data.api_global_password_set || false,
         voice_enabled: settingsRes.data.voice_enabled !== false,
         voice_volume: settingsRes.data.voice_volume || 1.0,
@@ -2906,6 +2908,42 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       <p className="text-emerald-400 text-sm mt-2">
                         Next scheduled sync: {new Date(syncStatus.next_scheduled_run).toLocaleString()}
                       </p>
+                    )}
+                    
+                    {/* Auto-Sync Start Date */}
+                    {portalSettings.auto_sync_enabled && (
+                      <div className="mt-3 flex items-center gap-3 bg-black/30 p-3 rounded-lg border border-vault-border">
+                        <label className="text-vault-text-secondary text-sm whitespace-nowrap">Start Date:</label>
+                        <Input
+                          type="date"
+                          value={portalSettings.auto_sync_start_date}
+                          onChange={(e) => setPortalSettings({...portalSettings, auto_sync_start_date: e.target.value})}
+                          className="bg-black/50 border-vault-border text-vault-text w-44"
+                          data-testid="auto-sync-start-date"
+                        />
+                        <Button
+                          onClick={async () => {
+                            try {
+                              await axios.post(`${API}/admin/settings`, { 
+                                auto_sync_enabled: true,
+                                auto_sync_start_date: portalSettings.auto_sync_start_date 
+                              });
+                              toast.success(`Auto-sync will start from ${portalSettings.auto_sync_start_date || 'today'}`);
+                            } catch (error) {
+                              toast.error("Failed to update start date");
+                            }
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm h-9 px-3"
+                          data-testid="save-auto-sync-date-btn"
+                        >
+                          Save Start Date
+                        </Button>
+                        <span className="text-vault-text-secondary text-xs">
+                          {portalSettings.auto_sync_start_date 
+                            ? `Sync will skip dates before ${portalSettings.auto_sync_start_date}` 
+                            : "Leave empty to start immediately"}
+                        </span>
+                      </div>
                     )}
                   </div>
 
