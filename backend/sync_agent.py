@@ -545,26 +545,69 @@ class APIGlobalSyncAgent:
             
             logger.info(f"Verifying {name}, searching for: {search_name}")
             
-            # === Step 1: Find the row and input fields ===
-            logger.info("Step 1: Finding input fields in table row...")
+            # === Step 1: Find the row and input fields by scrolling through entire page ===
+            logger.info("Step 1: Finding input fields in table row (with scroll search)...")
             
-            # Use locator to find the row containing this name
-            rows = self.page.locator('tr')
             target_row = None
+            max_scroll_searches = 30  # Maximum scroll attempts to find the entry
             
-            for i in range(await rows.count()):
-                row = rows.nth(i)
-                row_text = await row.inner_text()
-                if search_name.upper() in row_text.upper():
-                    # Check if this row has input fields
-                    inputs = row.locator('input[type="text"]')
-                    if await inputs.count() >= 2:
-                        target_row = row
-                        logger.info(f"Found target row for {search_name}")
+            # First scroll to top
+            await self.page.evaluate('window.scrollTo(0, 0)')
+            await self.page.wait_for_timeout(500)
+            
+            # Get page height for scrolling
+            page_height = await self.page.evaluate('document.body.scrollHeight')
+            viewport_height = await self.page.evaluate('window.innerHeight')
+            scroll_step = viewport_height * 0.7  # Scroll 70% of viewport at a time
+            current_scroll = 0
+            
+            logger.info(f"Searching for '{search_name}' - page height: {page_height}, viewport: {viewport_height}")
+            
+            # Scroll through page to find the entry
+            for scroll_attempt in range(max_scroll_searches):
+                # Search for row at current scroll position
+                rows = self.page.locator('tr')
+                row_count = await rows.count()
+                
+                for i in range(row_count):
+                    row = rows.nth(i)
+                    try:
+                        row_text = await row.inner_text()
+                        if search_name.upper() in row_text.upper():
+                            # Check if this row has input fields
+                            inputs = row.locator('input[type="text"]')
+                            if await inputs.count() >= 2:
+                                # Check if row is visible
+                                is_visible = await row.is_visible()
+                                if is_visible:
+                                    target_row = row
+                                    logger.info(f"Found target row for {search_name} at scroll position {current_scroll}")
+                                    break
+                    except:
+                        continue
+                
+                if target_row:
+                    break
+                
+                # Scroll down
+                current_scroll += scroll_step
+                if current_scroll >= page_height:
+                    # Reached bottom, scroll back to top and try once more
+                    logger.info("Reached bottom, scrolling back to top...")
+                    await self.page.evaluate('window.scrollTo(0, 0)')
+                    current_scroll = 0
+                    await self.page.wait_for_timeout(500)
+                    
+                    # If we've already done a full pass, stop
+                    if scroll_attempt > max_scroll_searches / 2:
                         break
+                else:
+                    await self.page.evaluate(f'window.scrollTo(0, {current_scroll})')
+                    await self.page.wait_for_timeout(300)
+                    logger.info(f"Scroll search {scroll_attempt + 1}: position {current_scroll}/{page_height}")
             
             if not target_row:
-                logger.warning(f"Could not find row for: {search_name}")
+                logger.warning(f"Could not find row for: {search_name} after scrolling entire page")
                 return False
             
             # === Scroll row into view before interacting ===
@@ -717,26 +760,61 @@ class APIGlobalSyncAgent:
             
             logger.info(f"Searching for row with name containing: {search_name}")
             
-            # Find all rows and search for the one containing this name
-            all_rows = await self.page.query_selector_all('tr')
+            # === Scroll-based search to find the row ===
             target_row = None
+            max_scroll_searches = 30
             
-            for row in all_rows:
-                try:
-                    row_text = await row.inner_text()
-                    if search_name in row_text:
-                        # Verify this is a data row (has checkboxes)
-                        checkboxes = await row.query_selector_all('.ui-chkbox, input[type="checkbox"]')
-                        if len(checkboxes) > 0:
-                            target_row = row
-                            logger.info(f"Found row for {search_name}")
-                            break
-                except:
-                    continue
+            # First scroll to top
+            await self.page.evaluate('window.scrollTo(0, 0)')
+            await self.page.wait_for_timeout(500)
+            
+            page_height = await self.page.evaluate('document.body.scrollHeight')
+            viewport_height = await self.page.evaluate('window.innerHeight')
+            scroll_step = viewport_height * 0.7
+            current_scroll = 0
+            
+            for scroll_attempt in range(max_scroll_searches):
+                # Search for row at current scroll position
+                all_rows = await self.page.query_selector_all('tr')
+                
+                for row in all_rows:
+                    try:
+                        row_text = await row.inner_text()
+                        if search_name in row_text:
+                            # Verify this is a data row (has checkboxes)
+                            checkboxes = await row.query_selector_all('.ui-chkbox, input[type="checkbox"]')
+                            if len(checkboxes) > 0:
+                                # Check if visible
+                                is_visible = await row.is_visible()
+                                if is_visible:
+                                    target_row = row
+                                    logger.info(f"Found row for {search_name} at scroll position {current_scroll}")
+                                    break
+                    except:
+                        continue
+                
+                if target_row:
+                    break
+                
+                # Scroll down
+                current_scroll += scroll_step
+                if current_scroll >= page_height:
+                    logger.info("Reached bottom while searching for No Bill row")
+                    break
+                else:
+                    await self.page.evaluate(f'window.scrollTo(0, {current_scroll})')
+                    await self.page.wait_for_timeout(300)
             
             if not target_row:
                 logger.warning(f"Could not find row for: {name} (searched: {search_name})")
                 return False
+            
+            # Scroll row into view
+            try:
+                await self.page.evaluate('arguments[0].scrollIntoView({block: "center"})', target_row)
+                await self.page.wait_for_timeout(500)
+            except:
+                pass
             
             # Find checkboxes in this row - No Bill is typically the second checkbox
             # PrimeFaces checkboxes have a wrapper div
