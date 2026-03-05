@@ -425,9 +425,16 @@ class APIGlobalSyncAgent:
                         logger.info(f"JavaScript date set result: {date_set_success}")
                         await self.page.wait_for_timeout(1000)
                         
-                        # Verify the value was actually set
+                        # Verify the value was actually set - THIS IS CRITICAL
                         current_value = await date_input.input_value()
-                        logger.info(f"Date input current value after JS: '{current_value}'")
+                        logger.info("=" * 50)
+                        logger.info(f"DATE VERIFICATION: Expected '{formatted_date}', Got '{current_value}'")
+                        logger.info("=" * 50)
+                        
+                        if current_value and formatted_date.lower() in current_value.lower():
+                            logger.info("SUCCESS: Date input contains expected date value")
+                        else:
+                            logger.warning(f"WARNING: Date input value '{current_value}' does not match expected '{formatted_date}'")
                         
                         # If JavaScript method didn't work, try clicking the calendar button
                         if not current_value or formatted_date not in current_value:
@@ -497,9 +504,19 @@ class APIGlobalSyncAgent:
                             await date_input.press('Tab')  # Tab triggers blur event
                             await self.page.wait_for_timeout(500)
                         
-                        # Final verification
+                        # Final verification - CRITICAL CHECK
                         final_value = await date_input.input_value()
-                        logger.info(f"Final date input value: '{final_value}'")
+                        logger.info("=" * 50)
+                        logger.info(f"FINAL DATE VERIFICATION:")
+                        logger.info(f"  Target date: {target_date}")
+                        logger.info(f"  Formatted date: {formatted_date}")
+                        logger.info(f"  Input field value: '{final_value}'")
+                        logger.info("=" * 50)
+                        
+                        if not final_value or formatted_date.lower() not in final_value.lower():
+                            logger.error(f"DATE SET FAILED: Input shows '{final_value}' but expected '{formatted_date}'")
+                        else:
+                            logger.info(f"DATE SET SUCCESS: Input correctly shows '{final_value}'")
                         
                     except Exception as date_err:
                         logger.error(f"Failed to set date input: {date_err}")
@@ -553,22 +570,35 @@ class APIGlobalSyncAgent:
             
             # === CRITICAL ERROR CHECK: Verify data actually loaded ===
             # Check for portal error message that indicates data load failure
+            # This is the EXACT error message the portal shows when date selection fails
             portal_error_patterns = [
+                'Unable to enter sign-in sheets for current or future res',
                 'Unable to enter sign-in sheets',
                 'Unable to enter sign in sheets',
                 'No sign-in sheets available',
                 'Error loading',
                 'Access denied',
                 'Session expired',
-                'Invalid date'
+                'Invalid date',
+                'current or future res'
             ]
             
+            logger.info("=== CHECKING FOR PORTAL ERROR MESSAGES ===")
             for error_pattern in portal_error_patterns:
                 if error_pattern.lower() in page_text.lower():
-                    error_msg = f"Portal error detected: '{error_pattern}' - The date picker interaction likely failed. Portal did not load data for the requested date."
+                    error_msg = f"PORTAL ERROR DETECTED: '{error_pattern}' found in page. The date picker interaction FAILED. Portal did not load data for the requested date. This sync will be aborted."
+                    logger.error("!" * 50)
                     logger.error(error_msg)
+                    logger.error("!" * 50)
                     self.results["errors"].append(error_msg)
+                    # Take screenshot of the error state
+                    try:
+                        await self.page.screenshot(path="/tmp/sync_portal_error.png")
+                        logger.info("Error screenshot saved to /tmp/sync_portal_error.png")
+                    except:
+                        pass
                     raise Exception(error_msg)
+            logger.info("No portal error messages detected - proceeding with sync")
             
             # Check if "Scheduled Arrivals" section appeared
             try:
