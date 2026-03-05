@@ -1390,6 +1390,11 @@ class APIGlobalSyncAgent:
             name_aliases = []
         
         try:
+            # Log version at start of sync
+            logger.info(f"=" * 50)
+            logger.info(f"SYNC AGENT VERSION: {SYNC_AGENT_VERSION}")
+            logger.info(f"=" * 50)
+            
             await self.start()
             
             # Step 1: Login
@@ -1682,11 +1687,14 @@ class APIGlobalSyncAgent:
                     })
             
             logger.info(f"Sync completed. Verified: {len(self.results['verified'])}, No Bill: {len(self.results['no_bill'])}")
+            # Add version to results
+            self.results["agent_version"] = SYNC_AGENT_VERSION
             return self.results
             
         except Exception as e:
             logger.error(f"Sync error: {str(e)}")
             self.results["errors"].append(str(e))
+            self.results["agent_version"] = SYNC_AGENT_VERSION
             return self.results
             
         finally:
