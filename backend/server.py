@@ -233,42 +233,87 @@ async def auto_sync_task():
         
         # Get yesterday's date for sync
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        day_before = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
         
-        # Get Hodler Inn records for yesterday
-        bookings = await db.bookings.find({"check_in_date": yesterday}, {"_id": 0}).to_list(1000)
+        # Get Hodler Inn records for yesterday AND day before (for late arrivals)
+        bookings = await db.bookings.find(
+            {"check_in_date": {"$in": [yesterday, day_before]}}, 
+            {"_id": 0}
+        ).to_list(1000)
         
         # Get guest names
         employee_numbers = [b['employee_number'] for b in bookings]
         guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
         guests_dict = {g['employee_number']: g for g in guests_list}
         
+        # Also get employee names as fallback
+        employees_list = await db.employees.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
+        employees_dict = {e['employee_number']: e for e in employees_list}
+        
         # Build records for sync agent
         hodler_records = []
         for booking in bookings:
             guest = guests_dict.get(booking['employee_number'])
-            if guest:
-                # Handle both encrypted and non-encrypted names
+            employee = employees_dict.get(booking['employee_number'])
+            
+            # Determine name to use (prefer employee name from portal, fallback to guest name)
+            name_to_use = ""
+            if employee:
+                name_to_use = employee.get('name', '')
+            if not name_to_use and guest:
                 name_encrypted = guest.get('name_encrypted')
                 if name_encrypted:
-                    decrypted_name = decrypt_data(name_encrypted)
+                    name_to_use = decrypt_data(name_encrypted)
                 else:
-                    decrypted_name = guest.get('name', '')
-                    
+                    name_to_use = guest.get('name', '')
+            
+            if name_to_use:
                 hodler_records.append({
-                    "employee_name": decrypted_name,
+                    "employee_name": name_to_use,
                     "employee_number": booking['employee_number'],
                     "room_number": booking['room_number']
                 })
         
-        logging.info(f"Auto-sync: Processing {len(hodler_records)} Hodler Inn records for {yesterday}")
+        logging.info(f"Auto-sync: Processing {len(hodler_records)} Hodler Inn records for {yesterday} (+ {day_before})")
         
-        # Run the sync
+        # Get name aliases
+        name_aliases = await db.name_aliases.find({}, {"_id": 0}).to_list(100)
+        
+        # Run the sync for BOTH days (yesterday and day before)
         from sync_agent import APIGlobalSyncAgent
         username = settings.get("api_global_username")
         password = decrypt_data(settings.get("api_global_password_encrypted"))
         
-        agent = APIGlobalSyncAgent(username, password)
-        results = await agent.run_sync(hodler_records)
+        all_results = {
+            "verified": [],
+            "no_bill": [],
+            "missing_in_hodler": [],
+            "errors": []
+        }
+        
+        for sync_date in [day_before, yesterday]:  # Sync day before first, then yesterday
+            logging.info(f"Auto-sync: Syncing portal for {sync_date}")
+            agent = APIGlobalSyncAgent(username, password)
+            results = await agent.run_sync(hodler_records, sync_date, name_aliases)
+            
+            all_results["verified"].extend(results.get("verified", []))
+            all_results["no_bill"].extend(results.get("no_bill", []))
+            all_results["errors"].extend(results.get("errors", []))
+            
+            # Only add missing from yesterday
+            if sync_date == yesterday:
+                all_results["missing_in_hodler"].extend(results.get("missing_in_hodler", []))
+        
+        # Deduplicate verified entries
+        seen = set()
+        unique_verified = []
+        for v in all_results["verified"]:
+            key = v.get("employee_id") or v.get("api_name")
+            if key not in seen:
+                seen.add(key)
+                unique_verified.append(v)
+        all_results["verified"] = unique_verified
+        results = all_results
         
         # Auto-update employee names to match portal format
         names_updated = 0
