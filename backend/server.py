@@ -3748,6 +3748,14 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
     
     logging.info(f"Sync requested for date: {target}")
     
+    # Get bookings for target date AND previous day (to catch entries with different billing dates)
+    from datetime import datetime as dt
+    target_dt = dt.strptime(target, "%Y-%m-%d")
+    prev_day = (target_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    query = {"check_in_date": {"$in": [target, prev_day]}}
+    logging.info(f"Querying bookings for dates: {target} and {prev_day}")
+    
     bookings = await db.bookings.find(query, {"_id": 0}).sort([("check_in_date", 1), ("check_in_time", 1)]).to_list(1000)
     
     # Get employee names from EMPLOYEES collection (Admin updated names)
