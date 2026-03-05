@@ -3666,7 +3666,7 @@ class SyncRequest(BaseModel):
     target_date: Optional[str] = None
 
 @api_router.post("/admin/sync/run")
-async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = None, target_date: Optional[str] = None):
+async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = None, target_date: Optional[str] = Query(None)):
     """Run sync with API Global portal
     
     Args:
@@ -3675,11 +3675,12 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
     """
     global sync_status
     
-    # Support both query parameter and JSON body
-    if request and request.target_date:
-        target_date = request.target_date
+    # Support both query parameter and JSON body - query param takes priority
+    effective_date = target_date  # Query parameter
+    if not effective_date and request and request.target_date:
+        effective_date = request.target_date  # JSON body fallback
     
-    logging.info(f"Sync endpoint called with target_date: {target_date}")
+    logging.info(f"Sync endpoint called - query param: {target_date}, body: {request.target_date if request else None}, effective: {effective_date}")
     
     if sync_status["running"]:
         raise HTTPException(status_code=400, detail="Sync already in progress")
@@ -3689,8 +3690,8 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
         raise HTTPException(status_code=400, detail="Portal credentials not configured")
     
     # Get Hodler Inn records for the target date
-    if target_date:
-        target = target_date  # Use the provided target_date
+    if effective_date:
+        target = effective_date  # Use the provided target_date
         query = {"check_in_date": target}
     else:
         # Default to yesterday or today based on time
