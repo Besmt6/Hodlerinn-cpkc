@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-05-v8"  # Added real-time progress with entry names
+SYNC_AGENT_VERSION = "2026-03-05-v9"  # Fixed progress to show for all entries including blue ones
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1483,8 +1483,17 @@ class APIGlobalSyncAgent:
                 
                 # FIRST: Match blue (already verified) entries against Hodler records
                 # This ensures we count them as verified even if no portal work is needed
-                for entry in entries:
+                total_entries = len(entries)
+                for entry_num, entry in enumerate(entries, 1):
                     api_name = entry["name"]
+                    
+                    # Report progress for all entries
+                    if self.progress_callback:
+                        try:
+                            await self.progress_callback(entry_num, total_entries, api_name)
+                        except:
+                            pass
+                    
                     already_verified_on_portal = entry.get("verified") or entry.get("has_blue_status")
                     
                     if already_verified_on_portal:
@@ -1519,19 +1528,9 @@ class APIGlobalSyncAgent:
                 
                 # Step 5: Process each entry that needs verification (red/unverified entries only)
                 entries_processed_this_pass = 0
-                total_entries = len(entries)
-                entry_num = 0
                 
                 for entry in entries:
-                    entry_num += 1
                     api_name = entry["name"]
-                    
-                    # Report progress
-                    if self.progress_callback:
-                        try:
-                            await self.progress_callback(entry_num, total_entries, api_name)
-                        except:
-                            pass
                     
                     # Skip already verified entries - they were matched above
                     if entry.get("verified") or entry.get("has_blue_status"):
