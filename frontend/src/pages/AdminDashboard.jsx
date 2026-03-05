@@ -1125,6 +1125,11 @@ export default function AdminDashboard() {
                     <CardTitle className="font-outfit text-lg text-vault-text flex items-center gap-2">
                       <RefreshCw className={`w-5 h-5 ${syncStatus.running ? 'text-vault-gold animate-spin' : 'text-vault-gold'}`} />
                       Last Sync Results
+                      {syncStatus.agent_version && (
+                        <span className="text-xs font-mono text-vault-text-secondary bg-vault-border/50 px-2 py-0.5 rounded">
+                          {syncStatus.agent_version}
+                        </span>
+                      )}
                     </CardTitle>
                     {syncStatus.last_run && (
                       <span className="text-vault-text-secondary text-sm font-manrope">

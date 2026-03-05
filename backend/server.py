@@ -3664,6 +3664,13 @@ sync_status = {
 @api_router.get("/admin/sync/status")
 async def get_sync_status():
     """Get current sync status including next scheduled run"""
+    # Get sync agent version
+    try:
+        from sync_agent import SYNC_AGENT_VERSION
+        agent_version = SYNC_AGENT_VERSION
+    except:
+        agent_version = "unknown"
+    
     # Get next scheduled run time if auto-sync is enabled
     next_run = None
     auto_sync_enabled = False
@@ -3679,7 +3686,8 @@ async def get_sync_status():
     return {
         **sync_status,
         "auto_sync_enabled": auto_sync_enabled,
-        "next_scheduled_run": next_run
+        "next_scheduled_run": next_run,
+        "agent_version": agent_version
     }
 
 class SyncRequest(BaseModel):
