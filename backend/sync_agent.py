@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-05-v9"  # Fixed progress to show for all entries including blue ones
+SYNC_AGENT_VERSION = "2026-03-05-v10"  # Fill Employee ID and Room for blue entries that are missing them
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1483,6 +1483,7 @@ class APIGlobalSyncAgent:
                 
                 # FIRST: Match blue (already verified) entries against Hodler records
                 # This ensures we count them as verified even if no portal work is needed
+                # BUT if they're missing Employee ID or Room, we should still fill it in
                 total_entries = len(entries)
                 for entry_num, entry in enumerate(entries, 1):
                     api_name = entry["name"]
@@ -1495,6 +1496,7 @@ class APIGlobalSyncAgent:
                             pass
                     
                     already_verified_on_portal = entry.get("verified") or entry.get("has_blue_status")
+                    has_employee_id = entry.get("current_emp_id") and entry.get("current_emp_id") != "NO ID"
                     
                     if already_verified_on_portal:
                         # Check if this already-verified entry matches a Hodler Inn record
@@ -1506,6 +1508,19 @@ class APIGlobalSyncAgent:
                                     v.get("api_name") == api_name or v.get("hodler_name") == hodler_name
                                     for v in self.results["verified"]
                                 )
+                                
+                                # If blue but missing Employee ID or Room, fill it in
+                                if not has_employee_id:
+                                    logger.info(f"Blue entry missing Employee ID - filling in: {api_name}")
+                                    try:
+                                        await self.verify_entry(
+                                            entry,
+                                            record.get("employee_number", ""),
+                                            record.get("room_number", "")
+                                        )
+                                    except Exception as e:
+                                        logger.error(f"Failed to fill blue entry: {e}")
+                                
                                 if not already_counted:
                                     logger.info(f"*** VERIFIED (blue checkmark + Hodler match): {api_name} <-> {hodler_name} ***")
                                     self.results["verified"].append({
@@ -1515,7 +1530,8 @@ class APIGlobalSyncAgent:
                                         "room": record.get("room_number"),
                                         "portal_name": api_name,
                                         "update_name": api_name != hodler_name,
-                                        "pre_verified": True
+                                        "pre_verified": True,
+                                        "filled_missing_data": not has_employee_id
                                     })
                                 break
                 
