@@ -652,7 +652,8 @@ export default function AdminDashboard() {
         url += `?target_date=${syncTargetDate}`;
       }
       const response = await axios.post(url);
-      toast.success(`Sync started for ${syncTargetDate || 'default date'}! Processing ${response.data.hodler_records_count} records...`);
+      toast.success(`Sync started for ${response.data.target_date_used || syncTargetDate || 'default date'}! Processing ${response.data.hodler_records_count} Hodler Inn records...`);
+      console.log('Sync response:', response.data);  // Debug log
       setSyncStatus({ ...syncStatus, running: true, progress: "Starting..." });
       
       // Poll for status

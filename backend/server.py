@@ -3826,7 +3826,13 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
     # Start background task using asyncio.create_task directly
     asyncio.create_task(run_sync_task_wrapper())
     
-    return {"message": "Sync started", "hodler_records_count": len(hodler_records)}
+    return {
+        "message": "Sync started", 
+        "hodler_records_count": len(hodler_records),
+        "target_date_used": target,
+        "query_param_received": target_date,
+        "effective_date": effective_date
+    }
 
 
 @api_router.get("/admin/sync/debug-records")
