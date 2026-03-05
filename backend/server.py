@@ -1468,27 +1468,43 @@ async def remove_guest(employee_number: str):
 # Check-In (signature captured here)
 @api_router.post("/checkin", response_model=CheckIn)
 async def check_in(input: CheckInCreate):
-    # Verify employee is registered
-    guest = await db.guests.find_one({"employee_number": input.employee_number}, {"_id": 0})
-    if not guest:
-        raise HTTPException(status_code=404, detail="Employee not registered. Please register first.")
+    # First check if employee is in the admin's employee list (primary source)
+    employee = await db.employees.find_one({"employee_number": input.employee_number}, {"_id": 0})
     
-    # Check if guest is blocked
-    if guest.get('is_blocked'):
+    # Also check guests collection for additional info (blocked status, etc.)
+    guest = await db.guests.find_one({"employee_number": input.employee_number}, {"_id": 0})
+    
+    # Determine if this is a known employee
+    if not employee and not guest:
+        # Unknown employee - allow check-in but mark as pending verification
+        # This allows walk-ins while flagging them for admin review
+        guest_name = f"Unknown Employee {input.employee_number}"
+        is_pending_verification = True
+        logging.info(f"Unknown employee {input.employee_number} checking in - will be flagged for verification")
+    else:
+        is_pending_verification = False
+        # Get name from employee list (preferred) or guest record
+        if employee and employee.get('name'):
+            guest_name = employee.get('name')
+        elif guest:
+            guest_name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown')))
+        else:
+            guest_name = f"Employee {input.employee_number}"
+    
+    # Check if guest is blocked (if they have a guest record)
+    if guest and guest.get('is_blocked'):
         raise HTTPException(status_code=403, detail="This employee has been blocked. Please contact front desk.")
     
     # Check if this is a returning unverified guest (not allowed for 2nd check-in)
-    previous_checkins = await db.bookings.count_documents({"employee_number": input.employee_number})
-    is_unverified = guest.get('pending_verification') or not guest.get('is_verified', True)
-    
-    if previous_checkins > 0 and is_unverified:
-        raise HTTPException(
-            status_code=403, 
-            detail="Cannot check in again until verified by admin. Please contact front desk."
-        )
-    
-    # Decrypt guest name for notification
-    guest_name = decrypt_data(guest.get('name_encrypted', guest.get('name', 'Unknown')))
+    if guest:
+        previous_checkins = await db.bookings.count_documents({"employee_number": input.employee_number})
+        is_unverified = guest.get('pending_verification') or not guest.get('is_verified', True)
+        
+        if previous_checkins > 0 and is_unverified:
+            raise HTTPException(
+                status_code=403, 
+                detail="Cannot check in again until verified by admin. Please contact front desk."
+            )
     
     # Check if room is already occupied
     active_booking = await db.bookings.find_one({
@@ -1533,9 +1549,8 @@ async def check_in(input: CheckInCreate):
     check_in_count = await db.bookings.count_documents({"employee_number": input.employee_number})
     is_first_time = check_in_count == 1
     
-    # Check if employee is in admin's pre-approved list
-    employee_in_list = await db.employees.find_one({"employee_number": input.employee_number})
-    is_pre_approved = employee_in_list is not None
+    # Employee is pre-approved if they're in the employees list
+    is_pre_approved = employee is not None
     
     # Send Telegram notification for check-in
     if is_first_time and not is_pre_approved:
