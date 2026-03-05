@@ -61,8 +61,18 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] Zoho WorkDrive backup integration
 - [x] **AI Sync Agent** - Fixed date picker interaction and error handling (March 4, 2026)
 
+### Recently Fixed (March 5, 2026)
+- [x] **AI Sync Agent Classification Bug (P0)** - Fixed logic where matched entries weren't being counted as "Verified"
+  - Entries already verified on portal + matching Hodler record are now counted
+  - Entries where verify_entry fails but name match is confirmed are still counted
+  - Version updated to 2026-03-05-v4
+- [x] **Nights Billed Calculation Bug (P1)** - Changed from calendar-day based to 24-hour period based
+  - Now uses `math.ceil(hours/24)` for accurate billing
+  - 28-hour stay = 2 nights (was incorrectly showing 1 night)
+
 ### In Progress 🔄
-- [ ] User verification of recent features
+- [ ] User verification of sync agent fix (recommend running a manual sync to confirm)
+- [ ] User verification of billing calculation on real stays
 
 ### Backlog/Future Tasks 📋
 - [ ] **P1:** AI Phone Agent (blocked - waiting on Virtual PBX provider info)
