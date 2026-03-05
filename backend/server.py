@@ -3726,7 +3726,7 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
     logging.info(f"Sync endpoint called - query param: {target_date}, body: {request.target_date if request else None}, effective: {effective_date}")
     
     if sync_status["running"]:
-        raise HTTPException(status_code=400, detail="Sync already in progress")
+        raise HTTPException(status_code=400, detail="Sync already in progress - click Reset button if stuck")
     
     settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
     if not settings or not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):

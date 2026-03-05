@@ -652,21 +652,35 @@ export default function AdminDashboard() {
         url += `?target_date=${syncTargetDate}`;
       }
       const response = await axios.post(url);
-      toast.success(`Sync started for ${response.data.target_date_used || syncTargetDate || 'default date'}! Processing ${response.data.hodler_records_count} Hodler Inn records...`);
-      console.log('Sync response:', response.data);  // Debug log
-      setSyncStatus({ ...syncStatus, running: true, progress: `Sync started for ${syncDate}...` });
-      toast.info(`Sync started for ${syncDate} - ${response.data.hodler_records_count} records to check`);
+      const targetDate = response.data.target_date_used || syncTargetDate || 'today';
+      const recordCount = response.data.hodler_records_count || 0;
       
-      // Poll for status
+      console.log('Sync response:', response.data);
+      
+      // Show single toast with clear message
+      toast.success(`Sync started for ${targetDate} - checking ${recordCount} records`);
+      
+      // Update status immediately
+      setSyncStatus({ 
+        ...syncStatus, 
+        running: true, 
+        progress: `Connecting to portal for ${targetDate}...`
+      });
+      
+      // Poll for status updates
       const pollStatus = setInterval(async () => {
         try {
           const statusRes = await axios.get(`${API}/admin/sync/status`);
           setSyncStatus(statusRes.data);
+          
           if (!statusRes.data.running) {
             clearInterval(pollStatus);
             if (statusRes.data.last_results) {
               const results = statusRes.data.last_results;
-              toast.success(`Sync completed! Verified: ${results.verified?.length || 0}, No Bill: ${results.no_bill?.length || 0}`);
+              const verified = results.verified?.length || 0;
+              const noBill = results.no_bill?.length || 0;
+              const missing = results.missing_in_hodler?.length || 0;
+              toast.success(`Sync completed! ✓${verified} verified, ⊘${noBill} no-bill, ?${missing} missing`);
             }
           }
         } catch (e) {
