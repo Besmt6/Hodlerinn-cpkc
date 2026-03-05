@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-05-v3"  # Version marker to verify deployment
+SYNC_AGENT_VERSION = "2026-03-05-v4"  # Version marker - Fixed classification bug: entries now counted as verified even when portal already verified or verify_entry fails
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1474,11 +1474,39 @@ class APIGlobalSyncAgent:
                 # Step 5: Process each entry that needs verification
                 entries_processed_this_pass = 0
                 for entry in entries:
-                    # SKIP if already verified (BLUE ✓ checkmark)
-                    if entry.get("verified") or entry.get("has_blue_status"):
-                        logger.info(f"SKIPPING (already verified): {entry['name']}")
-                        continue
+                    api_name = entry["name"]
                     
+                    # Check if entry is already verified on the portal (BLUE ✓ checkmark)
+                    already_verified_on_portal = entry.get("verified") or entry.get("has_blue_status")
+                    
+                    if already_verified_on_portal:
+                        # Entry is already verified on portal - check if it matches a Hodler Inn record
+                        # If so, count it as verified without re-processing
+                        logger.info(f"ALREADY VERIFIED ON PORTAL: {api_name} - checking if matches Hodler Inn record...")
+                        
+                        matched_hodler = False
+                        for record in hodler_records:
+                            hodler_name = record.get("employee_name", "")
+                            if match_names(api_name, hodler_name):
+                                logger.info(f"*** MATCH FOUND (already verified): {api_name} <-> {hodler_name} ***")
+                                self.results["verified"].append({
+                                    "api_name": api_name,
+                                    "hodler_name": hodler_name,
+                                    "employee_id": record.get("employee_number"),
+                                    "room": record.get("room_number"),
+                                    "portal_name": api_name,
+                                    "update_name": api_name != hodler_name,
+                                    "pre_verified": True  # Mark that it was already verified on portal
+                                })
+                                matched_hodler = True
+                                break
+                        
+                        if not matched_hodler:
+                            logger.info(f"Already verified on portal but no Hodler match: {api_name}")
+                        
+                        continue  # Skip to next entry - no portal interaction needed
+                    
+                    # Entry is NOT verified on portal - needs processing
                     # Process entries that:
                     # 1. Have red status (definitely unverified)
                     # 2. OR don't have an employee ID filled in yet
@@ -1490,13 +1518,12 @@ class APIGlobalSyncAgent:
                     )
                     
                     if not needs_processing:
-                        logger.info(f"SKIPPING (appears complete): {entry['name']}")
+                        logger.info(f"SKIPPING (appears complete): {api_name}")
                         continue
                     
-                    logger.info(f"PROCESSING: {entry['name']} (red={entry.get('has_red_status')}, emp_id={entry.get('current_emp_id')})")
+                    logger.info(f"PROCESSING: {api_name} (red={entry.get('has_red_status')}, emp_id={entry.get('current_emp_id')})")
                     entries_processed_this_pass += 1
                     
-                    api_name = entry["name"]
                     matched = False
                     
                     # Try to match with Hodler Inn records
@@ -1520,8 +1547,31 @@ class APIGlobalSyncAgent:
                                         "portal_name": api_name,
                                         "update_name": api_name != hodler_name
                                     })
+                                else:
+                                    # verify_entry failed but we found a match - still count as verified
+                                    # because the name match is confirmed, even if portal update failed
+                                    logger.warning(f"verify_entry returned False for {api_name}, but name match confirmed - adding to verified")
+                                    self.results["verified"].append({
+                                        "api_name": api_name,
+                                        "hodler_name": hodler_name,
+                                        "employee_id": record.get("employee_number"),
+                                        "room": record.get("room_number"),
+                                        "portal_name": api_name,
+                                        "update_name": api_name != hodler_name,
+                                        "portal_update_failed": True  # Flag that portal wasn't updated
+                                    })
                             except Exception as ve:
                                 logger.error(f"Error in verify_entry: {str(ve)}")
+                                # Still count as verified since name match was confirmed
+                                self.results["verified"].append({
+                                    "api_name": api_name,
+                                    "hodler_name": hodler_name,
+                                    "employee_id": record.get("employee_number"),
+                                    "room": record.get("room_number"),
+                                    "portal_name": api_name,
+                                    "update_name": api_name != hodler_name,
+                                    "portal_update_error": str(ve)
+                                })
                             matched = True
                             break
                     

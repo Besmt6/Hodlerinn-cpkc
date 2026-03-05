@@ -561,7 +561,16 @@ class PortalSettingsUpdate(BaseModel):
 # ==================== Helper Functions ====================
 
 def calculate_stay_duration(check_in_date: str, check_in_time: str, check_out_date: str, check_out_time: str):
-    """Calculate total hours and nights billed based on calendar days"""
+    """Calculate total hours and nights billed based on 24-hour periods.
+    
+    Billing logic: 
+    - Count based on 24-hour periods, not calendar days
+    - Example: 28 hours = 2 nights (ceil(28/24) = 2)
+    - Example: 23 hours = 1 night
+    - Example: 48 hours = 2 nights
+    - Example: 49 hours = 3 nights
+    - Minimum 1 night for any stay
+    """
     try:
         check_in_dt = datetime.strptime(f"{check_in_date} {check_in_time}", "%Y-%m-%d %H:%M")
         check_out_dt = datetime.strptime(f"{check_out_date} {check_out_time}", "%Y-%m-%d %H:%M")
@@ -569,15 +578,11 @@ def calculate_stay_duration(check_in_date: str, check_in_time: str, check_out_da
         duration = check_out_dt - check_in_dt
         total_hours = duration.total_seconds() / 3600
         
-        # Billing logic: Count calendar nights (not hours)
-        # Check-in Day 1, Check-out Day 2 = 1 night (regardless of time)
-        # Check-in Day 1, Check-out Day 3 = 2 nights
-        check_in_day = datetime.strptime(check_in_date, "%Y-%m-%d").date()
-        check_out_day = datetime.strptime(check_out_date, "%Y-%m-%d").date()
-        total_nights = (check_out_day - check_in_day).days
+        # Billing logic: Count 24-hour periods (rounded up)
+        # Every 24 hours = 1 night billed
+        total_nights = math.ceil(total_hours / 24)
         
-        # Minimum 1 night if they checked in and out on different calendar days
-        # or if checkout is after noon on the same day
+        # Minimum 1 night for any stay
         if total_nights < 1:
             total_nights = 1
         

@@ -1,0 +1,59 @@
+{
+  "summary": "Backend-only testing for Hodler Inn bug fixes. All billing calculation and sync agent version tests passed (19/19). The two critical fixes are verified working: (1) Nights billed calculation now uses ceil(hours/24) instead of calendar days - 28-hour stays correctly bill as 2 nights, (2) SYNC_AGENT_VERSION is correctly set to 2026-03-05-v4.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_billing_calculation.py",
+    "/app/test_reports/pytest/pytest_results_billing.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": ["/app/backend/tests/test_billing_calculation.py"],
+  "success_rate": {
+    "backend": "100% (19/19 tests passed)",
+    "frontend": "N/A (backend-only testing)"
+  },
+  "seed_data_creation": "N/A",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Two bug fixes have been verified: (1) Billing calculation fix at server.py:563-590 uses math.ceil(hours/24) for nights billed - edge cases like 28 hours = 2 nights all pass; (2) Sync agent classification fix at sync_agent.py:1474-1600 ensures entries matched by name are counted as 'verified' even when already verified on portal or when verify_entry fails.",
+  "bugs_tested": {
+    "billing_calculation": {
+      "status": "FIXED",
+      "description": "Nights billed calculation now uses 24-hour periods (ceil(hours/24))",
+      "test_cases_passed": [
+        "28 hours = 2 nights (ceil(28/24) = 2)",
+        "23 hours = 1 night (ceil(23/24) = 1)",
+        "48 hours = 2 nights (ceil(48/24) = 2)",
+        "72 hours = 3 nights (ceil(72/24) = 3)",
+        "49 hours = 3 nights (ceil(49/24) = 3)",
+        "25 hours = 2 nights (ceil(25/24) = 2)",
+        "24 hours = 1 night exactly",
+        "Minimum 1 night for any stay"
+      ]
+    },
+    "sync_agent_version": {
+      "status": "VERIFIED",
+      "description": "SYNC_AGENT_VERSION = 2026-03-05-v4",
+      "version_comment": "Fixed classification bug: entries now counted as verified even when portal already verified or verify_entry fails"
+    },
+    "sync_agent_classification": {
+      "status": "CODE REVIEWED - FIX IN PLACE",
+      "description": "The run_sync method at lines 1474-1600 now correctly handles three scenarios: (1) Already verified on portal AND matches Hodler record -> counted as verified; (2) verify_entry succeeds -> counted as verified; (3) verify_entry fails but name match confirmed -> still counted as verified with portal_update_failed flag"
+    }
+  },
+  "api_endpoints_tested": [
+    "GET /api/health - 200 OK, status=healthy, database=connected",
+    "GET /api/admin/guests - 200 OK, returns guest list",
+    "GET /api/admin/employees - 200 OK, returns employee list",
+    "GET /api/admin/billing/export?format=csv - endpoint exists",
+    "GET /api/admin/billing/export?format=xlsx - endpoint exists"
+  ]
+}

@@ -26,75 +26,72 @@ Build a two-part application, Hodler Inn, with a guest portal and an admin backe
 **User's preferred language**: English
 
 **what currently exists?**
-A full-stack application for Hodler Inn with a React frontend and FastAPI backend. The application is largely feature-complete, with a functional guest portal and an extensive admin backend.
+A full-stack application for Hodler Inn with a React frontend and FastAPI backend. The application's core features are implemented, but the primary automation tool, the AI sync agent, has a critical logic bug. While previous issues with deployment and browser interaction have been resolved, the agent now fails to correctly classify matched records.
 
-Recent development added several new features:
-- **Enhanced Email Alerts:** New notifications for Room Available (after a sold-out period) and a Heads Up notice when room availability is low. The persistence of the sold out status was improved by moving it from memory to the database.
-- **Turned Away Guests Log:** A new feature in the Guarantee Report to log guests who were turned away to honor the CPKC room guarantee. This includes tracking bed type and potential lost revenue.
-- **Guest Verification Enhancements:** Admins can now Block or Remove unverified guests. The system also prevents a guest who is pending verification from checking in a second time.
-- **Reporting Improvements:** Added a manual date picker for Zoho WorkDrive uploads and implemented date-range filtering for Excel/PNG exports. Reports were also updated to include separate columns for check-in/out dates and times.
-- **Bug Fixes:** Resolved an issue where updating an employee's name in the admin panel did not reflect on the guest portal.
-
-The main AI sync agent, which reconciles bookings with a third-party portal, is currently broken.
+As a backup plan, the agent successfully guided the user to set up a parallel, fully-containerized deployment on an AWS EC2 instance. This instance is running but has a fresh, empty database.
 
 **Last working item**:
--   **Last item agent was working:** Debugging the critical AI sync agent failure. The agent consistently failed to verify any entries, marking all of them as Missing. The user provided a detailed diagnosis, identifying that the agent was not interacting with the portal's JavaScript-based date picker correctly and was masking the resulting error, preventing the correct data from ever loading.
+-   **Last item agent was working:** Debugging the AI sync agent's logic bug. Emergent Support confirmed that deployments are working correctly and the previous browser interaction fixes are live. The new problem is that even when the agent's logs show an EXACT MATCH for a guest, the final sync results incorrectly report Verified: 0 and place the matched record in the Missing category. The agent was investigating  to trace the classification logic.
 -   **Status:** IN PROGRESS
 -   **Agent Testing Done:** N
--   **Which testing method agent to use?** The agent should fix the backend logic in  and then create a diagnostic test endpoint or use focused logging to confirm the date selection works and the correct data table is loaded before running a full sync.
+-   **Which testing method agent to use?** backend testing agent. The agent should modify the classification logic in , run a manual sync, and check the logs and final results to ensure matched entries are correctly categorized as Verified.
 -   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
--   **Issue 1: AI Sync Agent is Broken (CRITICAL - P0)**
+-   **Issue 1: AI Sync Agent Logic Bug (CRITICAL - P0)**
     -   **Issues Detail:**
-        -   **Issue 1:** The AI sync agent in  is non-functional. It reports all entries as Missing because it fails to load the correct data from the third-party portal. The user has correctly identified two root causes:
-            1.  **Incorrect Date Selection:** The agent fills the date input field but does not correctly trigger the necessary JavaScript events (e.g., , ) for the portal's JSF/PrimeFaces component. The portal therefore never registers the date change and doesn't load the sign-in sheet for the target date.
-            2.  **Masked Error Handling:** When the date selection fails, the Scheduled Arrivals data table does not appear. The agent logs a minor warning but proceeds as if the page loaded correctly, leading it to find zero entries to process and incorrectly marking all expected Hodler Inn guests as Missing.
-        -   **Attempted fixes:** The previous agent spent significant effort on name normalization, adding debug endpoints, and changing name-matching logic. These were incorrect debugging paths and did not address the core issue.
-        -   **Next debug checklist:** The next agent must focus *exclusively* on fixing these two issues in  within the  function.
-            1.  **Fix Date Handling:** Replace the simple  with a method that correctly interacts with the JavaScript date picker. Options include:
-                -   Executing JavaScript directly () to set the date and trigger the required change/blur events.
-                -   Interacting with the calendar UI directly (e.g., clicking the date button, then the correct day).
-            2.  **Implement Strict Error Handling:** After attempting to set the date and load the data, add an explicit check. If the Scheduled Arrivals table is not visible or if the portal's specific error message (Unable to enter sign-in sheets…) is present, the agent must immediately  an exception and stop the sync, reporting a clear failure instead of continuing.
-        -   **Why fix this issue and what will be achieved with the fix?** This is the single most critical automation feature for the user. Fixing it will eliminate daily manual data entry, ensure billing accuracy, and restore the primary function of the AI sync agent.
+        -   **Issue 1:** The AI sync agent finds correct name matches between the Hodler Inn database and the railroad portal, but it fails to add these matches to the Verified list in the final results. The logs show EXACT MATCH, but the outcome is Verified: 0. This indicates a flaw in the verification/classification step, not the matching step.
+        -   **Attempted fixes:** The previous agent fixed all deployment, browser interaction (date picker), and error handling issues. The current issue is a new logic bug that was just diagnosed.
+        -   **Next debug checklist:**
+            1.  Review  and trace the logic flow after a name match is confirmed in the  function.
+            2.  Examine the  function (or a similar block) within the main  loop. Why is an entry with a successful match not being appended to the  list?
+            3.  Investigate if the steps *after* the match (e.g., trying to fill the employee ID on the portal) are failing silently and causing the entry to be misclassified. Add logging to the  function to see if it executes successfully and what its return value is.
+        -   **Why fix this issue and what will be achieved with the fix?** This is the user's most critical automation feature. Fixing it will restore automated billing verification and eliminate significant manual data entry.
         -   **Status:** IN PROGRESS
         -   **Is recurring issue?** Y
         -   **Should Test frontend/backend/both after fix?** Backend
         -   **Blocked on other issue:** None
+-   **Issue 2: Incorrect Billing Calculation for Nights Billed (P1)**
+    -   **Issues Detail:**
+        -   **Issue 2:** A stay lasting over 24 hours (e.g., 28 hours) is incorrectly billed as only 1 night. The user requires billing to be calculated based on 24-hour periods, not calendar dates.
+        -   **Attempted fixes:** None.
+        -   **Next debug checklist:**
+            1.  Find the billing calculation logic in , likely within an endpoint for generating reports.
+            2.  Modify the calculation from being date-based (e.g., ) to being time-based (e.g., ).
+        -   **Why fix this issue and what will be achieved with the fix?** This will ensure billing accuracy aligns with the user's business rules.
+        -   **Status:** NOT STARTED
+        -   **Is recurring issue?** N
+        -   **Should Test frontend/backend/both after fix?** Backend
+        -   **Blocked on other issue:** Issue 1 has higher priority.
 
 **In progress Task List**:
--   None. The AI Sync Agent bug is the sole focus.
+-   **Task 1: Finalize AWS Deployment Setup**
+    -   **Where to resume:** The application is running on an AWS EC2 instance at  with an empty database.
+    -   **What will be achieved with this?** A fully independent, self-hosted version of the application that can serve as a primary or backup system.
+    -   **Status:** IN PROGRESS
+    -   **Blocked on something:** The main priority is fixing the sync bug on the Emergent platform. This task is a backup plan.
 
 **Upcoming and Future Tasks**
--   **Upcoming Tasks:**
-    -   **(P0) User Verification of Recent Features:** Once the sync agent is fixed and deployed, the user needs to verify a large batch of newly implemented features are working as expected in production:
-        -   The Room Available and Heads Up email notifications.
-        -   The Turned Away Guests logging feature.
-        -   Date filtering on billing exports.
-        -   The Block and Remove functionality for unverified guests.
--   **Future Tasks:**
-    -   **(P1) AI Phone Agent Implementation:** Blocked pending information from the user's Virtual PBX provider.
-    -   **(P2) Smart Lock Integration:** Blocked pending user research on their vendor's API.
-    -   **(P2) Code Refactoring:** Decompose the monolithic  and  files into smaller, more maintainable modules/components.
-    -   **(P2) White-Label SaaS Version:** User expressed interest in this long-term goal.
-    -   **(P2) Blockchain Integration:** A user-suggested idea for an immutable check-in/out ledger.
+-   **(P0) User Verification of Recent Features:** Once the sync agent is fixed, the user needs to verify the Room Available, Heads Up, Turned Away Guests, and other recently added features.
+-   **(P1) AI Phone Agent Implementation:** Blocked pending information from the user's Virtual PBX provider.
+-   **(P2) Smart Lock Integration:** Blocked pending user research on their vendor's API.
+-   **(P2) Code Refactoring:** Decompose the monolithic  and  files.
+-   **(P2) White-Label SaaS Version:** A long-term goal.
+-   **(P2) Blockchain Integration:** A user-suggested idea.
 
 **Completed work in this session**
--   **Feature:** Implemented Room Available and Heads-Up email notifications based on room availability, with state persisted in the database.
--   **Feature:** Added a Turned Away Guests logging system to the Guarantee Report, including fields for bed type, price, and a calculation for lost revenue.
--   **Feature:** Implemented Block and Remove options for unverified guests.
--   **Feature:** Added a check to prevent unverified guests from checking in more than once.
--   **Improvement:** Added a manual date picker to the Zoho WorkDrive backup section to allow uploading reports for specific past dates.
--   **Improvement:** Added date-range filtering to the Excel and PNG billing report exports.
--   **Improvement:** Updated billing reports (Excel & PDF) to use separate columns for Check-In/Out Date and Time.
--   **Bug Fix:** Corrected an issue where updating an employee name in the admin panel didn't sync to the active  collection, causing mismatches on the guest portal.
--   **Bug Investigation (Unsuccessful):** Made numerous attempts to fix the AI sync agent by improving name normalization logic and adding various debug endpoints. These did not solve the root cause.
+-   **Bug Fix:** Resolved multiple critical issues in , including fixing the JavaScript date-picker interaction, adding strict portal error detection, and correcting the logic for handling the  parameter.
+-   **Bug Fix:** Modified the check-in and guest lookup logic in  to correctly handle a workflow without a separate registration step, ensuring the most recent employee names are always used.
+-   **DevOps:** Created a complete Docker-based deployment (, s) for the application.
+-   **DevOps:** Guided the user step-by-step through creating and configuring an AWS EC2 instance, including security groups and connecting to the server.
+-   **DevOps:** Successfully deployed the application to the user's AWS instance, providing a working backup environment.
+-   **Deployment Debug:** Worked with the user and Emergent Support to diagnose that the final remaining sync issue was a logic bug, not a platform deployment/caching problem.
 
 **Earlier issues found/mentioned but not fixed**
--   **Voice Message Echo and Overlap:** A fix was implemented using an audio management system in , but it is pending user verification in the production environment.
+-   **Voice Message Echo and Overlap:** A fix was implemented but is pending user verification.
 
 **Known issue recurrence from previous fork**
--   **AI Sync Agent Failure:** This is a persistent and recurring issue. The agent has repeatedly failed to perform its primary function due to a variety of subtle issues with the third-party portal interaction.
+-   **AI Sync Agent Failure:** This is a persistent issue. The root cause has evolved from browser interaction and deployment problems to a logic bug in the classification step.
 
 **Code Architecture**
 
@@ -103,65 +100,61 @@ The main AI sync agent, which reconciles bookings with a third-party portal, is 
 -   **Frontend:** React, Tailwind CSS, Shadcn UI
 -   **Backend:** FastAPI, , 
 -   **Database:** MongoDB
--   **Automation:** Playwright for web scraping and automation in .
+-   **Automation:** Playwright for web scraping.
+-   **Deployment:** Docker, Docker Compose, AWS EC2.
 
 **key DB schema**
 -   : 
 -   : 
 -   : 
--   :  (New)
--   :  (New)
 -   : 
 
 **changes in tech stack**
--   None.
+-   Docker and Docker Compose were introduced for deploying the application to external infrastructure (AWS).
 
 **All files of reference**
--   : **Highest priority.** This file is broken and needs to be fixed according to the user's diagnosis. The  method is the primary target for the fix.
--   : Contains the API endpoints for all the new features and the logic that triggers the sync agent.
--   : Contains the UI for all the recently added admin features.
+-   : **Highest priority.** Contains the logic bug preventing verified entries from being classified correctly. The  and  functions are the focus.
+-   : Contains the billing logic that needs to be updated for the Nights Billed issue.
+-   , , : New files for the AWS deployment.
 
 **Areas that need refactoring**:
--   : This file has grown excessively large and handles too many responsibilities (employees, guests, rooms, settings, reports, sync triggers). It should be broken down into multiple FastAPI routers.
--   : This component is over 2,000 lines and is difficult to maintain. It should be decomposed into smaller, focused components (e.g., , , ).
+-   : Excessively large and should be broken into multiple FastAPI routers.
+-   : Overly large and should be decomposed into smaller, focused components.
 
 **key api endpoints**
--   : (POST, GET, DELETE) - New CRUD for turned away guests.
--   : (POST) - New endpoint to block a pending guest.
--   : (POST) - New endpoint to remove a pending guest.
--   : (GET) - Updated to support  and  query parameters.
--   : (GET) - Diagnostic endpoint to check Hodler Inn records for a specific date.
--   : (GET) - Diagnostic endpoint to count entries found on the portal.
+-   : (POST) Triggers the AI sync agent. Modified to correctly handle  as a query parameter.
+-   : (POST) Modified to allow check-in for users from the  list without prior registration.
 
 **Critical Info for New Agent**
--   **TRUST THE USER'S DIAGNOSIS.** Your immediate and only priority is to fix the AI sync agent based on the user's last message. Do not get sidetracked by name matching or other secondary issues. The problem is definitively **date picker interaction** and **error handling** in .
--   **Focus on :** All your changes should be concentrated in this method within .
--   **Confirm Portal Credentials:** The previous agent noted that portal credentials were not set in the preview environment, which caused diagnostic tests to fail. Before testing the sync agent, ensure the necessary environment variables for the portal login are available or ask the user to configure them.
--   **Post-Fix Verification:** After fixing the agent, propose a clear plan to verify its functionality with the user. First, use a diagnostic test to confirm it can load the correct number of entries for a given date. Then, run a full sync on a small number of entries to confirm it works end-to-end.
+-   **TRUST THE SUPPORT DIAGNOSIS:** The deployment platform is working correctly. The problem is a **logic bug** in . Do not investigate deployment or caching.
+-   **THE BUG:** The sync agent finds correct name matches (e.g., EXACT MATCH: blake sandefur) but fails to classify them as Verified in the final result. Focus on the code path *after* a match is found.
+-   **AWS DEPLOYMENT:** A parallel deployment is running on the user's AWS EC2 instance (). This is a backup with a fresh database. The primary task is to fix the bug on the main Emergent platform.
+-   **LOWER PRIORITY BUG:** The user wants Nights Billed to be calculated based on 24-hour periods, not calendar dates. Address this only after the critical sync agent bug is fixed and verified.
 
 **documents and test reports created in this job**
--   None.
+-   : Instructions for deploying the application on AWS using Docker.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** Reports the sync agent is showing Missing: 9 even after they manually verified all entries (all have blue checkmarks). (Status: Unresolved)
-2.  **User:** Reports a new sync for March 4th resulted in Missing: 27, Errors: 1. (Status: Unresolved)
-3.  **User:** Clarifies that Hodler Inn has 27 records for March 4th. (Status: Unresolved)
-4.  **User:** States that the portal data for the current day is not available until after 6 PM Central Time. (Status: Clarified)
-5.  **User:** Provides the JSON output from the  endpoint, showing the 25 records the agent has for March 4th. (Status: Clarified)
-6.  **User:** Provides a detailed, correct diagnosis of the sync agent's two main problems: incorrect date selection on the portal's JS-heavy date picker and masked error handling that hides the initial failure. (Status: **CRITICAL - THIS IS THE FIX**).
-7.  **User:** Informs the agent they are manually updating employee names in the admin list to match the portal's format. (Status: Completed)
-8.  **User:** Provides an example of the name mismatch: Portal  vs Guest Portal . (Status: Addressed by code change)
-9.  **User:** Reports Missing: 9 after running sync. (Status: Unresolved)
-10. **User:** Asks if the agent told the sync agent to fill in the employee ID and room number, as it's only returning Missing. (Status: Addressed by investigation)
+1.  **User:** Successfully launched the application on their AWS server.
+2.  **User:** Noticed the admin page was black (fixed by setting backend URL).
+3.  **User:** Confirmed the AWS instance is accessible but has no records (expected, fresh DB).
+4.  **User:** Shared reply from Emergent Support: The deployment is working; the issue is a logic bug where matches aren't being verified.
+5.  **User:** Reported a new bug: stays over 24 hours are being billed as only 1 night.
+6.  **User:** Has been guided through setting up an AWS EC2 instance, including creating security group rules for all necessary ports.
+7.  **User:** Created a GitHub repository and pushed the application code.
+8.  **User:** Asked if upgrading to a Pro plan would fix the deployment issue (Answer: No).
+9.  **User:** Received and shared a reply from Emergent Support escalating the deployment issue to a senior team.
+10. **User:** Was advised that the code is deployment-ready and the issue was platform-side (this was before the final diagnosis from support).
 
 **Project Health Check:**
 -   **Broken:**
-    -   The core AI Sync Agent in  is completely non-functional due to incorrect date picker interaction and poor error handling. This is the highest priority issue.
+    -   The core classification logic of the AI Sync Agent in  is non-functional.
+    -   The billing logic for calculating Nights Billed does not meet user requirements.
 -   **Mocked:**
     -   None.
 
 **3rd Party Integrations**
--   **API Global Solutions - Provider Rail Portal:** Integrated via Playwright. This is the integration that is currently failing.
+-   **API Global Solutions - Provider Rail Portal:** Integrated via Playwright. This is the integration at the center of the current bug.
 -   **OpenAI TTS-1:** Integrated for voice guidance.
 -   **Telegram:** Integrated for admin notifications.
 -   **Zoho WorkDrive:** Integrated for daily backups.
@@ -170,11 +163,11 @@ The main AI sync agent, which reconciles bookings with a third-party portal, is 
 -   **Testing agent used after significant changes:** NO
 -   **Troubleshoot agent used after agent stuck in loop:** NO
 -   **Test files created:** []
--   **Known regressions:** The AI Sync Agent is a major regression; it was previously partially working but is now completely broken.
+-   **Known regressions:** The AI Sync Agent's classification logic has regressed; it now fails to verify any entries, even when it finds a correct match.
 
 **Credentials to test flow:**
 -   **Admin Login:** Access at  with password .
--   **Rail Portal Credentials:** The agent must confirm these are set in the environment before testing the sync agent. They are not available in the summary.
+-   **Rail Portal Credentials:** These are set in the environment and are working.
 
 **What agent forgot to execute**
--   The previous agent failed to correctly diagnose the root cause of the AI sync agent failure. It focused on secondary symptoms like name normalization instead of the primary issue of browser interaction (date picker) and error handling, which the user ultimately had to identify.</analysis>
+-   The agent spent significant time debugging a deployment issue which turned out to be a red herring. While the creation of an AWS backup was a useful side-task, focusing on the application logic sooner, as suggested by the final support message, would have been more direct.</analysis>
