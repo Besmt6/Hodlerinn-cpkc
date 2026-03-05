@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-05-v6"  # Added detailed name comparison logging
+SYNC_AGENT_VERSION = "2026-03-05-v7"  # Fixed: Blue entries now matched BEFORE early-exit check
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1478,50 +1478,52 @@ class APIGlobalSyncAgent:
                     (not e.get("current_emp_id") or e.get("has_red_status"))
                 ]
                 
+                # FIRST: Match blue (already verified) entries against Hodler records
+                # This ensures we count them as verified even if no portal work is needed
+                for entry in entries:
+                    api_name = entry["name"]
+                    already_verified_on_portal = entry.get("verified") or entry.get("has_blue_status")
+                    
+                    if already_verified_on_portal:
+                        # Check if this already-verified entry matches a Hodler Inn record
+                        for record in hodler_records:
+                            hodler_name = record.get("employee_name", "")
+                            if match_names(api_name, hodler_name):
+                                # Check if we already counted this one
+                                already_counted = any(
+                                    v.get("api_name") == api_name or v.get("hodler_name") == hodler_name
+                                    for v in self.results["verified"]
+                                )
+                                if not already_counted:
+                                    logger.info(f"*** VERIFIED (blue checkmark + Hodler match): {api_name} <-> {hodler_name} ***")
+                                    self.results["verified"].append({
+                                        "api_name": api_name,
+                                        "hodler_name": hodler_name,
+                                        "employee_id": record.get("employee_number"),
+                                        "room": record.get("room_number"),
+                                        "portal_name": api_name,
+                                        "update_name": api_name != hodler_name,
+                                        "pre_verified": True
+                                    })
+                                break
+                
                 if len(entries_needing_work) == 0 and len(red_entries) == 0:
                     if len(blue_entries) == len(entries):
-                        logger.info("All entries have blue checkmarks - sync complete!")
+                        logger.info(f"All entries have blue checkmarks - matched {len(self.results['verified'])} with Hodler records")
                     else:
                         logger.info("No entries need verification - all have employee IDs filled")
                     break
                 
-                # Step 5: Process each entry that needs verification
+                # Step 5: Process each entry that needs verification (red/unverified entries only)
                 entries_processed_this_pass = 0
                 for entry in entries:
                     api_name = entry["name"]
                     
-                    # Check if entry is already verified on the portal (BLUE ✓ checkmark)
-                    already_verified_on_portal = entry.get("verified") or entry.get("has_blue_status")
+                    # Skip already verified entries - they were matched above
+                    if entry.get("verified") or entry.get("has_blue_status"):
+                        continue
                     
-                    if already_verified_on_portal:
-                        # Entry is already verified on portal - check if it matches a Hodler Inn record
-                        # If so, count it as verified without re-processing
-                        logger.info(f"ALREADY VERIFIED ON PORTAL: {api_name} - checking if matches Hodler Inn record...")
-                        
-                        matched_hodler = False
-                        for record in hodler_records:
-                            hodler_name = record.get("employee_name", "")
-                            if match_names(api_name, hodler_name):
-                                logger.info(f"*** MATCH FOUND (already verified): {api_name} <-> {hodler_name} ***")
-                                self.results["verified"].append({
-                                    "api_name": api_name,
-                                    "hodler_name": hodler_name,
-                                    "employee_id": record.get("employee_number"),
-                                    "room": record.get("room_number"),
-                                    "portal_name": api_name,
-                                    "update_name": api_name != hodler_name,
-                                    "pre_verified": True  # Mark that it was already verified on portal
-                                })
-                                matched_hodler = True
-                                break
-                        
-                        if not matched_hodler:
-                            logger.info(f"Already verified on portal but no Hodler match: {api_name}")
-                        
-                        continue  # Skip to next entry - no portal interaction needed
-                    
-                    # Entry is NOT verified on portal - needs processing
-                    # Process entries that:
+                    # Process entries that need work:
                     # 1. Have red status (definitely unverified)
                     # 2. OR don't have an employee ID filled in yet
                     # 3. OR explicitly marked as not verified
