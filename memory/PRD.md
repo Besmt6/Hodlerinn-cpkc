@@ -69,6 +69,10 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - [x] **Nights Billed Calculation Bug (P1)** - Changed from calendar-day based to 24-hour period based
   - Now uses `math.ceil(hours/24)` for accurate billing
   - 28-hour stay = 2 nights (was incorrectly showing 1 night)
+- [x] **Sync Status Dashboard Card** - Added prominent sync status indicator to main dashboard
+  - Shows breakdown: Verified (green), No Bill (amber), Missing (blue), Errors (red)
+  - Shows timestamp of last sync
+  - Placeholder message when no sync has been run
 
 ### In Progress 🔄
 - [ ] User verification of sync agent fix (recommend running a manual sync to confirm)

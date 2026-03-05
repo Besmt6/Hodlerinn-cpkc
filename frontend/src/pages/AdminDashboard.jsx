@@ -1118,6 +1118,77 @@ export default function AdminDashboard() {
                 />
               </div>
 
+              {/* Sync Status Card */}
+              <Card className="bg-vault-surface border-vault-border mb-8" data-testid="sync-status-card">
+                <CardHeader className="border-b border-vault-border py-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="font-outfit text-lg text-vault-text flex items-center gap-2">
+                      <RefreshCw className={`w-5 h-5 ${syncStatus.running ? 'text-vault-gold animate-spin' : 'text-vault-gold'}`} />
+                      Last Sync Results
+                    </CardTitle>
+                    {syncStatus.last_run && (
+                      <span className="text-vault-text-secondary text-sm font-manrope">
+                        {new Date(syncStatus.last_run).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  {syncStatus.last_results ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="flex items-center gap-3 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <div>
+                          <p className="text-vault-text-secondary text-xs">Verified</p>
+                          <p className="text-xl font-bold text-green-400 font-mono" data-testid="sync-verified-count">
+                            {syncStatus.last_results.verified?.length || 0}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                        <XCircle className="w-5 h-5 text-amber-500" />
+                        <div>
+                          <p className="text-vault-text-secondary text-xs">No Bill</p>
+                          <p className="text-xl font-bold text-amber-400 font-mono" data-testid="sync-nobill-count">
+                            {syncStatus.last_results.no_bill?.length || 0}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                        <AlertCircle className="w-5 h-5 text-blue-500" />
+                        <div>
+                          <p className="text-vault-text-secondary text-xs">Missing</p>
+                          <p className="text-xl font-bold text-blue-400 font-mono" data-testid="sync-missing-count">
+                            {syncStatus.last_results.missing_in_hodler?.length || 0}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+                        <XCircle className="w-5 h-5 text-red-500" />
+                        <div>
+                          <p className="text-vault-text-secondary text-xs">Errors</p>
+                          <p className="text-xl font-bold text-red-400 font-mono" data-testid="sync-errors-count">
+                            {syncStatus.last_results.errors?.length || 0}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-vault-text-secondary">
+                      <RefreshCw className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p>No sync has been run yet</p>
+                      <p className="text-xs mt-1">Go to Portal Settings to run a sync</p>
+                    </div>
+                  )}
+                  {syncStatus.running && (
+                    <div className="mt-4 flex items-center gap-2 text-vault-gold">
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span className="text-sm">{syncStatus.progress || "Sync in progress..."}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Records Table */}
               <Card className="bg-vault-surface border-vault-border" data-testid="records-table-card">
                 <CardHeader className="border-b border-vault-border">
