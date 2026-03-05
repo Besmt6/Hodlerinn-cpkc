@@ -678,6 +678,17 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleResetSync = async () => {
+    try {
+      await axios.post(`${API}/admin/sync/reset`);
+      const statusRes = await axios.get(`${API}/admin/sync/status`);
+      setSyncStatus(statusRes.data);
+      toast.success("Sync status reset");
+    } catch (error) {
+      toast.error("Failed to reset sync status");
+    }
+  };
+
   const handleExportSignIn = async () => {
     try {
       const response = await axios.get(`${API}/admin/export`, {
@@ -3421,6 +3432,15 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       >
                         <Globe className="w-4 h-4" />
                         {syncStatus.running ? "Syncing..." : "Run Sync Now"}
+                      </Button>
+                      <Button
+                        onClick={handleResetSync}
+                        variant="outline"
+                        className="border-vault-border text-vault-text-secondary hover:bg-vault-border/30 flex items-center gap-2"
+                        data-testid="reset-sync-btn"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Reset
                       </Button>
                     </div>
                   </div>
