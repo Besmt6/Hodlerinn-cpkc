@@ -178,6 +178,8 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
+SYNC_AGENT_VERSION = "2026-03-05-v3"  # Version marker to verify deployment
+
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
         self.username = username

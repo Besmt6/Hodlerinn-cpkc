@@ -3831,7 +3831,8 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
         "hodler_records_count": len(hodler_records),
         "target_date_used": target,
         "query_param_received": target_date,
-        "effective_date": effective_date
+        "effective_date": effective_date,
+        "sync_agent_version": "2026-03-05-v3"
     }
 
 
