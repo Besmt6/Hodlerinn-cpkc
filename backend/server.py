@@ -1045,6 +1045,24 @@ async def get_guest(employee_number: str):
     if 'name_encrypted' in guest:
         guest['name'] = decrypt_data(guest['name_encrypted'])
     
+    # IMPORTANT: Check if employee name has been updated in the employees collection
+    # This ensures the Guest Portal always shows the latest name (e.g., after admin updates to match portal format)
+    employee = await db.employees.find_one({"employee_number": employee_number}, {"_id": 0})
+    if employee and employee.get("name"):
+        employee_name = employee.get("name")
+        guest_name = guest.get("name", "")
+        
+        # If names differ, use the employee name (which is the authoritative source)
+        if employee_name != guest_name:
+            logging.info(f"Guest name sync: Using employee name '{employee_name}' instead of stored guest name '{guest_name}' for employee {employee_number}")
+            guest['name'] = employee_name
+            
+            # Also update the guest record in the background so it stays in sync
+            await db.guests.update_one(
+                {"employee_number": employee_number},
+                {"$set": {"name": employee_name, "name_encrypted": encrypt_data(employee_name)}}
+            )
+    
     return guest
 
 
@@ -3070,8 +3088,8 @@ async def update_employee(employee_id: str, input: EmployeeUpdate):
             "name": update_data["name"],
             "name_encrypted": encrypt_data(update_data["name"])
         }
-        # Update guests collection using the employee_number
-        await db.guests.update_one(
+        # Update ALL guest records with this employee_number (not just one)
+        await db.guests.update_many(
             {"employee_number": current_employee_number},
             {"$set": guest_update}
         )
@@ -3122,8 +3140,8 @@ async def sync_employee_names_to_guests():
         if not employee_number or not employee_name:
             continue
         
-        # Update the guest record with the new name
-        result = await db.guests.update_one(
+        # Update ALL guest records with this employee number (not just one)
+        result = await db.guests.update_many(
             {"employee_number": employee_number},
             {"$set": {
                 "name": employee_name,
@@ -3132,7 +3150,7 @@ async def sync_employee_names_to_guests():
         )
         
         if result.modified_count > 0:
-            updated_count += 1
+            updated_count += result.modified_count
     
     return {
         "message": f"Synced {updated_count} guest records with updated employee names",
