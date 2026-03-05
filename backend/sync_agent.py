@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-05-v4"  # Version marker - Fixed classification bug: entries now counted as verified even when portal already verified or verify_entry fails
+SYNC_AGENT_VERSION = "2026-03-05-v6"  # Added detailed name comparison logging
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1460,6 +1460,15 @@ class APIGlobalSyncAgent:
                 
                 logger.info(f"Pass {sync_pass}: Total entries={len(entries)}, Red (unverified)={len(red_entries)}, Blue (verified)={len(blue_entries)}, Without employee ID={len(entries_without_emp_id)}")
                 
+                # Store diagnostic info in results
+                if "diagnostics" not in self.results:
+                    self.results["diagnostics"] = {
+                        "portal_entries_found": len(entries),
+                        "hodler_records_provided": len(hodler_records),
+                        "portal_entry_names": [e.get("name", "unknown") for e in entries[:10]],  # First 10
+                        "hodler_record_names": [r.get("employee_name", "unknown") for r in hodler_records[:10]]  # First 10
+                    }
+                
                 # Determine if we have work to do:
                 # - If all entries are verified (blue checkmarks), we're done
                 # - But we should also check if there are entries without employee IDs - those need processing
@@ -1530,6 +1539,12 @@ class APIGlobalSyncAgent:
                     entries_processed_this_pass += 1
                     
                     matched = False
+                    
+                    # Log all Hodler records we're comparing against
+                    logger.info(f"Comparing '{api_name}' against {len(hodler_records)} Hodler records:")
+                    for idx, record in enumerate(hodler_records):
+                        hodler_name = record.get("employee_name", "")
+                        logger.info(f"  [{idx}] Hodler: '{hodler_name}' (ID: {record.get('employee_number')})")
                     
                     # Try to match with Hodler Inn records
                     for record in hodler_records:
