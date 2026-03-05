@@ -378,52 +378,100 @@ class APIGlobalSyncAgent:
                         input_id = await date_input.get_attribute('id')
                         logger.info(f"Date input ID: {input_id}")
                         
+                        # First, click on the input to focus it
+                        await date_input.click()
+                        await self.page.wait_for_timeout(300)
+                        
+                        # Clear the field first
+                        await date_input.fill('')
+                        await self.page.wait_for_timeout(200)
+                        
                         # Method 1: Try using JavaScript to set value and trigger all necessary events
-                        date_set_success = await self.page.evaluate(f'''
-                            (formattedDate) => {{
+                        date_set_success = await self.page.evaluate('''
+                            (args) => {
+                                const { selector, inputId, formattedDate } = args;
+                                
                                 // Try to find the input element
-                                let input = document.querySelector('{date_input_selector}');
-                                if (!input && '{input_id}') {{
-                                    input = document.getElementById('{input_id}');
-                                }}
+                                let input = document.querySelector(selector);
+                                if (!input && inputId) {
+                                    input = document.getElementById(inputId);
+                                }
                                 
-                                if (!input) {{
+                                if (!input) {
                                     console.log('Date input not found');
-                                    return false;
-                                }}
+                                    return { success: false, error: 'Input not found' };
+                                }
                                 
-                                console.log('Found date input:', input.id);
+                                console.log('Found date input:', input.id, 'Current value:', input.value);
+                                
+                                // Focus the input first
+                                input.focus();
                                 
                                 // Clear and set the value
+                                input.value = '';
                                 input.value = formattedDate;
                                 
-                                // Trigger all necessary events for JSF/PrimeFaces
-                                // Order matters: focus -> input -> change -> blur
-                                input.dispatchEvent(new Event('focus', {{ bubbles: true }}));
-                                input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                                input.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                                input.dispatchEvent(new Event('blur', {{ bubbles: true }}));
+                                // Create and dispatch events with all necessary properties
+                                const focusEvent = new FocusEvent('focus', { bubbles: true, cancelable: true });
+                                const inputEvent = new InputEvent('input', { bubbles: true, cancelable: true, data: formattedDate });
+                                const changeEvent = new Event('change', { bubbles: true, cancelable: true });
+                                const blurEvent = new FocusEvent('blur', { bubbles: true, cancelable: true });
                                 
-                                // For PrimeFaces, also try to trigger the dateSelect event
-                                if (typeof PrimeFaces !== 'undefined') {{
-                                    try {{
-                                        // Find the widget associated with this input
-                                        var widgetVar = input.getAttribute('data-p-widget') || 
-                                                       input.parentElement.getAttribute('data-p-widget');
-                                        if (widgetVar && PrimeFaces.widgets[widgetVar]) {{
-                                            PrimeFaces.widgets[widgetVar].setDate(new Date(formattedDate));
-                                        }}
-                                    }} catch(e) {{
-                                        console.log('PrimeFaces widget trigger failed:', e);
-                                    }}
-                                }}
+                                input.dispatchEvent(focusEvent);
+                                input.dispatchEvent(inputEvent);
+                                input.dispatchEvent(changeEvent);
+                                input.dispatchEvent(blurEvent);
                                 
-                                return true;
-                            }}
-                        ''', formatted_date)
+                                // For PrimeFaces, also try to trigger the dateSelect event and AJAX behavior
+                                if (typeof PrimeFaces !== 'undefined') {
+                                    try {
+                                        // Find the calendar widget
+                                        const widgetVarAttr = input.getAttribute('data-widget') || 
+                                                            input.closest('.ui-calendar')?.getAttribute('data-widget');
+                                        
+                                        // Try to find widget by ID pattern
+                                        const inputIdBase = input.id.replace('_input', '');
+                                        const possibleWidgetNames = [inputIdBase, inputIdBase.replace(/:/g, '_')];
+                                        
+                                        for (const widgetName of possibleWidgetNames) {
+                                            if (PrimeFaces.widgets && PrimeFaces.widgets[widgetName]) {
+                                                const widget = PrimeFaces.widgets[widgetName];
+                                                if (widget.setDate) {
+                                                    widget.setDate(new Date(formattedDate));
+                                                    console.log('Set date via PrimeFaces widget:', widgetName);
+                                                }
+                                                if (widget.fireDateSelectEvent) {
+                                                    widget.fireDateSelectEvent();
+                                                    console.log('Fired dateSelect event');
+                                                }
+                                                break;
+                                            }
+                                        }
+                                        
+                                        // Also trigger any AJAX behavior attached to the input
+                                        if (input.onchange) {
+                                            input.onchange();
+                                        }
+                                        
+                                        // Try triggering PrimeFaces AJAX directly
+                                        const ajaxBehavior = input.getAttribute('onchange');
+                                        if (ajaxBehavior && ajaxBehavior.includes('PrimeFaces.ab')) {
+                                            eval(ajaxBehavior);
+                                            console.log('Executed PrimeFaces AJAX behavior');
+                                        }
+                                    } catch(e) {
+                                        console.log('PrimeFaces widget trigger failed:', e.message);
+                                    }
+                                }
+                                
+                                // Final check
+                                console.log('Final input value:', input.value);
+                                return { success: true, finalValue: input.value };
+                            }
+                        ''', {'selector': date_input_selector, 'inputId': input_id, 'formattedDate': formatted_date})
                         
                         logger.info(f"JavaScript date set result: {date_set_success}")
-                        await self.page.wait_for_timeout(1000)
+                        await self.page.wait_for_timeout(1500)  # Longer wait for AJAX
                         
                         # Verify the value was actually set - THIS IS CRITICAL
                         current_value = await date_input.input_value()
@@ -502,6 +550,12 @@ class APIGlobalSyncAgent:
                             await date_input.fill(formatted_date)
                             await self.page.wait_for_timeout(300)
                             await date_input.press('Tab')  # Tab triggers blur event
+                            await self.page.wait_for_timeout(1000)
+                            
+                            # Also try pressing Enter which often triggers form submission/AJAX
+                            await date_input.click()
+                            await self.page.wait_for_timeout(100)
+                            await self.page.keyboard.press('Enter')
                             await self.page.wait_for_timeout(500)
                         
                         # Final verification - CRITICAL CHECK
