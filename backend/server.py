@@ -2773,9 +2773,10 @@ def fix_pronunciation(name: str) -> str:
     # Key: lowercase name, Value: phonetically-friendly spelling
     pronunciation_fixes = {
         # First names
-        'brian': 'Bryan',      # Prevents "brain" pronunciation
-        'Brain': 'Bryan',      # In case it's already capitalized wrong
+        'brian': 'Bry-an',     # Prevents "brain" pronunciation
+        'brain': 'Bry-an',     # In case it's misspelled as "Brain"
         'gerald': 'Jerald',    # Prevents "gayr-ad" pronunciation, should be "jer-ald"
+        'geraldh': 'Jerald',   # Handle GERALD with H attached
         'gerard': 'Jerard',    # Similar issue
         'shawn': 'Shaun',      # Some TTS struggle with Shawn
         'sean': 'Shaun',       # Irish spelling
