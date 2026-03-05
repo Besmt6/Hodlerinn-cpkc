@@ -3662,10 +3662,24 @@ async def get_sync_status():
         "next_scheduled_run": next_run
     }
 
+class SyncRequest(BaseModel):
+    target_date: Optional[str] = None
+
 @api_router.post("/admin/sync/run")
-async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str] = None):
-    """Run sync with API Global portal"""
+async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = None, target_date: Optional[str] = None):
+    """Run sync with API Global portal
+    
+    Args:
+        target_date: Query parameter for target date (e.g., ?target_date=2026-03-04)
+        request: JSON body can also contain {"target_date": "2026-03-04"}
+    """
     global sync_status
+    
+    # Support both query parameter and JSON body
+    if request and request.target_date:
+        target_date = request.target_date
+    
+    logging.info(f"Sync endpoint called with target_date: {target_date}")
     
     if sync_status["running"]:
         raise HTTPException(status_code=400, detail="Sync already in progress")
@@ -3676,7 +3690,8 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
     
     # Get Hodler Inn records for the target date
     if target_date:
-        query = {"check_in_date": target_date}
+        target = target_date  # Use the provided target_date
+        query = {"check_in_date": target}
     else:
         # Default to yesterday or today based on time
         now = datetime.now()
@@ -3685,6 +3700,8 @@ async def run_sync(background_tasks: BackgroundTasks, target_date: Optional[str]
         else:
             target = now.strftime("%Y-%m-%d")
         query = {"check_in_date": target}
+    
+    logging.info(f"Sync requested for date: {target}")
     
     bookings = await db.bookings.find(query, {"_id": 0}).sort([("check_in_date", 1), ("check_in_time", 1)]).to_list(1000)
     

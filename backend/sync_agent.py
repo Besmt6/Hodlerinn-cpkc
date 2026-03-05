@@ -1448,12 +1448,25 @@ class APIGlobalSyncAgent:
                 # Count red (unverified) entries
                 red_entries = [e for e in entries if e.get("has_red_status") and not e.get("verified")]
                 blue_entries = [e for e in entries if e.get("has_blue_status") or e.get("verified")]
+                unverified_entries = [e for e in entries if not e.get("verified") and not e.get("has_blue_status")]
+                entries_without_emp_id = [e for e in entries if not e.get("current_emp_id")]
                 
-                logger.info(f"Pass {sync_pass}: Total entries={len(entries)}, Red (unverified)={len(red_entries)}, Blue (verified)={len(blue_entries)}")
+                logger.info(f"Pass {sync_pass}: Total entries={len(entries)}, Red (unverified)={len(red_entries)}, Blue (verified)={len(blue_entries)}, Without employee ID={len(entries_without_emp_id)}")
                 
-                # If all entries are blue (verified), we're done!
-                if len(red_entries) == 0:
-                    logger.info("All entries have blue checkmarks - sync complete!")
+                # Determine if we have work to do:
+                # - If all entries are verified (blue checkmarks), we're done
+                # - But we should also check if there are entries without employee IDs - those need processing
+                entries_needing_work = [e for e in entries if 
+                    not e.get("verified") and 
+                    not e.get("has_blue_status") and 
+                    (not e.get("current_emp_id") or e.get("has_red_status"))
+                ]
+                
+                if len(entries_needing_work) == 0 and len(red_entries) == 0:
+                    if len(blue_entries) == len(entries):
+                        logger.info("All entries have blue checkmarks - sync complete!")
+                    else:
+                        logger.info("No entries need verification - all have employee IDs filled")
                     break
                 
                 # Step 5: Process each entry that needs verification
