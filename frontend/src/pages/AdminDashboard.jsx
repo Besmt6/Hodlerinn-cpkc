@@ -186,6 +186,7 @@ export default function AdminDashboard() {
   const [syncStatus, setSyncStatus] = useState({ running: false, progress: "", last_results: null });
   const [runningSyncTest, setRunningSyncTest] = useState(false);
   const [syncTargetDate, setSyncTargetDate] = useState("");
+  const [syncIncludePrevDay, setSyncIncludePrevDay] = useState(false);
   
   const navigate = useNavigate();
 
@@ -648,8 +649,15 @@ export default function AdminDashboard() {
     try {
       // Build URL with optional date parameter
       let url = `${API}/admin/sync/run`;
+      const params = [];
       if (syncTargetDate) {
-        url += `?target_date=${syncTargetDate}`;
+        params.push(`target_date=${syncTargetDate}`);
+      }
+      if (syncIncludePrevDay) {
+        params.push(`include_prev_day=true`);
+      }
+      if (params.length > 0) {
+        url += `?${params.join('&')}`;
       }
       const response = await axios.post(url);
       const targetDate = response.data.target_date_used || syncTargetDate || 'today';
@@ -658,7 +666,7 @@ export default function AdminDashboard() {
       console.log('Sync response:', response.data);
       
       // Show single toast with clear message
-      toast.success(`Sync started for ${targetDate} - checking ${recordCount} records`);
+      toast.success(`Sync started for ${targetDate}${syncIncludePrevDay ? ' + prev day' : ''} - checking ${recordCount} records`);
       
       // Update status immediately
       setSyncStatus({ 
@@ -3426,6 +3434,15 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       <span className="text-vault-text-secondary text-xs">
                         {syncTargetDate ? `Selected: ${syncTargetDate}` : "Leave empty for yesterday/today"}
                       </span>
+                      <label className="flex items-center gap-2 text-vault-text-secondary text-sm cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={syncIncludePrevDay}
+                          onChange={(e) => setSyncIncludePrevDay(e.target.checked)}
+                          className="w-4 h-4 accent-vault-gold"
+                        />
+                        Include previous day (for late arrivals)
+                      </label>
                     </div>
                     
                     <div className="flex flex-wrap gap-3">

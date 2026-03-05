@@ -3710,11 +3710,17 @@ class SyncRequest(BaseModel):
     target_date: Optional[str] = None
 
 @api_router.post("/admin/sync/run")
-async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = None, target_date: Optional[str] = Query(None)):
+async def run_sync(
+    background_tasks: BackgroundTasks, 
+    request: SyncRequest = None, 
+    target_date: Optional[str] = Query(None),
+    include_prev_day: bool = Query(False, description="Also sync previous day's portal page")
+):
     """Run sync with API Global portal
     
     Args:
         target_date: Query parameter for target date (e.g., ?target_date=2026-03-04)
+        include_prev_day: If true, also syncs the previous day's portal page
         request: JSON body can also contain {"target_date": "2026-03-04"}
     """
     global sync_status
@@ -3801,8 +3807,15 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
         "username": settings.get("api_global_username"),
         "password": decrypt_data(settings.get("api_global_password_encrypted")),
         "hodler_records": hodler_records,
-        "target": target_date or target
+        "target": target_date or target,
+        "include_prev_day": include_prev_day
     }
+    
+    # Calculate previous day if needed
+    if include_prev_day:
+        from datetime import datetime as dt
+        target_dt = dt.strptime(sync_params["target"], "%Y-%m-%d")
+        sync_params["prev_day"] = (target_dt - timedelta(days=1)).strftime("%Y-%m-%d")
     
     # Get name aliases for matching
     name_aliases = await db.name_aliases.find({}, {"_id": 0}).to_list(100)
@@ -3822,25 +3835,59 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
                 display_name = name[:25] + "..." if len(name) > 25 else name
                 sync_status["progress"] = f"Processing {entry_num}/{total}: {display_name}"
             
-            sync_status["progress"] = f"Connecting to portal for {sync_params['target']}..."
-            agent = APIGlobalSyncAgent(sync_params["username"], sync_params["password"])
+            # Dates to sync
+            dates_to_sync = [sync_params["target"]]
+            if sync_params.get("include_prev_day") and sync_params.get("prev_day"):
+                dates_to_sync.insert(0, sync_params["prev_day"])  # Do prev day first
             
-            sync_status["progress"] = f"Loading portal entries..."
-            results = await agent.run_sync(
-                sync_params["hodler_records"], 
-                sync_params["target"], 
-                name_aliases,
-                progress_callback=update_progress
-            )
+            all_results = {
+                "verified": [],
+                "no_bill": [],
+                "missing_in_hodler": [],
+                "errors": []
+            }
             
-            sync_status["last_results"] = results
+            for sync_date in dates_to_sync:
+                sync_status["progress"] = f"Connecting to portal for {sync_date}..."
+                agent = APIGlobalSyncAgent(sync_params["username"], sync_params["password"])
+                
+                sync_status["progress"] = f"Loading portal entries for {sync_date}..."
+                results = await agent.run_sync(
+                    sync_params["hodler_records"], 
+                    sync_date, 
+                    name_aliases,
+                    progress_callback=update_progress
+                )
+                
+                # Merge results
+                all_results["verified"].extend(results.get("verified", []))
+                all_results["no_bill"].extend(results.get("no_bill", []))
+                all_results["errors"].extend(results.get("errors", []))
+                
+                # Only add missing from the main date (not prev day)
+                if sync_date == sync_params["target"]:
+                    all_results["missing_in_hodler"].extend(results.get("missing_in_hodler", []))
+            
+            # Deduplicate verified entries
+            seen = set()
+            unique_verified = []
+            for v in all_results["verified"]:
+                key = v.get("employee_id") or v.get("api_name")
+                if key not in seen:
+                    seen.add(key)
+                    unique_verified.append(v)
+            all_results["verified"] = unique_verified
+            all_results["agent_version"] = results.get("agent_version", "unknown")
+            
+            sync_status["last_results"] = all_results
             sync_status["last_run"] = datetime.now(timezone.utc).isoformat()
             
             # Build completion message
-            verified_count = len(results.get("verified", []))
-            no_bill_count = len(results.get("no_bill", []))
-            missing_count = len(results.get("missing_in_hodler", []))
-            sync_status["progress"] = f"Completed: {verified_count} verified, {no_bill_count} no-bill, {missing_count} missing"
+            verified_count = len(all_results.get("verified", []))
+            no_bill_count = len(all_results.get("no_bill", []))
+            missing_count = len(all_results.get("missing_in_hodler", []))
+            dates_msg = " + prev day" if len(dates_to_sync) > 1 else ""
+            sync_status["progress"] = f"Completed{dates_msg}: {verified_count} verified, {no_bill_count} no-bill, {missing_count} missing"
             
             # Auto-update employee names to match portal format
             if results.get("verified"):

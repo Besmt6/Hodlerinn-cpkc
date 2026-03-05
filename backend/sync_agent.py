@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-05-v10"  # Fill Employee ID and Room for blue entries that are missing them
+SYNC_AGENT_VERSION = "2026-03-05-v11"  # Added include_prev_day option to sync both dates
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
