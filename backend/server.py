@@ -3807,11 +3807,22 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
         try:
             from sync_agent import APIGlobalSyncAgent
             
+            # Progress callback to update status
+            async def update_progress(entry_num, total, name):
+                # Truncate long names
+                display_name = name[:25] + "..." if len(name) > 25 else name
+                sync_status["progress"] = f"Processing {entry_num}/{total}: {display_name}"
+            
             sync_status["progress"] = f"Connecting to portal for {sync_params['target']}..."
             agent = APIGlobalSyncAgent(sync_params["username"], sync_params["password"])
             
-            sync_status["progress"] = f"Syncing {len(sync_params['hodler_records'])} Hodler records against portal..."
-            results = await agent.run_sync(sync_params["hodler_records"], sync_params["target"], name_aliases)
+            sync_status["progress"] = f"Loading portal entries..."
+            results = await agent.run_sync(
+                sync_params["hodler_records"], 
+                sync_params["target"], 
+                name_aliases,
+                progress_callback=update_progress
+            )
             
             sync_status["last_results"] = results
             sync_status["last_run"] = datetime.now(timezone.utc).isoformat()

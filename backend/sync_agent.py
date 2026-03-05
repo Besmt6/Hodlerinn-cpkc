@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-05-v7"  # Fixed: Blue entries now matched BEFORE early-exit check
+SYNC_AGENT_VERSION = "2026-03-05-v8"  # Added real-time progress with entry names
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1374,7 +1374,7 @@ class APIGlobalSyncAgent:
             logger.error(f"Error saving changes: {str(e)}")
             return False
     
-    async def run_sync(self, hodler_records: list, target_date: str = None, name_aliases: list = None) -> dict:
+    async def run_sync(self, hodler_records: list, target_date: str = None, name_aliases: list = None, progress_callback=None) -> dict:
         """
         Run the full sync process.
         
@@ -1382,12 +1382,15 @@ class APIGlobalSyncAgent:
             hodler_records: List of dicts with 'employee_name', 'employee_number', 'room_number'
             target_date: Optional date in format 'YYYY-MM-DD' to sync for a specific date
             name_aliases: Optional list of name mappings from portal names to employee IDs
+            progress_callback: Optional async function(entry_num, total, name) to report progress
         
         Returns:
             Results dict with verified, no_bill, missing entries
         """
         if name_aliases is None:
             name_aliases = []
+        
+        self.progress_callback = progress_callback
         
         try:
             # Log version at start of sync
@@ -1516,8 +1519,19 @@ class APIGlobalSyncAgent:
                 
                 # Step 5: Process each entry that needs verification (red/unverified entries only)
                 entries_processed_this_pass = 0
+                total_entries = len(entries)
+                entry_num = 0
+                
                 for entry in entries:
+                    entry_num += 1
                     api_name = entry["name"]
+                    
+                    # Report progress
+                    if self.progress_callback:
+                        try:
+                            await self.progress_callback(entry_num, total_entries, api_name)
+                        except:
+                            pass
                     
                     # Skip already verified entries - they were matched above
                     if entry.get("verified") or entry.get("has_blue_status"):
