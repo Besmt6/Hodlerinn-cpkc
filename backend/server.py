@@ -3788,17 +3788,25 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
     async def run_sync_task_wrapper():
         global sync_status
         sync_status["running"] = True
-        sync_status["progress"] = "Starting sync..."
+        sync_status["progress"] = "Initializing sync agent..."
         
         try:
             from sync_agent import APIGlobalSyncAgent
             
+            sync_status["progress"] = f"Connecting to portal for {sync_params['target']}..."
             agent = APIGlobalSyncAgent(sync_params["username"], sync_params["password"])
+            
+            sync_status["progress"] = f"Syncing {len(sync_params['hodler_records'])} Hodler records against portal..."
             results = await agent.run_sync(sync_params["hodler_records"], sync_params["target"], name_aliases)
             
             sync_status["last_results"] = results
             sync_status["last_run"] = datetime.now(timezone.utc).isoformat()
-            sync_status["progress"] = "Sync completed"
+            
+            # Build completion message
+            verified_count = len(results.get("verified", []))
+            no_bill_count = len(results.get("no_bill", []))
+            missing_count = len(results.get("missing_in_hodler", []))
+            sync_status["progress"] = f"Completed: {verified_count} verified, {no_bill_count} no-bill, {missing_count} missing"
             
             # Auto-update employee names to match portal format
             if results.get("verified"):
@@ -3846,7 +3854,7 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
         "target_date_used": target,
         "query_param_received": target_date,
         "effective_date": effective_date,
-        "sync_agent_version": "2026-03-05-v3"
+        "sync_agent_version": "v7"
     }
 
 
