@@ -27,6 +27,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 import asyncio
+import json
 
 ROOT_DIR = Path(__file__).parent
 AUDIO_DIR = ROOT_DIR / "audio"
@@ -4752,6 +4753,94 @@ async def public_billing_report(
         },
         "records": billing_records
     }
+
+
+
+# ==================== Database Export/Import for Backup ====================
+
+@api_router.get("/admin/export-database")
+async def export_full_database():
+    """Export all database collections as JSON for backup/migration"""
+    try:
+        export_data = {
+            "export_date": datetime.now(timezone.utc).isoformat(),
+            "collections": {}
+        }
+        
+        # Export all collections
+        collections_to_export = [
+            "employees", "guests", "bookings", "rooms", 
+            "settings", "blocked_rooms", "turned_away_guests",
+            "sync_history", "name_aliases", "notification_state",
+            "pending_access_requests"
+        ]
+        
+        for collection_name in collections_to_export:
+            try:
+                collection = db[collection_name]
+                documents = await collection.find({}, {"_id": 0}).to_list(10000)
+                export_data["collections"][collection_name] = documents
+                logging.info(f"Exported {len(documents)} documents from {collection_name}")
+            except Exception as e:
+                logging.error(f"Error exporting {collection_name}: {e}")
+                export_data["collections"][collection_name] = []
+        
+        # Return as downloadable JSON
+        json_str = json.dumps(export_data, indent=2, default=str)
+        
+        return Response(
+            content=json_str,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f"attachment; filename=hodler_inn_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            }
+        )
+    except Exception as e:
+        logging.error(f"Database export failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
+
+class ImportDatabaseRequest(BaseModel):
+    data: dict
+
+
+@api_router.post("/admin/import-database")
+async def import_database(file_content: dict):
+    """Import database from JSON backup (WARNING: This will overwrite existing data)"""
+    try:
+        if "collections" not in file_content:
+            raise HTTPException(status_code=400, detail="Invalid backup format - missing 'collections' key")
+        
+        import_results = {}
+        
+        for collection_name, documents in file_content["collections"].items():
+            try:
+                collection = db[collection_name]
+                
+                if documents:
+                    # Clear existing data
+                    await collection.delete_many({})
+                    
+                    # Insert new data
+                    if isinstance(documents, list) and len(documents) > 0:
+                        await collection.insert_many(documents)
+                    
+                    import_results[collection_name] = f"Imported {len(documents)} documents"
+                else:
+                    import_results[collection_name] = "No documents to import"
+                    
+            except Exception as e:
+                import_results[collection_name] = f"Error: {str(e)}"
+        
+        return {
+            "success": True,
+            "message": "Database import completed",
+            "results": import_results
+        }
+    except Exception as e:
+        logging.error(f"Database import failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
 
 
 # Include the router in the main app (MUST be after all route definitions)
