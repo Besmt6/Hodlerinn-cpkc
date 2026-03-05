@@ -3691,6 +3691,20 @@ async def get_sync_status():
         "agent_version": agent_version
     }
 
+
+@api_router.post("/admin/sync/reset")
+async def reset_sync_status():
+    """Reset sync status if it gets stuck"""
+    global sync_status
+    sync_status = {
+        "running": False,
+        "progress": "",
+        "last_results": sync_status.get("last_results"),  # Keep last results
+        "last_run": sync_status.get("last_run")  # Keep last run time
+    }
+    return {"message": "Sync status reset", "status": sync_status}
+
+
 class SyncRequest(BaseModel):
     target_date: Optional[str] = None
 
@@ -3840,10 +3854,12 @@ async def run_sync(background_tasks: BackgroundTasks, request: SyncRequest = Non
             })
             
         except Exception as e:
+            logging.error(f"Sync task failed: {str(e)}")
             sync_status["progress"] = f"Sync failed: {str(e)}"
-            sync_status["last_results"] = {"errors": [str(e)]}
+            sync_status["last_results"] = {"errors": [str(e)], "agent_version": "v7"}
         finally:
             sync_status["running"] = False
+            logging.info(f"Sync task finished. Running={sync_status['running']}, Progress={sync_status['progress']}")
     
     # Start background task using asyncio.create_task directly
     asyncio.create_task(run_sync_task_wrapper())
