@@ -5,6 +5,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import re
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
@@ -620,15 +621,21 @@ async def start_scheduler():
     scheduler.add_job(monthly_data_reset, CronTrigger(day=1, hour=0, minute=0))
     
     # Daily status alerts at 7 AM and 10 PM Central Time
-    # Pass async functions directly - AsyncIOScheduler handles them
+    # Use wrapper functions that the AsyncIOScheduler can handle
+    async def morning_alert():
+        await send_daily_status_alert("morning")
+    
+    async def evening_alert():
+        await send_daily_status_alert("evening")
+    
     scheduler.add_job(
-        lambda: asyncio.create_task(send_daily_status_alert("morning")),
+        morning_alert,
         CronTrigger(hour=7, minute=0, timezone=central_tz),
         id="morning_status_alert",
         replace_existing=True
     )
     scheduler.add_job(
-        lambda: asyncio.create_task(send_daily_status_alert("evening")),
+        evening_alert,
         CronTrigger(hour=22, minute=0, timezone=central_tz),
         id="evening_status_alert",
         replace_existing=True
