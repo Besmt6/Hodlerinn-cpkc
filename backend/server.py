@@ -4103,6 +4103,140 @@ async def update_recipient_alerts(email: str, alerts: List[str]):
     )
     return {"message": f"Updated alerts for {email}", "recipients": new_recipients}
 
+@api_router.get("/admin/email-alerts/preview/{alert_type}")
+async def preview_email_alert(alert_type: str):
+    """Generate a preview of what an email alert would look like."""
+    valid_types = ["sold_out", "rooms_available", "heads_up", "daily_status"]
+    if alert_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid alert type. Valid types: {valid_types}")
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    alert_settings = await get_email_alert_settings()
+    subject_prefix = alert_settings.get("custom_subject_prefix", "Hodler Inn")
+    
+    # Get current room data for realistic preview
+    total_rooms = await db.rooms.count_documents({})
+    if total_rooms == 0:
+        total_rooms = 28
+    
+    railroad_occupied = await db.bookings.count_documents({"is_checked_out": False})
+    other_occupied = await db.blocked_rooms.count_documents({"is_active": True, "is_reservation": {"$ne": True}})
+    total_occupied = railroad_occupied + other_occupied
+    available_rooms = total_rooms - total_occupied
+    
+    # Get clean/dirty counts
+    occupied_room_numbers = []
+    railroad_bookings = await db.bookings.find({"is_checked_out": False}, {"room_number": 1, "_id": 0}).to_list(100)
+    occupied_room_numbers.extend([b["room_number"] for b in railroad_bookings if b.get("room_number")])
+    blocked = await db.blocked_rooms.find({"is_active": True, "is_reservation": {"$ne": True}}, {"room_number": 1, "_id": 0}).to_list(100)
+    occupied_room_numbers.extend([b["room_number"] for b in blocked if b.get("room_number")])
+    
+    clean_available = await db.rooms.count_documents({
+        "room_number": {"$nin": occupied_room_numbers},
+        "cleaning_status": "clean"
+    })
+    dirty_available = available_rooms - clean_available
+    occupancy_percent = round((total_occupied / total_rooms) * 100, 1)
+    
+    if alert_type == "sold_out":
+        subject = f"{subject_prefix} - 100% Occupied ({today})"
+        body = f"""Hello,
+
+This is an automated notification from {subject_prefix}.
+
+We are currently 100% occupied with {total_rooms} rooms in house.
+
+More rooms will become available as crew gets called out from the hotel.
+
+Thank you,
+{subject_prefix}
+
+---
+This is an automated message. Please do not reply to this email."""
+    
+    elif alert_type == "rooms_available":
+        subject = f"{subject_prefix} - Rooms Now Available ({today})"
+        body = f"""Hello,
+
+This is an automated notification from {subject_prefix}.
+
+GOOD NEWS! Rooms are now available after being at 100% capacity.
+
+ROOM AVAILABILITY:
+- Total Rooms Available: {available_rooms}
+- Clean & Ready: {clean_available}
+- Being Cleaned: {dirty_available}
+
+CURRENT OCCUPANCY:
+- Railroad Crew In-House: {railroad_occupied}
+- Other Guests: {other_occupied}
+- Total Occupied: {total_occupied}/{total_rooms}
+
+Thank you,
+{subject_prefix}
+
+---
+This is an automated message. Please do not reply to this email."""
+    
+    elif alert_type == "heads_up":
+        subject = f"{subject_prefix} - HEADS UP: Low Room Availability ({today})"
+        body = f"""Hello,
+
+This is a HEADS UP notice from {subject_prefix}.
+
+We have limited room availability. Please prepare for incoming crews.
+
+ROOM STATUS:
+- Rooms Available: {available_rooms}
+- Clean & Ready: {clean_available}
+- Being Cleaned: {dirty_available}
+
+CURRENT OCCUPANCY:
+- Railroad Crew In-House: {railroad_occupied}
+- Other Guests (Blocked Rooms): {other_occupied}
+- Total Occupied: {total_occupied}/{total_rooms}
+
+Please plan accordingly for any additional crew arrivals.
+
+Thank you,
+{subject_prefix}
+
+---
+This is an automated message. Please do not reply to this email."""
+    
+    elif alert_type == "daily_status":
+        subject = f"{subject_prefix} - Daily Status (Morning)"
+        body = f"""Hello,
+
+Daily Status Report - Morning
+
+OCCUPANCY: {occupancy_percent}%
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total Rooms: {total_rooms}
+Occupied: {total_occupied} ({railroad_occupied} railroad + {other_occupied} other)
+Available: {available_rooms}
+
+AVAILABLE ROOMS BREAKDOWN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Clean & Ready: {clean_available}
+🧹 Needs Cleaning: {dirty_available}
+
+Thank you,
+{subject_prefix}
+
+---
+This is an automated status report."""
+    
+    recipients = await get_email_recipients(alert_type)
+    
+    return {
+        "alert_type": alert_type,
+        "subject": subject,
+        "body": body,
+        "recipients": recipients,
+        "preview_note": "This is a preview with current room data. Actual email will use data at send time."
+    }
+
 @api_router.post("/admin/email-alerts/test")
 async def send_test_email_alert():
     """Send a test email to all configured recipients."""

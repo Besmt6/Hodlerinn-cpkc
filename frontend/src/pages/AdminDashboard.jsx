@@ -165,6 +165,8 @@ export default function AdminDashboard() {
     custom_subject_prefix: "Hodler Inn"
   });
   const [newRecipientEmail, setNewRecipientEmail] = useState("");
+  const [emailPreview, setEmailPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   
   // Guarantee report state
   const [guaranteeReport, setGuaranteeReport] = useState(null);
@@ -499,6 +501,17 @@ export default function AdminDashboard() {
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to send test email");
     }
+  };
+
+  const previewEmailAlert = async (alertType) => {
+    setPreviewLoading(true);
+    try {
+      const res = await axios.get(`${API}/admin/email-alerts/preview/${alertType}`);
+      setEmailPreview(res.data);
+    } catch (error) {
+      toast.error("Failed to load email preview");
+    }
+    setPreviewLoading(false);
   };
 
   const handleMarkRoomDirty = async (roomNumber) => {
@@ -4455,10 +4468,60 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                   
                   {/* Legacy Test Buttons */}
                   <div className="border-t border-vault-border pt-4 mt-4">
-                    <h4 className="text-sm font-semibold text-vault-gold mb-3">Test Individual Alerts</h4>
+                    <h4 className="text-sm font-semibold text-vault-gold mb-3">Preview & Test Individual Alerts</h4>
                     <p className="text-vault-text-secondary text-xs mb-3">
-                      Test specific notification types
+                      Preview email content or send test notifications
                     </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                      <div className="space-y-2">
+                        <p className="text-vault-text-secondary text-xs">Sold Out</p>
+                        <Button
+                          onClick={() => previewEmailAlert('sold_out')}
+                          variant="outline"
+                          className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10 text-xs"
+                          data-testid="preview-sold-out-btn"
+                        >
+                          <Eye className="w-3 h-3 mr-1" />
+                          Preview
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-vault-text-secondary text-xs">Rooms Available</p>
+                        <Button
+                          onClick={() => previewEmailAlert('rooms_available')}
+                          variant="outline"
+                          className="w-full border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 text-xs"
+                          data-testid="preview-rooms-available-btn"
+                        >
+                          <Eye className="w-3 h-3 mr-1" />
+                          Preview
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-vault-text-secondary text-xs">Low Availability</p>
+                        <Button
+                          onClick={() => previewEmailAlert('heads_up')}
+                          variant="outline"
+                          className="w-full border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-xs"
+                          data-testid="preview-heads-up-btn"
+                        >
+                          <Eye className="w-3 h-3 mr-1" />
+                          Preview
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-vault-text-secondary text-xs">Daily Status</p>
+                        <Button
+                          onClick={() => previewEmailAlert('daily_status')}
+                          variant="outline"
+                          className="w-full border-blue-500/50 text-blue-400 hover:bg-blue-500/10 text-xs"
+                          data-testid="preview-daily-status-btn"
+                        >
+                          <Eye className="w-3 h-3 mr-1" />
+                          Preview
+                        </Button>
+                      </div>
+                    </div>
                     <div className="flex flex-wrap gap-3">
                       <Button
                         onClick={async () => {
@@ -4477,7 +4540,7 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                         className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm"
                         data-testid="test-room-available-btn"
                       >
-                        Test Room Available Alert
+                        Send Room Available Test
                       </Button>
                       <Button
                         onClick={async () => {
@@ -4496,10 +4559,46 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                         className="bg-amber-600 hover:bg-amber-700 text-white text-sm"
                         data-testid="test-heads-up-btn"
                       >
-                        Test Heads-Up Notice
+                        Send Heads-Up Test
                       </Button>
                     </div>
                   </div>
+                  
+                  {/* Email Preview Modal */}
+                  <Dialog open={!!emailPreview} onOpenChange={() => setEmailPreview(null)}>
+                    <DialogContent className="bg-vault-surface border-vault-border max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="text-vault-gold flex items-center gap-2">
+                          <Mail className="w-5 h-5" />
+                          Email Preview: {emailPreview?.alert_type?.replace('_', ' ').toUpperCase()}
+                        </DialogTitle>
+                      </DialogHeader>
+                      {emailPreview && (
+                        <div className="space-y-4">
+                          <div className="bg-black/30 rounded-lg p-4">
+                            <p className="text-vault-text-secondary text-xs mb-1">SUBJECT:</p>
+                            <p className="text-vault-text font-medium">{emailPreview.subject}</p>
+                          </div>
+                          <div className="bg-black/30 rounded-lg p-4">
+                            <p className="text-vault-text-secondary text-xs mb-1">RECIPIENTS ({emailPreview.recipients?.length || 0}):</p>
+                            <p className="text-vault-text">{emailPreview.recipients?.join(', ') || 'No recipients configured for this alert'}</p>
+                          </div>
+                          <div className="bg-black/30 rounded-lg p-4">
+                            <p className="text-vault-text-secondary text-xs mb-2">EMAIL BODY:</p>
+                            <pre className="text-vault-text text-sm whitespace-pre-wrap font-mono bg-black/20 p-3 rounded">{emailPreview.body}</pre>
+                          </div>
+                          <p className="text-vault-text-secondary text-xs italic">{emailPreview.preview_note}</p>
+                        </div>
+                      )}
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button variant="outline" className="border-vault-border text-vault-text">
+                            Close
+                          </Button>
+                        </DialogClose>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
 
