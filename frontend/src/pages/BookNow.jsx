@@ -38,6 +38,8 @@ export default function BookNow() {
   const [availability, setAvailability] = useState(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showPlayButton, setShowPlayButton] = useState(false);
+  const [greetingMessageId, setGreetingMessageId] = useState("bitsy_greeting");
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -46,7 +48,7 @@ export default function BookNow() {
   const isRecordingRef = useRef(false); // Track recording state for closure
 
   // Play voice message from backend (OpenAI TTS)
-  const playVoiceMessage = (messageId) => {
+  const playVoiceMessage = (messageId, isAutoplay = false) => {
     if (!voiceEnabled) return;
     
     // Stop any currently playing audio
@@ -57,6 +59,7 @@ export default function BookNow() {
     currentAudio = audio;
     
     setIsSpeaking(true);
+    setShowPlayButton(false);
     
     audio.onended = () => {
       setIsSpeaking(false);
@@ -71,8 +74,14 @@ export default function BookNow() {
     };
     
     audio.play().catch(err => {
-      console.log("Audio play failed, trying fallback:", err);
-      audio.onerror();
+      console.log("Audio autoplay blocked by browser:", err);
+      setIsSpeaking(false);
+      currentAudio = null;
+      // If autoplay was blocked, show a play button
+      if (isAutoplay) {
+        setShowPlayButton(true);
+        setGreetingMessageId(messageId);
+      }
     });
   };
 
@@ -170,7 +179,7 @@ export default function BookNow() {
           hasPlayedGreeting.current = true;
           setTimeout(() => {
             const messageId = res.data.is_sold_out ? "bitsy_greeting_sold_out" : "bitsy_greeting";
-            playVoiceMessage(messageId);
+            playVoiceMessage(messageId, true); // true = autoplay attempt
           }, 500);
         }
       } catch (error) {
@@ -181,7 +190,7 @@ export default function BookNow() {
         if (!hasPlayedGreeting.current) {
           hasPlayedGreeting.current = true;
           setTimeout(() => {
-            playVoiceMessage("bitsy_greeting");
+            playVoiceMessage("bitsy_greeting", true); // true = autoplay attempt
           }, 500);
         }
       }
@@ -567,6 +576,24 @@ export default function BookNow() {
                       <span className="text-gray-400 text-sm">Typing...</span>
                     </div>
                   </div>
+                </motion.div>
+              )}
+
+              {/* Play Greeting Button - shown when autoplay is blocked */}
+              {showPlayButton && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex justify-center"
+                >
+                  <Button
+                    onClick={() => playVoiceMessage(greetingMessageId, false)}
+                    className="bg-amber-500 hover:bg-amber-400 text-black px-6 py-2 rounded-full flex items-center gap-2"
+                    data-testid="play-greeting-btn"
+                  >
+                    <Volume2 className="w-5 h-5" />
+                    Tap to hear Bitsy's greeting
+                  </Button>
                 </motion.div>
               )}
             </div>
