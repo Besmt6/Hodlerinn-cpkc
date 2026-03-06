@@ -6980,23 +6980,30 @@ async def transcribe_audio(file: UploadFile = File(...)):
         if not llm_key:
             raise HTTPException(status_code=500, detail="LLM key not configured")
         
-        # Save uploaded file temporarily
+        # Read the uploaded file content
+        content = await file.read()
+        
+        # Save to temp file for transcription
         temp_path = f"/tmp/audio_{uuid.uuid4()}.webm"
         with open(temp_path, "wb") as f:
-            content = await file.read()
             f.write(content)
         
         # Transcribe using OpenAI Whisper via emergentintegrations
+        # Open file in binary mode and pass the file object
         stt = OpenAISpeechToText(api_key=llm_key)
-        result = await stt.transcribe(temp_path, model="whisper-1", response_format="text")
+        with open(temp_path, "rb") as audio_file:
+            result = await stt.transcribe(audio_file, model="whisper-1", response_format="text")
         
         # Clean up temp file
-        os.remove(temp_path)
+        try:
+            os.remove(temp_path)
+        except:
+            pass
         
         # Handle different response formats
         transcript = result if isinstance(result, str) else result.text if hasattr(result, 'text') else str(result)
         
-        logging.info(f"Transcription successful: {transcript[:100]}...")
+        logging.info(f"Transcription successful: {transcript[:100] if transcript else 'empty'}...")
         return {"transcript": transcript, "success": True}
         
     except Exception as e:
