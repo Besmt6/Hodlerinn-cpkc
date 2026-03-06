@@ -698,14 +698,14 @@ export default function BookNow() {
                   <circle cx="12" cy="12" r="10"/>
                   <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
                 </svg>
-                <span className="text-red-400 text-xs font-medium">100% Non-Smoking</span>
+                <span className="text-red-400 text-xs font-bold">100% Non-Smoking</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/>
                   <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
                 </svg>
-                <span className="text-red-400 text-xs font-medium">No Pets</span>
+                <span className="text-red-400 text-xs font-bold">No Pets</span>
               </div>
             </div>
           </div>
