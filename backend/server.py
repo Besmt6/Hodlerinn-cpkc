@@ -4428,21 +4428,37 @@ async def collect_employees_from_portal_endpoint():
 
 
 @api_router.post("/admin/collect-employees-daily")
-async def collect_employees_daily_endpoint(days_back: int = Query(30, description="Number of days to scan back")):
-    """Use AI agent to collect employee names and IDs by scanning daily entries for the past X days."""
+async def collect_employees_daily_endpoint(
+    start_date: str = Query(None, description="Start date YYYY-MM-DD"),
+    end_date: str = Query(None, description="End date YYYY-MM-DD"),
+    days_back: int = Query(30, description="Number of days to scan back (used if no dates provided)")
+):
+    """Use AI agent to collect employee names and IDs by scanning daily entries for a date range."""
     settings = await db.settings.find_one({}, {"_id": 0}) or {}
     
     if not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
         raise HTTPException(status_code=400, detail="Portal credentials not configured")
     
     try:
-        from sync_agent import collect_employees_daily
+        from sync_agent import collect_employees_by_date_range
         
         username = settings.get("api_global_username")
         password = decrypt_data(settings.get("api_global_password_encrypted"))
         
-        logging.info(f"Starting daily employee collection for {days_back} days")
-        result = await collect_employees_daily(username, password, days_back)
+        if start_date and end_date:
+            logging.info(f"Starting daily employee collection from {start_date} to {end_date}")
+            result = await collect_employees_by_date_range(username, password, start_date, end_date)
+        else:
+            logging.info(f"Starting daily employee collection for {days_back} days")
+            # Calculate date range from days_back
+            from datetime import datetime, timedelta
+            end_dt = datetime.now() - timedelta(days=1)
+            start_dt = end_dt - timedelta(days=days_back - 1)
+            result = await collect_employees_by_date_range(
+                username, password, 
+                start_dt.strftime("%Y-%m-%d"), 
+                end_dt.strftime("%Y-%m-%d")
+            )
         logging.info(f"Daily collection result: success={result.get('success')}, employees={len(result.get('employees', []))}")
         
         if result["success"] and result["employees"]:

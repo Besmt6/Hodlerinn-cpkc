@@ -2194,6 +2194,120 @@ def format_crew_name(crew_name: str) -> str:
 
 
 
+async def collect_employees_by_date_range(username: str, password: str, start_date: str, end_date: str) -> dict:
+    """
+    Collect all employee names and IDs by scanning the daily sign-in entries.
+    Goes through each day in the specified date range.
+    
+    Args:
+        username: Portal username
+        password: Portal password
+        start_date: Start date YYYY-MM-DD
+        end_date: End date YYYY-MM-DD
+    
+    Returns:
+        Dict with success status and list of unique employees
+    """
+    agent = APIGlobalSyncAgent(username, password)
+    employees = []
+    seen_ids = set()
+    seen_names = set()
+    
+    try:
+        await agent.start()
+        
+        # Calculate dates
+        from datetime import datetime, timedelta
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        total_days = (end_dt - start_dt).days + 1
+        
+        # Step 1: Login
+        logger.info("="*50)
+        logger.info(f"EMPLOYEE COLLECTION: Scanning {start_date} to {end_date} ({total_days} days)")
+        logger.info("="*50)
+        if not await agent.login():
+            return {
+                "success": False,
+                "message": "Login failed - check credentials",
+                "employees": []
+            }
+        logger.info("Login successful!")
+        
+        current_date = start_dt
+        day_num = 0
+        
+        while current_date <= end_dt:
+            day_num += 1
+            date_str = current_date.strftime("%Y-%m-%d")
+            
+            logger.info(f"\n--- Day {day_num}/{total_days}: {date_str} ---")
+            
+            try:
+                # Load entries for this date
+                entries = await agent.load_entries_for_date(date_str)
+                
+                if entries:
+                    day_new = 0
+                    for entry in entries:
+                        emp_name = entry.get("name", "").strip()
+                        emp_id = entry.get("current_emp_id", "").strip()
+                        
+                        if not emp_name:
+                            continue
+                        
+                        # Skip if we've seen this ID or name already
+                        if emp_id and emp_id != "NO ID":
+                            if emp_id in seen_ids:
+                                continue
+                            seen_ids.add(emp_id)
+                            employees.append({
+                                "employee_number": emp_id,
+                                "name": emp_name
+                            })
+                            day_new += 1
+                        else:
+                            # No valid ID, track by name
+                            if emp_name.upper() in seen_names:
+                                continue
+                            seen_names.add(emp_name.upper())
+                            employees.append({
+                                "employee_number": "",
+                                "name": emp_name
+                            })
+                            day_new += 1
+                    
+                    logger.info(f"Found {len(entries)} entries, {day_new} new employees")
+                else:
+                    logger.info("No entries for this date")
+                    
+            except Exception as day_err:
+                logger.warning(f"Error processing {date_str}: {day_err}")
+            
+            current_date += timedelta(days=1)
+        
+        logger.info("="*50)
+        logger.info(f"COLLECTION COMPLETE: Found {len(employees)} unique employees")
+        logger.info("="*50)
+        
+        return {
+            "success": len(employees) > 0,
+            "message": f"Found {len(employees)} unique employees from {total_days} days",
+            "employees": employees,
+            "days_scanned": total_days,
+            "start_date": start_date,
+            "end_date": end_date
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in date range collection: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"success": False, "message": f"Error: {str(e)}", "employees": []}
+    finally:
+        await agent.stop()
+
+
 async def collect_employees_daily(username: str, password: str, days_back: int = 30) -> dict:
     """
     Collect all employee names and IDs by scanning the daily sign-in entries.
