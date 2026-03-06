@@ -87,11 +87,20 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
   - Shows timestamp of last sync
   - Placeholder message when no sync has been run
 
+### Completed (December 2025)
+- [x] **Per-Recipient Email Alerts** - Admins can now customize which alerts (Sold Out, Rooms Available, Low Availability, Daily Status) each email recipient receives
+  - New table UI showing recipients with individual alert toggles
+  - Backend APIs updated to support per-recipient preferences
+  - Backwards compatible with old string format
+  - Master toggles preserved for global on/off control
+
 ### In Progress 🔄
 - [ ] User verification of sync agent fix (recommend running a manual sync to confirm)
 - [ ] User verification of billing calculation on real stays
+- [ ] User verification of Employee Import (v2) via "Import from Portal" button
 
 ### Backlog/Future Tasks 📋
+- [ ] **P0:** Verify Auto-Sync v11 results (EWING, HOLLEY test case)
 - [ ] **P1:** AI Phone Agent (blocked - waiting on Virtual PBX provider info)
 - [ ] **P2:** Smart Lock Integration (blocked - waiting on vendor API info)
 - [ ] **P2:** Code Refactoring (decompose `server.py` and `AdminDashboard.jsx`)
@@ -106,6 +115,10 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - `/api/guests/unverified/block` - Block pending guest
 - `/api/guests/unverified/remove` - Remove pending guest
 - `/api/admin/export-billing/excel` - Export billing (supports date range)
+- `/api/admin/email-alerts/settings` - GET/POST email alert settings
+- `/api/admin/email-alerts/recipients/add` - Add email recipient
+- `/api/admin/email-alerts/recipients` - DELETE email recipient
+- `/api/admin/email-alerts/recipients/alerts` - PUT update per-recipient alerts
 
 ## Key Files
 - `/app/backend/sync_agent.py` - AI Sync Agent (Playwright automation)
