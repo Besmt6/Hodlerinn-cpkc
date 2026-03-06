@@ -45,23 +45,70 @@ export default function BookNow() {
   const hasPlayedGreeting = useRef(false);
   const isRecordingRef = useRef(false); // Track recording state for closure
 
-  // Text-to-Speech function using Web Speech API
+  // Play voice message from backend (OpenAI TTS)
+  const playVoiceMessage = (messageId) => {
+    if (!voiceEnabled) return;
+    
+    // Stop any currently playing audio
+    stopSpeaking();
+    
+    const audio = new Audio(`${API}/voice/${messageId}`);
+    audio.volume = 0.9;
+    currentAudio = audio;
+    
+    setIsSpeaking(true);
+    
+    audio.onended = () => {
+      setIsSpeaking(false);
+      currentAudio = null;
+    };
+    
+    audio.onerror = () => {
+      setIsSpeaking(false);
+      currentAudio = null;
+      // Fallback to Web Speech API if backend TTS fails
+      fallbackSpeak(messageId);
+    };
+    
+    audio.play().catch(err => {
+      console.log("Audio play failed, trying fallback:", err);
+      audio.onerror();
+    });
+  };
+
+  // Fallback Web Speech API for greeting
+  const fallbackSpeak = (messageId) => {
+    if (!('speechSynthesis' in window)) return;
+    
+    const messages = {
+      "bitsy_greeting": "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?",
+      "bitsy_greeting_sold_out": "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
+    };
+    
+    const text = messages[messageId];
+    if (text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      utterance.volume = 0.9;
+      setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Text-to-Speech function using Web Speech API (for dynamic responses)
   const speakText = (text) => {
     if (!voiceEnabled || !('speechSynthesis' in window)) return;
     
     // Stop any currently playing audio
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio = null;
-    }
-    window.speechSynthesis.cancel();
+    stopSpeaking();
     
     // Clean text for speech (remove emojis and special chars)
-    const cleanText = text.replace(/[🏨⚠️•\n]/g, ' ').replace(/\$/g, ' dollars ').replace(/\s+/g, ' ').trim();
+    const cleanText = text.replace(/[🏨⚠️•\n\*]/g, ' ').replace(/\$/g, ' dollars ').replace(/\s+/g, ' ').trim();
     
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.rate = 0.95;
-    utterance.pitch = 1.1;
+    utterance.pitch = 1.0;
     utterance.volume = 0.9;
     
     // Try to use a female voice
@@ -118,25 +165,23 @@ export default function BookNow() {
         
         setMessages([{ role: "assistant", content: welcomeMsg }]);
         
-        // Play voice greeting after a short delay (only once)
+        // Play voice greeting using backend TTS (OpenAI voice)
         if (!hasPlayedGreeting.current) {
           hasPlayedGreeting.current = true;
           setTimeout(() => {
-            const voiceGreeting = res.data.is_sold_out 
-              ? "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
-              : "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?";
-            speakText(voiceGreeting);
+            const messageId = res.data.is_sold_out ? "bitsy_greeting_sold_out" : "bitsy_greeting";
+            playVoiceMessage(messageId);
           }, 500);
         }
       } catch (error) {
         const defaultMsg = "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?\n\nJust let me know when you'd like to stay!";
         setMessages([{ role: "assistant", content: defaultMsg }]);
         
-        // Play default greeting
+        // Play default greeting using backend TTS
         if (!hasPlayedGreeting.current) {
           hasPlayedGreeting.current = true;
           setTimeout(() => {
-            speakText("Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?");
+            playVoiceMessage("bitsy_greeting");
           }, 500);
         }
       }

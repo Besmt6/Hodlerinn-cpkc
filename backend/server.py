@@ -3320,7 +3320,11 @@ VOICE_MESSAGES = {
     
     # Other reminders
     "signature_reminder": "Please sign your full name legibly. A simple line or X will not be accepted.",
-    "room_reminder": "Please select the room number from key on desk. Print your name and room number on yellow card."
+    "room_reminder": "Please select the room number from key on desk. Print your name and room number on yellow card.",
+    
+    # Bitsy chatbot greeting
+    "bitsy_greeting": "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?",
+    "bitsy_greeting_sold_out": "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
 }
 
 @api_router.get("/voice/{message_id}")
