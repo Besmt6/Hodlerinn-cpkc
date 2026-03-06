@@ -99,13 +99,12 @@ export default function BookNow() {
         setAvailability(res.data);
         
         // Get pricing info
-        const singleRate = res.data.single_rate || 85;
-        const doubleRate = res.data.double_rate || 95;
+        const singleRate = res.data.single_rate || 79;
+        const doubleRate = res.data.double_rate || 89;
         const taxRate = res.data.tax_rate || 0;
-        const taxInfo = taxRate > 0 ? ` (plus ${taxRate}% tax)` : "";
         
-        // Natural greeting with policy note
-        let welcomeMsg = `Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night${taxInfo}\n\nJust let me know when you'd like to stay, or if you've been here before, share your phone number and I'll look up your info!`;
+        // Simple greeting without rate info (rates shown in card below)
+        let welcomeMsg = `Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?\n\nJust let me know when you'd like to stay, or if you've been here before, share your phone number and I'll look up your info!`;
         
         if (res.data.is_sold_out) {
           welcomeMsg = `Hi there! I'm Bitsy, your hotel concierge at Hodler Inn.\n\nUnfortunately, we're currently fully booked online. Please call us at (918) 653-7801 to check availability.`;
@@ -415,7 +414,7 @@ export default function BookNow() {
             </div>
             <div>
               <p className="text-white font-medium text-sm">Rates From</p>
-              <p className="text-gray-400 text-xs">$85/night</p>
+              <p className="text-gray-400 text-xs">$79 + tax</p>
             </div>
           </div>
         </div>
@@ -644,50 +643,6 @@ export default function BookNow() {
             </div>
           </div>
         </div>
-
-        {/* Rate Card */}
-        {availability && (
-          <div className="mt-6 bg-gradient-to-r from-slate-800/50 to-slate-900/50 border border-amber-500/20 rounded-xl p-4 max-w-md mx-auto">
-            <h3 className="text-amber-400 font-semibold text-center mb-3">Room Rates</h3>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-black/30 rounded-lg p-3 text-center">
-                <p className="text-gray-400 text-xs mb-1">Single Bed</p>
-                <p className="text-white font-bold">${availability.single_rate || 85}</p>
-                {(availability.tax_rate || 0) > 0 && (
-                  <>
-                    <p className="text-gray-500 text-xs">+ ${((availability.single_rate || 85) * (availability.tax_rate / 100)).toFixed(2)} tax</p>
-                    <p className="text-amber-400 font-semibold text-xs mt-1">
-                      Total: ${((availability.single_rate || 85) * (1 + availability.tax_rate / 100)).toFixed(2)}/night
-                    </p>
-                  </>
-                )}
-                {!(availability.tax_rate > 0) && (
-                  <p className="text-amber-400 font-semibold text-xs mt-1">/night</p>
-                )}
-              </div>
-              <div className="bg-black/30 rounded-lg p-3 text-center">
-                <p className="text-gray-400 text-xs mb-1">Double Bed</p>
-                <p className="text-white font-bold">${availability.double_rate || 95}</p>
-                {(availability.tax_rate || 0) > 0 && (
-                  <>
-                    <p className="text-gray-500 text-xs">+ ${((availability.double_rate || 95) * (availability.tax_rate / 100)).toFixed(2)} tax</p>
-                    <p className="text-amber-400 font-semibold text-xs mt-1">
-                      Total: ${((availability.double_rate || 95) * (1 + availability.tax_rate / 100)).toFixed(2)}/night
-                    </p>
-                  </>
-                )}
-                {!(availability.tax_rate > 0) && (
-                  <p className="text-amber-400 font-semibold text-xs mt-1">/night</p>
-                )}
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-slate-700/50 flex justify-center gap-4 text-xs text-gray-400">
-              <span>Check-in: 3 PM</span>
-              <span>•</span>
-              <span>Check-out: 11 AM</span>
-            </div>
-          </div>
-        )}
 
         {/* Contact */}
         <div className="mt-6 text-center">
