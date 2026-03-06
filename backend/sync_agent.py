@@ -1148,9 +1148,9 @@ class APIGlobalSyncAgent:
             await self.page.mouse.click(100, 100)
             logger.info("Clicked at (100, 100) - outside the row")
             
-            # Wait longer for auto-save to complete
-            logger.info("Waiting 5 seconds for Employee ID to save...")
-            await self.page.wait_for_timeout(5000)
+            # Wait for auto-save to complete (reduced from 5s to 2s)
+            logger.info("Waiting 2 seconds for Employee ID to save...")
+            await self.page.wait_for_timeout(2000)
             
             # === Step 4: Enter Room Number ===
             if room_input:
@@ -1181,9 +1181,9 @@ class APIGlobalSyncAgent:
                 await self.page.mouse.click(100, 100)
                 logger.info("Clicked at (100, 100) - outside the row")
                 
-                # Wait longer for Room Number to save and blue checkmark to appear
-                logger.info("Waiting 5 seconds for Room Number to save...")
-                await self.page.wait_for_timeout(5000)
+                # Wait for Room Number to save and blue checkmark to appear (reduced from 5s to 2s)
+                logger.info("Waiting 2 seconds for Room Number to save...")
+                await self.page.wait_for_timeout(2000)
                 
                 # === Step 6: Check for blue checkmark (verify save was successful) ===
                 logger.info("Step 6: Checking for blue checkmark...")
@@ -1214,8 +1214,8 @@ class APIGlobalSyncAgent:
             except:
                 pass
             
-            # Wait for page to stabilize before processing next entry
-            await self.page.wait_for_timeout(2000)
+            # Wait for page to stabilize before processing next entry (reduced from 2s to 1s)
+            await self.page.wait_for_timeout(1000)
             
             logger.info(f"Completed: {name} -> EmpID: {employee_id}, Room: {room_number}")
             return True
@@ -1724,17 +1724,30 @@ class APIGlobalSyncAgent:
             
             # Final check: Scroll through entire page to count blue checkmarks
             logger.info("=== FINAL VERIFICATION ===")
+            
+            # Update progress to indicate final verification phase
+            if self.progress_callback:
+                try:
+                    # Use len(hodler_records) as a fallback for total count
+                    final_total = len(hodler_records) if hodler_records else 0
+                    await self.progress_callback(final_total, final_total, "Final verification...")
+                except:
+                    pass
+            
             await self.page.evaluate('window.scrollTo(0, 0)')
             await self.page.wait_for_timeout(1000)
             
-            # Load all entries one more time
-            while True:
+            # Load all entries one more time - with maximum iterations to prevent hanging
+            max_load_more_clicks = 20
+            load_more_count = 0
+            while load_more_count < max_load_more_clicks:
                 await self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
                 await self.page.wait_for_timeout(1000)
                 load_more = self.page.get_by_text('Load More', exact=False).first
                 try:
                     if await load_more.count() > 0 and await load_more.is_visible():
                         await load_more.click()
+                        load_more_count += 1
                         await self.page.wait_for_timeout(2000)
                     else:
                         break

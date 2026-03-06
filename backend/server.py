@@ -5335,6 +5335,7 @@ async def run_sync(
         global sync_status
         sync_status["running"] = True
         sync_status["progress"] = "Initializing sync agent..."
+        sync_start_time = datetime.now(timezone.utc)
         
         try:
             from sync_agent import APIGlobalSyncAgent
@@ -5344,6 +5345,7 @@ async def run_sync(
                 # Truncate long names
                 display_name = name[:25] + "..." if len(name) > 25 else name
                 sync_status["progress"] = f"Processing {entry_num}/{total}: {display_name}"
+                logging.info(f"Sync progress: {entry_num}/{total} - {display_name}")
             
             # Dates to sync
             dates_to_sync = [sync_params["target"]]
@@ -5357,17 +5359,41 @@ async def run_sync(
                 "errors": []
             }
             
+            # Set a timeout for the entire sync operation (10 minutes max)
+            SYNC_TIMEOUT_SECONDS = 600
+            
             for sync_date in dates_to_sync:
+                # Check if we've exceeded the timeout
+                elapsed = (datetime.now(timezone.utc) - sync_start_time).total_seconds()
+                if elapsed > SYNC_TIMEOUT_SECONDS:
+                    error_msg = f"Sync timed out after {elapsed:.0f} seconds"
+                    logging.error(error_msg)
+                    all_results["errors"].append(error_msg)
+                    break
+                
                 sync_status["progress"] = f"Connecting to portal for {sync_date}..."
+                logging.info(f"Starting sync for date: {sync_date}")
                 agent = APIGlobalSyncAgent(sync_params["username"], sync_params["password"])
                 
                 sync_status["progress"] = f"Loading portal entries for {sync_date}..."
-                results = await agent.run_sync(
-                    sync_params["hodler_records"], 
-                    sync_date, 
-                    name_aliases,
-                    progress_callback=update_progress
-                )
+                
+                try:
+                    # Run sync with asyncio timeout
+                    results = await asyncio.wait_for(
+                        agent.run_sync(
+                            sync_params["hodler_records"], 
+                            sync_date, 
+                            name_aliases,
+                            progress_callback=update_progress
+                        ),
+                        timeout=SYNC_TIMEOUT_SECONDS - elapsed  # Remaining time
+                    )
+                except asyncio.TimeoutError:
+                    error_msg = f"Sync for {sync_date} timed out"
+                    logging.error(error_msg)
+                    results = {"errors": [error_msg], "verified": [], "no_bill": [], "missing_in_hodler": []}
+                
+                logging.info(f"Sync results for {sync_date}: verified={len(results.get('verified', []))}, errors={len(results.get('errors', []))}")
                 
                 # Merge results
                 all_results["verified"].extend(results.get("verified", []))
@@ -5456,12 +5482,13 @@ async def run_sync(
                 logging.info(f"Manual sync: Recorded {len(missing_entries)} missing entries")
             
         except Exception as e:
-            logging.error(f"Sync task failed: {str(e)}")
+            logging.error(f"Sync task failed: {str(e)}", exc_info=True)
             sync_status["progress"] = f"Sync failed: {str(e)}"
             sync_status["last_results"] = {"errors": [str(e)], "agent_version": "v7"}
         finally:
             sync_status["running"] = False
-            logging.info(f"Sync task finished. Running={sync_status['running']}, Progress={sync_status['progress']}")
+            elapsed = (datetime.now(timezone.utc) - sync_start_time).total_seconds()
+            logging.info(f"Sync task finished in {elapsed:.1f}s. Running={sync_status['running']}, Progress={sync_status['progress']}")
     
     # Start background task using asyncio.create_task directly
     asyncio.create_task(run_sync_task_wrapper())
