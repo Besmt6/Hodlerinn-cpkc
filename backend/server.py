@@ -6498,7 +6498,7 @@ IMPORTANT: We are currently SOLD OUT. Apologize politely and suggest the guest c
         availability_note = f"""
 AVAILABILITY: We have {rooms_left} room(s) available for online booking today. If guest asks about availability, you can confirm we have rooms available."""
 
-    return f"""You are a friendly and professional reservation assistant for Hodler Inn, a comfortable hotel in Okmulgee, Oklahoma. Your job is to help guests make room reservations through natural conversation.
+    return f"""You are a friendly and professional reservation assistant for Hodler Inn, a comfortable hotel in Heavener, Oklahoma. Your job is to help guests make room reservations through natural conversation.
 {availability_note}
 
 IMPORTANT BOOKING RULES:
@@ -6523,7 +6523,7 @@ BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone"
 5. Be conversational, warm, and helpful. Don't overwhelm guests with all questions at once - ask naturally in conversation.
 
 6. Hotel info if asked:
-   - Address: 800 N Wood Dr, Okmulgee, OK 74447
+   - Address: 1003 S 1st St, Heavener, OK 74937
    - Phone: (918) 653-7801
    - Check-in time: 3:00 PM
    - Check-out time: 11:00 AM
@@ -6790,8 +6790,8 @@ cancelled 48 hours before the scheduled arrival date.
 
 HOTEL INFORMATION:
 Hodler Inn
-800 N Wood Dr
-Okmulgee, OK 74447
+1003 S 1st St
+Heavener, OK 74937
 Phone: (918) 653-7801
 
 POLICIES:

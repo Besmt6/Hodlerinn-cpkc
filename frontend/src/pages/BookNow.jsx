@@ -203,13 +203,16 @@ export default function BookNow() {
       {/* Header */}
       <header className="bg-black/40 backdrop-blur-md border-b border-amber-500/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-3">
+          <a 
+            href="/" 
+            className="flex items-center gap-3"
+          >
             <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center">
               <Home className="w-5 h-5 text-black" />
             </div>
             <div>
               <h1 className="font-bold text-xl text-white">Hodler Inn</h1>
-              <p className="text-xs text-amber-400/80">Okmulgee, Oklahoma</p>
+              <p className="text-xs text-amber-400/80">Heavener, Oklahoma</p>
             </div>
           </a>
           <a 
@@ -231,7 +234,7 @@ export default function BookNow() {
             </div>
             <div>
               <p className="text-white font-medium text-sm">Location</p>
-              <p className="text-gray-400 text-xs">800 N Wood Dr, Okmulgee</p>
+              <p className="text-gray-400 text-xs">1003 S 1st St, Heavener</p>
             </div>
           </div>
           <div className="bg-black/30 backdrop-blur border border-amber-500/20 rounded-xl p-4 flex items-center gap-3">
@@ -428,7 +431,7 @@ export default function BookNow() {
             © {new Date().getFullYear()} Hodler Inn. All rights reserved.
           </p>
           <p className="text-gray-600 text-xs mt-2">
-            800 N Wood Dr, Okmulgee, OK 74447
+            1003 S 1st St, Heavener, OK 74937
           </p>
         </div>
       </footer>
