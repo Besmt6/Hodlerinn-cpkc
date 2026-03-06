@@ -118,6 +118,9 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 
 ## AWS Production Server
 - **Server**: ubuntu@ip-172-31-9-167
+- **Public IP**: 3.149.0.151
+- **Production URL**: http://3.149.0.151:3000
+- **Admin Dashboard**: http://3.149.0.151:3000/admin/dashboard
 - **Project Folder**: `~/Hodlerinn-cpkc`
 - **Docker Containers**:
   - `hodlerinn-frontend` (port 3000)
