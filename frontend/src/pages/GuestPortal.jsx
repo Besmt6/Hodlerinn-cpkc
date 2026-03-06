@@ -41,6 +41,51 @@ import { useNavigate } from "react-router-dom";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Clean employee name - remove railroad job codes like "E", "BH", "HBW", "BMR", etc.
+const cleanEmployeeName = (name) => {
+  if (!name) return name;
+  
+  // Pattern: Name might be in format "LASTNAME,(FIRSTNAME)CODES" or "LASTNAME,(FIRSTNAME) CODES"
+  // Common codes: E, BH, HBW, BMR, DT, ALL, RWBH, etc.
+  
+  let cleanName = name;
+  
+  // If name is in format "LASTNAME,(FIRSTNAME)CODES"
+  // Extract just the name part
+  const parenMatch = name.match(/^([A-Z]+),\(([A-Z]+)\)/i);
+  if (parenMatch) {
+    // Format: LASTNAME,(FIRSTNAME) - take first name and last name
+    const lastName = parenMatch[1];
+    const firstName = parenMatch[2];
+    // Capitalize properly
+    cleanName = `${firstName.charAt(0).toUpperCase()}${firstName.slice(1).toLowerCase()} ${lastName.charAt(0).toUpperCase()}${lastName.slice(1).toLowerCase()}`;
+  } else {
+    // Remove common railroad job codes at the end of names
+    // These are typically uppercase letters/numbers after the actual name
+    cleanName = name
+      .replace(/\s*\*?[A-Z0-9/]+\s*E\s*$/i, '')  // Remove codes ending with E
+      .replace(/\s*\*?BH\s*E?\s*$/i, '')          // Remove BH codes
+      .replace(/\s*\*?HBW?\s*$/i, '')             // Remove HBW codes
+      .replace(/\s*\*?BMR\s*[A-Z]*\s*$/i, '')     // Remove BMR codes
+      .replace(/\s*\*?DT\s*[0-9/]*\s*$/i, '')     // Remove DT codes
+      .replace(/\s*\*?ALL\s*$/i, '')              // Remove ALL code
+      .replace(/\s*\*?RWBH?\s*$/i, '')            // Remove RWBH codes
+      .replace(/\s+[A-Z]{1,4}\s*$/i, '')          // Remove trailing 1-4 letter codes
+      .replace(/\)[\s\*]*[A-Z0-9\s/]+$/i, ')')    // Remove anything after closing paren
+      .trim();
+    
+    // If still in LASTNAME,(FIRSTNAME) format, convert it
+    const stillParenMatch = cleanName.match(/^([A-Z]+),\(([A-Z]+)\)$/i);
+    if (stillParenMatch) {
+      const lastName = stillParenMatch[1];
+      const firstName = stillParenMatch[2];
+      cleanName = `${firstName.charAt(0).toUpperCase()}${firstName.slice(1).toLowerCase()} ${lastName.charAt(0).toUpperCase()}${lastName.slice(1).toLowerCase()}`;
+    }
+  }
+  
+  return cleanName.trim();
+};
+
 // Voice settings cache
 let voiceSettings = { enabled: true, volume: 1.0, speed: 0.85 };
 
@@ -650,31 +695,32 @@ function CheckInForm({ setView, setSuccessMessage }) {
       try {
         // First check if already registered as a guest
         const response = await axios.get(`${API}/guests/${employeeNumber}`);
-        setEmployeeName(response.data.name);
+        const cleanedName = cleanEmployeeName(response.data.name);
+        setEmployeeName(cleanedName);
         setEmployeeStatus('found');
-        playWelcomeWithName(response.data.name, false);
+        playWelcomeWithName(cleanedName, false);
         setTimeout(() => roomInputRef.current?.focus(), 300);
       } catch (error) {
         // Check if employee ID is in admin's approved list
         try {
           const empResponse = await axios.get(`${API}/employees/verify/${employeeNumber}`);
-          const name = empResponse.data.name;
-          setEmployeeName(name);
+          const cleanedName = cleanEmployeeName(empResponse.data.name);
+          setEmployeeName(cleanedName);
           
           // Auto-register the employee since they're in the admin list
           try {
             await axios.post(`${API}/guests/register`, {
               employee_number: employeeNumber,
-              name: name
+              name: cleanedName
             });
             // Successfully registered - show full form
             setEmployeeStatus('found');
-            playWelcomeWithName(name, false);
+            playWelcomeWithName(cleanedName, false);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           } catch (regError) {
             // Registration failed - maybe already registered, still show form
             setEmployeeStatus('found');
-            playWelcomeWithName(name, false);
+            playWelcomeWithName(cleanedName, false);
             setTimeout(() => roomInputRef.current?.focus(), 300);
           }
         } catch (empError) {
@@ -1099,11 +1145,12 @@ function CheckOutForm({ setView, setSuccessMessage }) {
       // Lookup booking by room number - auto-fills employee info
       const response = await axios.get(`${API}/lookup-room/${roomNumber.trim()}`);
       setEmployeeNumber(response.data.employee_number);
-      setVerifiedBooking(response.data);
-      toast.success(`Found: ${response.data.employee_name} in Room ${roomNumber}`);
+      const cleanedName = cleanEmployeeName(response.data.employee_name);
+      setVerifiedBooking({...response.data, employee_name: cleanedName});
+      toast.success(`Found: ${cleanedName} in Room ${roomNumber}`);
       
       // Voice confirmation with name
-      playCheckoutFoundWithName(response.data.employee_name);
+      playCheckoutFoundWithName(cleanedName);
     } catch (error) {
       toast.error(error.response?.data?.detail || "No active booking found for this room.");
       setVerifiedBooking(null);
@@ -1524,7 +1571,7 @@ function SignInSheetView({ setView }) {
                       <TableRow key={record.id} className="table-row border-vault-border">
                         <TableCell className="font-mono text-vault-text">{index + 1}</TableCell>
                         <TableCell className="text-vault-text">Single Stay</TableCell>
-                        <TableCell className="text-vault-text font-medium">{record.employee_name}</TableCell>
+                        <TableCell className="text-vault-text font-medium">{cleanEmployeeName(record.employee_name)}</TableCell>
                         <TableCell className="font-mono text-vault-text">{record.employee_number}</TableCell>
                         <TableCell className="text-vault-success font-medium">
                           {record.signature ? "Signed" : "—"}
