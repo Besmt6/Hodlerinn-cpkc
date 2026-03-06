@@ -963,6 +963,32 @@ class APIGlobalSyncAgent:
             self.results["errors"].append(f"Failed to extract entries: {str(e)}")
             return []
     
+    async def load_entries_for_date(self, target_date: str) -> list:
+        """Load and extract entries for a specific date.
+        
+        Combines load_signin_sheet and get_signin_sheet_entries for date range scanning.
+        
+        Args:
+            target_date: Date in YYYY-MM-DD format
+            
+        Returns:
+            List of entry dicts with name, current_emp_id, room_number
+        """
+        try:
+            # Load the sign-in sheet for this date
+            success = await self.load_signin_sheet(target_date)
+            if not success:
+                logger.warning(f"Failed to load sign-in sheet for {target_date}")
+                return []
+            
+            # Extract entries from the loaded page
+            entries = await self.get_signin_sheet_entries()
+            return entries
+            
+        except Exception as e:
+            logger.error(f"Error loading entries for {target_date}: {str(e)}")
+            return []
+    
     async def verify_entry(self, entry: dict, employee_id: str, room_number: str) -> bool:
         """Fill in employee ID and room number for an entry.
         
