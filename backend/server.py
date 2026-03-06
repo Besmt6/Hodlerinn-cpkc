@@ -3036,38 +3036,57 @@ async def mark_room_clean(room_number: str):
 
 # Block room for non-railroad guest (Other Guest)
 class BlockRoomInput(BaseModel):
-    room_number: str
+    room_number: Optional[str] = None  # Optional for future reservations
+    room_type: Optional[str] = None  # For future reservations without specific room
     guest_name: str
+    email: Optional[str] = ""
     phone: Optional[str] = ""
     address: Optional[str] = ""
     check_in_date: Optional[str] = None  # YYYY-MM-DD format
     check_out_date: Optional[str] = None  # YYYY-MM-DD format
     room_rate: Optional[float] = 0.0  # Per night rate
     notes: Optional[str] = ""
+    is_reservation: Optional[bool] = False  # True if future booking
 
 @api_router.post("/admin/rooms/block")
 async def block_room_other_guest(input: BlockRoomInput):
-    """Block a room for non-railroad guest with full details. Counts toward occupancy but not billed to railroad."""
-    # Check if room exists
-    room = await db.rooms.find_one({"room_number": input.room_number}, {"_id": 0})
-    if not room:
-        raise HTTPException(status_code=404, detail="Room not found")
+    """Book a room for non-railroad guest. Supports both immediate check-in and future reservations."""
     
-    # Check if room is already occupied
-    active_booking = await db.bookings.find_one({
-        "room_number": input.room_number,
-        "is_checked_out": False
-    }, {"_id": 0})
-    if active_booking:
-        raise HTTPException(status_code=400, detail="Room is already occupied")
+    # Determine if this is a future reservation
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    is_future = input.check_in_date and input.check_in_date > today
+    is_reservation = input.is_reservation or is_future
     
-    # Check if room is already blocked
-    existing_block = await db.blocked_rooms.find_one({
-        "room_number": input.room_number,
-        "is_active": True
-    }, {"_id": 0})
-    if existing_block:
-        raise HTTPException(status_code=400, detail="Room is already blocked")
+    # For immediate check-in, room_number is required
+    if not is_reservation and not input.room_number:
+        raise HTTPException(status_code=400, detail="Room number is required for immediate check-in")
+    
+    # For reservations, either room_number or room_type is needed
+    if is_reservation and not input.room_number and not input.room_type:
+        raise HTTPException(status_code=400, detail="Either room number or room type is required for reservation")
+    
+    if input.room_number:
+        # Check if room exists
+        room = await db.rooms.find_one({"room_number": input.room_number}, {"_id": 0})
+        if not room:
+            raise HTTPException(status_code=404, detail="Room not found")
+        
+        # For immediate check-in, verify room is available
+        if not is_reservation:
+            active_booking = await db.bookings.find_one({
+                "room_number": input.room_number,
+                "is_checked_out": False
+            }, {"_id": 0})
+            if active_booking:
+                raise HTTPException(status_code=400, detail="Room is already occupied by railroad guest")
+            
+            existing_block = await db.blocked_rooms.find_one({
+                "room_number": input.room_number,
+                "is_active": True,
+                "is_reservation": {"$ne": True}  # Allow reservation on same room
+            }, {"_id": 0})
+            if existing_block:
+                raise HTTPException(status_code=400, detail="Room is already occupied by another guest")
     
     # Calculate total revenue if dates and rate provided
     total_revenue = 0.0
@@ -3082,58 +3101,134 @@ async def block_room_other_guest(input: BlockRoomInput):
         except:
             pass
     
-    # Create blocked room record with full details
+    # Create booking record with full details
     block_doc = {
         "id": str(uuid.uuid4()),
         "room_number": input.room_number,
+        "room_type": input.room_type,
         "guest_name": input.guest_name,
+        "email": input.email,
         "phone": input.phone,
         "address": input.address,
-        "check_in_date": input.check_in_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "check_in_date": input.check_in_date or today,
         "check_out_date": input.check_out_date,
         "room_rate": input.room_rate,
         "nights": nights,
         "total_revenue": total_revenue,
         "notes": input.notes,
         "is_active": True,
-        "blocked_at": datetime.now(timezone.utc).isoformat()
+        "is_reservation": is_reservation,
+        "status": "reservation" if is_reservation else "checked_in",
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.blocked_rooms.insert_one(block_doc)
     
-    # Check if we're now at 100% capacity
-    await check_and_send_sold_out_notification()
+    # Only check capacity for immediate check-ins
+    if not is_reservation:
+        await check_and_send_sold_out_notification()
+        await check_and_send_heads_up_notification()
     
-    # Check if we're low on rooms (4 or fewer) and send heads-up notice
-    await check_and_send_heads_up_notification()
-    
-    return {"message": f"Room {input.room_number} blocked for {input.guest_name}", "block": block_doc}
+    status_msg = "Reservation created" if is_reservation else "Guest checked in"
+    return {"message": f"{status_msg}: Room {input.room_number or input.room_type} for {input.guest_name}", "booking": block_doc}
 
 @api_router.post("/admin/rooms/unblock/{room_number}")
 async def unblock_room(room_number: str):
-    """Release a blocked room (other guest checked out)"""
+    """Check out a non-railroad guest"""
     block = await db.blocked_rooms.find_one({
         "room_number": room_number,
-        "is_active": True
+        "is_active": True,
+        "is_reservation": {"$ne": True}  # Only check out current guests, not reservations
     }, {"_id": 0})
     
     if not block:
-        raise HTTPException(status_code=404, detail="No active block found for this room")
+        raise HTTPException(status_code=404, detail="No active guest found for this room")
     
     await db.blocked_rooms.update_one(
-        {"room_number": room_number, "is_active": True},
-        {"$set": {"is_active": False, "unblocked_at": datetime.now(timezone.utc).isoformat()}}
+        {"room_number": room_number, "is_active": True, "is_reservation": {"$ne": True}},
+        {"$set": {
+            "is_active": False, 
+            "status": "checked_out",
+            "checked_out_at": datetime.now(timezone.utc).isoformat()
+        }}
     )
     
     # Check if rooms are now available after being sold out
     await send_room_available_notification()
     
-    return {"message": f"Room {room_number} unblocked"}
+    return {"message": f"Guest checked out from Room {room_number}"}
 
 @api_router.get("/admin/rooms/blocked")
 async def get_blocked_rooms():
-    """Get all currently blocked rooms (other guests)"""
-    blocked = await db.blocked_rooms.find({"is_active": True}, {"_id": 0}).to_list(100)
+    """Get currently checked-in non-railroad guests (not reservations)"""
+    blocked = await db.blocked_rooms.find({
+        "is_active": True,
+        "is_reservation": {"$ne": True}
+    }, {"_id": 0}).to_list(100)
     return blocked
+
+@api_router.get("/admin/rooms/reservations")
+async def get_reservations():
+    """Get future reservations for non-railroad guests"""
+    reservations = await db.blocked_rooms.find({
+        "is_active": True,
+        "is_reservation": True
+    }, {"_id": 0}).sort("check_in_date", 1).to_list(100)
+    return reservations
+
+@api_router.post("/admin/rooms/reservations/{reservation_id}/checkin")
+async def checkin_reservation(reservation_id: str, room_number: str = None):
+    """Convert a reservation to an active check-in"""
+    reservation = await db.blocked_rooms.find_one({"id": reservation_id, "is_reservation": True}, {"_id": 0})
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+    
+    # Use provided room number or the one from reservation
+    final_room = room_number or reservation.get("room_number")
+    if not final_room:
+        raise HTTPException(status_code=400, detail="Room number required for check-in")
+    
+    # Verify room is available
+    active_booking = await db.bookings.find_one({
+        "room_number": final_room,
+        "is_checked_out": False
+    }, {"_id": 0})
+    if active_booking:
+        raise HTTPException(status_code=400, detail="Room is occupied by railroad guest")
+    
+    existing_block = await db.blocked_rooms.find_one({
+        "room_number": final_room,
+        "is_active": True,
+        "is_reservation": {"$ne": True}
+    }, {"_id": 0})
+    if existing_block:
+        raise HTTPException(status_code=400, detail="Room is occupied by another guest")
+    
+    # Update reservation to checked-in status
+    await db.blocked_rooms.update_one(
+        {"id": reservation_id},
+        {"$set": {
+            "room_number": final_room,
+            "is_reservation": False,
+            "status": "checked_in",
+            "checked_in_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await check_and_send_sold_out_notification()
+    await check_and_send_heads_up_notification()
+    
+    return {"message": f"Reservation checked in to Room {final_room}"}
+
+@api_router.delete("/admin/rooms/reservations/{reservation_id}")
+async def cancel_reservation(reservation_id: str):
+    """Cancel a reservation"""
+    result = await db.blocked_rooms.update_one(
+        {"id": reservation_id, "is_reservation": True},
+        {"$set": {"is_active": False, "status": "cancelled", "cancelled_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+    return {"message": "Reservation cancelled"}
 
 
 @api_router.get("/admin/rooms/blocked/stats")

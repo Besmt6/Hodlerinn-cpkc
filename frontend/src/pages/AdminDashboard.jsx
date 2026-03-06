@@ -140,15 +140,19 @@ export default function AdminDashboard() {
   const [showBlockRoomDialog, setShowBlockRoomDialog] = useState(false);
   const [blockRoomForm, setBlockRoomForm] = useState({ 
     room_number: "", 
+    room_type: "",
     guest_name: "", 
+    email: "",
     phone: "",
     address: "",
     check_in_date: new Date().toISOString().split('T')[0],
     check_out_date: "",
     room_rate: "",
-    notes: "" 
+    notes: "",
+    is_reservation: false
   });
   const [blockedRoomStats, setBlockedRoomStats] = useState(null);
+  const [reservations, setReservations] = useState([]);
   
   // Guarantee report state
   const [guaranteeReport, setGuaranteeReport] = useState(null);
@@ -217,6 +221,7 @@ export default function AdminDashboard() {
     fetchRegisteredGuests();
     fetchBlockedRooms();
     fetchBlockedRoomStats();
+    fetchReservations();
   }, [navigate]);
 
   const fetchRegisteredGuests = async () => {
@@ -287,9 +292,25 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchReservations = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/rooms/reservations`);
+      setReservations(response.data);
+    } catch (error) {
+      console.error("Failed to load reservations");
+    }
+  };
+
   const handleBlockRoom = async () => {
-    if (!blockRoomForm.room_number) {
-      toast.error("Please select a room");
+    // For reservations, room_type is enough; for check-in, need room_number
+    const isReservation = blockRoomForm.is_reservation || (blockRoomForm.check_in_date > new Date().toISOString().split('T')[0]);
+    
+    if (!isReservation && !blockRoomForm.room_number) {
+      toast.error("Please select a room for check-in");
+      return;
+    }
+    if (isReservation && !blockRoomForm.room_number && !blockRoomForm.room_type) {
+      toast.error("Please select a room or room type for reservation");
       return;
     }
     if (!blockRoomForm.guest_name) {
@@ -298,43 +319,77 @@ export default function AdminDashboard() {
     }
     try {
       await axios.post(`${API}/admin/rooms/block`, {
-        room_number: blockRoomForm.room_number,
+        room_number: blockRoomForm.room_number || null,
+        room_type: blockRoomForm.room_type,
         guest_name: blockRoomForm.guest_name,
+        email: blockRoomForm.email,
         phone: blockRoomForm.phone,
         address: blockRoomForm.address,
         check_in_date: blockRoomForm.check_in_date,
         check_out_date: blockRoomForm.check_out_date,
         room_rate: parseFloat(blockRoomForm.room_rate) || 0,
-        notes: blockRoomForm.notes
+        notes: blockRoomForm.notes,
+        is_reservation: isReservation
       });
-      toast.success(`Room ${blockRoomForm.room_number} blocked for ${blockRoomForm.guest_name}`);
+      const action = isReservation ? "Reservation created" : "Guest checked in";
+      toast.success(`${action}: ${blockRoomForm.guest_name}`);
       setShowBlockRoomDialog(false);
       setBlockRoomForm({ 
         room_number: "", 
+        room_type: "",
         guest_name: "", 
+        email: "",
         phone: "",
         address: "",
         check_in_date: new Date().toISOString().split('T')[0],
         check_out_date: "",
         room_rate: "",
-        notes: "" 
+        notes: "",
+        is_reservation: false
       });
       fetchRooms();
       fetchBlockedRooms();
       fetchBlockedRoomStats();
+      fetchReservations();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to block room");
+      toast.error(error.response?.data?.detail || "Failed to process booking");
     }
   };
 
   const handleUnblockRoom = async (roomNumber) => {
     try {
       await axios.post(`${API}/admin/rooms/unblock/${roomNumber}`);
-      toast.success(`Room ${roomNumber} unblocked`);
+      toast.success(`Guest checked out from Room ${roomNumber}`);
       fetchRooms();
       fetchBlockedRooms();
+      fetchBlockedRoomStats();
     } catch (error) {
-      toast.error("Failed to unblock room");
+      toast.error("Failed to check out guest");
+    }
+  };
+
+  const handleCheckinReservation = async (reservationId, roomNumber) => {
+    try {
+      await axios.post(`${API}/admin/rooms/reservations/${reservationId}/checkin`, null, {
+        params: { room_number: roomNumber }
+      });
+      toast.success("Reservation checked in successfully");
+      fetchRooms();
+      fetchBlockedRooms();
+      fetchReservations();
+      fetchBlockedRoomStats();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to check in reservation");
+    }
+  };
+
+  const handleCancelReservation = async (reservationId) => {
+    try {
+      await axios.delete(`${API}/admin/rooms/reservations/${reservationId}`);
+      toast.success("Reservation cancelled");
+      fetchReservations();
+    } catch (error) {
+      toast.error("Failed to cancel reservation");
     }
   };
 
@@ -1902,7 +1957,7 @@ export default function AdminDashboard() {
                     data-testid="block-room-btn"
                   >
                     <Users className="w-4 h-4" />
-                    Block Room (Other Guest)
+                    Non-Railroad Guest
                   </Button>
                 </div>
               </div>
@@ -2030,6 +2085,70 @@ export default function AdminDashboard() {
                                 >
                                   <XCircle className="w-4 h-4 mr-1" />
                                   Check Out
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Future Reservations Section */}
+              {reservations.length > 0 && (
+                <Card className="bg-blue-900/20 border-blue-600/50 mb-6">
+                  <CardHeader className="border-b border-blue-600/30 pb-3">
+                    <CardTitle className="font-outfit text-lg text-blue-400 flex items-center gap-2">
+                      <Calendar className="w-5 h-5" />
+                      Upcoming Reservations ({reservations.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-blue-600/30">
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Room</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Guest Name</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Email</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Phone</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Check-In</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Check-Out</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Total</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reservations.map((res) => (
+                            <tr key={res.id} className="border-b border-blue-600/20 hover:bg-blue-900/20">
+                              <td className="py-2 px-3 text-vault-text font-bold">
+                                {res.room_number || res.room_type || 'Any'}
+                              </td>
+                              <td className="py-2 px-3 text-vault-text">{res.guest_name}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">{res.email || '-'}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">{res.phone || '-'}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">{res.check_in_date || '-'}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">{res.check_out_date || '-'}</td>
+                              <td className="py-2 px-3 text-green-400 font-medium">${res.total_revenue || 0}</td>
+                              <td className="py-2 px-3 flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-green-400 hover:text-green-300 hover:bg-green-900/30"
+                                  onClick={() => handleCheckinReservation(res.id, res.room_number)}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  Check In
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-900/30"
+                                  onClick={() => handleCancelReservation(res.id)}
+                                >
+                                  <XCircle className="w-4 h-4" />
                                 </Button>
                               </td>
                             </tr>
@@ -4376,16 +4495,16 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
             <DialogHeader>
               <DialogTitle className="font-outfit text-vault-text flex items-center gap-2">
                 <Users className="w-5 h-5 text-amber-400" />
-                Block Room for Other Guest
+                Non-Railroad Guest Booking
               </DialogTitle>
             </DialogHeader>
             <p className="text-vault-text-secondary text-sm mb-4">
-              Check in a non-railroad guest. This room will count toward occupancy but will NOT be billed to the railroad.
+              Check in or make a reservation for non-railroad guests. Future dates create reservations.
             </p>
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Number *</label>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Number</label>
                   <Select 
                     value={blockRoomForm.room_number} 
                     onValueChange={(val) => setBlockRoomForm({...blockRoomForm, room_number: val})}
@@ -4406,6 +4525,35 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                   </Select>
                 </div>
                 <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Or Room Type (for reservation)</label>
+                  <Select 
+                    value={blockRoomForm.room_type} 
+                    onValueChange={(val) => setBlockRoomForm({...blockRoomForm, room_type: val})}
+                    disabled={!!blockRoomForm.room_number}
+                  >
+                    <SelectTrigger className="bg-black/50 border-vault-border text-vault-text">
+                      <SelectValue placeholder="Any type" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-vault-surface border-vault-border">
+                      <SelectItem value="Single" className="text-vault-text">Single</SelectItem>
+                      <SelectItem value="Double" className="text-vault-text">Double</SelectItem>
+                      <SelectItem value="Suite" className="text-vault-text">Suite</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Guest Name *</label>
+                  <Input
+                    value={blockRoomForm.guest_name}
+                    onChange={(e) => setBlockRoomForm({...blockRoomForm, guest_name: e.target.value})}
+                    placeholder="Full name"
+                    className="bg-black/50 border-vault-border text-vault-text"
+                  />
+                </div>
+                <div>
                   <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Rate ($/night)</label>
                   <Input
                     type="number"
@@ -4417,24 +4565,26 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                 </div>
               </div>
               
-              <div>
-                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Guest Name *</label>
-                <Input
-                  value={blockRoomForm.guest_name}
-                  onChange={(e) => setBlockRoomForm({...blockRoomForm, guest_name: e.target.value})}
-                  placeholder="Full name"
-                  className="bg-black/50 border-vault-border text-vault-text"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Phone Number</label>
-                <Input
-                  value={blockRoomForm.phone}
-                  onChange={(e) => setBlockRoomForm({...blockRoomForm, phone: e.target.value})}
-                  placeholder="(xxx) xxx-xxxx"
-                  className="bg-black/50 border-vault-border text-vault-text"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Email</label>
+                  <Input
+                    type="email"
+                    value={blockRoomForm.email}
+                    onChange={(e) => setBlockRoomForm({...blockRoomForm, email: e.target.value})}
+                    placeholder="guest@email.com"
+                    className="bg-black/50 border-vault-border text-vault-text"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Phone Number</label>
+                  <Input
+                    value={blockRoomForm.phone}
+                    onChange={(e) => setBlockRoomForm({...blockRoomForm, phone: e.target.value})}
+                    placeholder="(xxx) xxx-xxxx"
+                    className="bg-black/50 border-vault-border text-vault-text"
+                  />
+                </div>
               </div>
               
               <div>
@@ -4491,6 +4641,14 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                   className="bg-black/50 border-vault-border text-vault-text"
                 />
               </div>
+              
+              {blockRoomForm.check_in_date > new Date().toISOString().split('T')[0] && (
+                <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-blue-400 text-sm">
+                    📅 This is a <strong>future reservation</strong>. Guest will need to check in on arrival.
+                  </p>
+                </div>
+              )}
             </div>
             <DialogFooter className="mt-4">
               <Button variant="ghost" onClick={() => setShowBlockRoomDialog(false)} className="text-vault-text-secondary">
@@ -4501,7 +4659,7 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                 className="bg-amber-600 hover:bg-amber-700 text-white"
                 data-testid="confirm-block-room-btn"
               >
-                Check In Guest
+                {blockRoomForm.check_in_date > new Date().toISOString().split('T')[0] ? 'Create Reservation' : 'Check In Guest'}
               </Button>
             </DialogFooter>
           </DialogContent>
