@@ -397,6 +397,175 @@ async def auto_sync_task():
             f"━━━━━━━━━━━━━━━"
         )
 
+
+async def send_daily_status_alert(time_of_day: str):
+    """Send daily status alert at 7 AM and 10 PM with room availability."""
+    try:
+        # Get room counts
+        total_rooms = await db.rooms.count_documents({})
+        if total_rooms == 0:
+            total_rooms = 28
+        
+        # Occupied rooms (railroad + non-railroad)
+        railroad_occupied = await db.bookings.count_documents({"is_checked_out": False})
+        other_occupied = await db.blocked_rooms.count_documents({"is_active": True, "is_reservation": {"$ne": True}})
+        total_occupied = railroad_occupied + other_occupied
+        
+        # Available rooms
+        total_available = total_rooms - total_occupied
+        
+        # Clean vs Dirty available rooms
+        occupied_room_numbers = []
+        
+        # Get railroad occupied room numbers
+        railroad_bookings = await db.bookings.find({"is_checked_out": False}, {"room_number": 1, "_id": 0}).to_list(100)
+        occupied_room_numbers.extend([b["room_number"] for b in railroad_bookings if b.get("room_number")])
+        
+        # Get other guest room numbers
+        blocked = await db.blocked_rooms.find({"is_active": True, "is_reservation": {"$ne": True}}, {"room_number": 1, "_id": 0}).to_list(100)
+        occupied_room_numbers.extend([b["room_number"] for b in blocked if b.get("room_number")])
+        
+        # Get clean and dirty available rooms
+        clean_available = await db.rooms.count_documents({
+            "room_number": {"$nin": occupied_room_numbers},
+            "cleaning_status": "clean"
+        })
+        dirty_available = await db.rooms.count_documents({
+            "room_number": {"$nin": occupied_room_numbers},
+            "cleaning_status": {"$ne": "clean"}
+        })
+        
+        occupancy_percent = round((total_occupied / total_rooms) * 100, 1)
+        
+        time_label = "🌅 MORNING" if time_of_day == "morning" else "🌙 EVENING"
+        
+        # Check if email alerts are enabled
+        alert_settings = await get_email_alert_settings()
+        recipients = await get_email_recipients()
+        subject_prefix = alert_settings.get("custom_subject_prefix", "Hodler Inn")
+        
+        # Send Email
+        if recipients:
+            settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+            if settings and settings.get("email_sender") and settings.get("email_password_encrypted"):
+                try:
+                    import smtplib
+                    from email.mime.text import MIMEText
+                    from email.mime.multipart import MIMEMultipart
+                    
+                    smtp_host = settings.get("email_smtp_host", "smtp.zoho.com")
+                    smtp_port = settings.get("email_smtp_port", 587)
+                    sender = settings.get("email_sender")
+                    password = decrypt_data(settings.get("email_password_encrypted"))
+                    
+                    msg = MIMEMultipart()
+                    msg['From'] = sender
+                    msg['To'] = ", ".join(recipients)
+                    msg['Subject'] = f"{subject_prefix} - Daily Status ({time_of_day.capitalize()})"
+                    
+                    body = f"""Hello,
+
+Daily Status Report - {time_of_day.capitalize()}
+
+OCCUPANCY: {occupancy_percent}%
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total Rooms: {total_rooms}
+Occupied: {total_occupied} ({railroad_occupied} railroad + {other_occupied} other)
+Available: {total_available}
+
+AVAILABLE ROOMS BREAKDOWN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Clean & Ready: {clean_available}
+🧹 Needs Cleaning: {dirty_available}
+
+Thank you,
+{subject_prefix}
+
+---
+This is an automated status report.
+"""
+                    msg.attach(MIMEText(body, 'plain'))
+                    
+                    server = smtplib.SMTP(smtp_host, smtp_port)
+                    server.starttls()
+                    server.login(sender, password)
+                    server.sendmail(sender, recipients, msg.as_string())
+                    server.quit()
+                    
+                    logging.info(f"Daily status alert ({time_of_day}) sent to: {recipients}")
+                    
+                except Exception as e:
+                    logging.error(f"Failed to send daily status email: {e}")
+        
+        # Also send Telegram notification
+        await send_telegram_notification(
+            f"{time_label} STATUS REPORT\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"📊 <b>Occupancy: {occupancy_percent}%</b>\n\n"
+            f"🏨 Total Rooms: {total_rooms}\n"
+            f"🚂 Railroad: {railroad_occupied}\n"
+            f"👤 Other: {other_occupied}\n"
+            f"📦 Total Occupied: {total_occupied}\n\n"
+            f"<b>AVAILABLE ({total_available}):</b>\n"
+            f"✅ Clean: {clean_available}\n"
+            f"🧹 Dirty: {dirty_available}"
+        )
+        
+    except Exception as e:
+        logging.error(f"Error sending daily status alert: {e}")
+
+
+async def check_and_mark_dirty_rooms():
+    """Check for rooms that were checked out 20+ minutes ago and mark them dirty."""
+    try:
+        # Calculate 20 minutes ago
+        twenty_min_ago = datetime.now(timezone.utc) - timedelta(minutes=20)
+        twenty_min_ago_str = twenty_min_ago.isoformat()
+        
+        # Find recently checked out bookings that haven't been processed
+        recent_checkouts = await db.bookings.find({
+            "is_checked_out": True,
+            "check_out": {"$lte": twenty_min_ago_str},
+            "dirty_processed": {"$ne": True}
+        }, {"_id": 0, "room_number": 1, "check_out": 1}).to_list(100)
+        
+        for checkout in recent_checkouts:
+            room_number = checkout.get("room_number")
+            if room_number:
+                # Check if room is still clean (housekeeping might have already cleaned it)
+                room = await db.rooms.find_one({"room_number": room_number}, {"_id": 0})
+                if room and room.get("cleaning_status") == "clean":
+                    # Mark as dirty
+                    await db.rooms.update_one(
+                        {"room_number": room_number},
+                        {"$set": {
+                            "cleaning_status": "dirty",
+                            "auto_dirty_at": datetime.now(timezone.utc).isoformat()
+                        }}
+                    )
+                    logging.info(f"Auto-marked Room {room_number} as dirty (20 min after checkout)")
+                    
+                    # Send Telegram notification
+                    await send_telegram_notification(
+                        f"🧹 <b>ROOM NEEDS CLEANING</b>\n"
+                        f"━━━━━━━━━━━━━━━\n"
+                        f"Room {room_number} auto-marked dirty\n"
+                        f"(20 min after checkout)\n\n"
+                        f"Reply: <code>/clean {room_number}</code> when done"
+                    )
+        
+        # Mark these checkouts as processed
+        if recent_checkouts:
+            room_numbers = [c.get("room_number") for c in recent_checkouts if c.get("room_number")]
+            await db.bookings.update_many(
+                {"room_number": {"$in": room_numbers}, "is_checked_out": True},
+                {"$set": {"dirty_processed": True}}
+            )
+            
+    except Exception as e:
+        logging.error(f"Error in auto-dirty check: {e}")
+
+
 def update_auto_sync_schedule(enabled: bool, start_date: str = None):
     """Add or remove the auto-sync scheduled job"""
     try:
@@ -431,8 +600,37 @@ def update_auto_sync_schedule(enabled: bool, start_date: str = None):
 
 @app.on_event("startup")
 async def start_scheduler():
+    from pytz import timezone
+    central_tz = timezone('America/Chicago')
+    
     # Run on 1st of every month at 00:00 (midnight)
     scheduler.add_job(monthly_data_reset, CronTrigger(day=1, hour=0, minute=0))
+    
+    # Daily status alerts at 7 AM and 10 PM Central Time
+    scheduler.add_job(
+        lambda: asyncio.create_task(send_daily_status_alert("morning")),
+        CronTrigger(hour=7, minute=0, timezone=central_tz),
+        id="morning_status_alert",
+        replace_existing=True
+    )
+    scheduler.add_job(
+        lambda: asyncio.create_task(send_daily_status_alert("evening")),
+        CronTrigger(hour=22, minute=0, timezone=central_tz),
+        id="evening_status_alert",
+        replace_existing=True
+    )
+    logging.info("Daily status alerts scheduled for 7 AM and 10 PM Central Time")
+    
+    # Auto-dirty checker every 5 minutes
+    scheduler.add_job(
+        lambda: asyncio.create_task(check_and_mark_dirty_rooms()),
+        'interval',
+        minutes=5,
+        id="auto_dirty_checker",
+        replace_existing=True
+    )
+    logging.info("Auto-dirty checker scheduled every 5 minutes")
+    
     scheduler.start()
     logging.info("Monthly reset scheduler started - will reset data on 1st of each month")
     
@@ -1245,8 +1443,158 @@ async def request_employee_access(request: AccessRequest):
 
 @api_router.post("/telegram-webhook")
 async def telegram_webhook(request_data: dict):
-    """Handle Telegram callback queries (button clicks) for access approvals."""
+    """Handle Telegram callback queries (button clicks) and text commands."""
     
+    # Handle text messages (commands like /clean 101)
+    if "message" in request_data and "text" in request_data.get("message", {}):
+        message = request_data["message"]
+        text = message.get("text", "").strip()
+        chat_id = message.get("chat", {}).get("id")
+        
+        # Check for room cleaning commands
+        if text.startswith("/clean "):
+            room_number = text.replace("/clean ", "").strip()
+            if room_number:
+                # Mark room as clean
+                result = await db.rooms.update_one(
+                    {"room_number": room_number},
+                    {"$set": {
+                        "cleaning_status": "clean",
+                        "cleaned_at": datetime.now(timezone.utc).isoformat(),
+                        "cleaned_via": "telegram"
+                    }}
+                )
+                
+                if result.modified_count > 0:
+                    response = f"✅ Room {room_number} marked as CLEAN"
+                else:
+                    response = f"⚠️ Room {room_number} not found or already clean"
+                
+                # Send response
+                if TELEGRAM_BOT_TOKEN:
+                    try:
+                        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+                        async with httpx.AsyncClient() as http_client:
+                            await http_client.post(url, json={
+                                "chat_id": chat_id,
+                                "text": response,
+                                "parse_mode": "HTML"
+                            })
+                    except Exception as e:
+                        logging.error(f"Failed to send Telegram response: {e}")
+                
+                return {"ok": True}
+        
+        elif text.startswith("/dirty "):
+            room_number = text.replace("/dirty ", "").strip()
+            if room_number:
+                # Mark room as dirty
+                result = await db.rooms.update_one(
+                    {"room_number": room_number},
+                    {"$set": {
+                        "cleaning_status": "dirty",
+                        "marked_dirty_at": datetime.now(timezone.utc).isoformat(),
+                        "marked_dirty_via": "telegram"
+                    }}
+                )
+                
+                if result.modified_count > 0:
+                    response = f"🧹 Room {room_number} marked as DIRTY"
+                else:
+                    response = f"⚠️ Room {room_number} not found or already dirty"
+                
+                # Send response
+                if TELEGRAM_BOT_TOKEN:
+                    try:
+                        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+                        async with httpx.AsyncClient() as http_client:
+                            await http_client.post(url, json={
+                                "chat_id": chat_id,
+                                "text": response,
+                                "parse_mode": "HTML"
+                            })
+                    except Exception as e:
+                        logging.error(f"Failed to send Telegram response: {e}")
+                
+                return {"ok": True}
+        
+        elif text == "/status":
+            # Send current room status
+            total_rooms = await db.rooms.count_documents({})
+            occupied = await db.bookings.count_documents({"is_checked_out": False})
+            other_guests = await db.blocked_rooms.count_documents({"is_active": True, "is_reservation": {"$ne": True}})
+            total_occupied = occupied + other_guests
+            
+            # Get available room numbers
+            occupied_rooms = []
+            bookings = await db.bookings.find({"is_checked_out": False}, {"room_number": 1, "_id": 0}).to_list(100)
+            occupied_rooms.extend([b["room_number"] for b in bookings if b.get("room_number")])
+            blocked = await db.blocked_rooms.find({"is_active": True, "is_reservation": {"$ne": True}}, {"room_number": 1, "_id": 0}).to_list(100)
+            occupied_rooms.extend([b["room_number"] for b in blocked if b.get("room_number")])
+            
+            clean_available = await db.rooms.count_documents({
+                "room_number": {"$nin": occupied_rooms},
+                "cleaning_status": "clean"
+            })
+            dirty_available = await db.rooms.count_documents({
+                "room_number": {"$nin": occupied_rooms},
+                "cleaning_status": {"$ne": "clean"}
+            })
+            
+            occupancy = round((total_occupied / total_rooms) * 100, 1) if total_rooms > 0 else 0
+            
+            response = (
+                f"📊 <b>ROOM STATUS</b>\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"Occupancy: {occupancy}%\n\n"
+                f"🏨 Total: {total_rooms}\n"
+                f"📦 Occupied: {total_occupied}\n"
+                f"  🚂 Railroad: {occupied}\n"
+                f"  👤 Other: {other_guests}\n\n"
+                f"<b>Available:</b>\n"
+                f"✅ Clean: {clean_available}\n"
+                f"🧹 Dirty: {dirty_available}"
+            )
+            
+            if TELEGRAM_BOT_TOKEN:
+                try:
+                    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+                    async with httpx.AsyncClient() as http_client:
+                        await http_client.post(url, json={
+                            "chat_id": chat_id,
+                            "text": response,
+                            "parse_mode": "HTML"
+                        })
+                except Exception as e:
+                    logging.error(f"Failed to send Telegram response: {e}")
+            
+            return {"ok": True}
+        
+        elif text == "/help":
+            response = (
+                f"🏨 <b>HODLER INN COMMANDS</b>\n"
+                f"━━━━━━━━━━━━━━━\n\n"
+                f"/status - View room status\n"
+                f"/clean 101 - Mark room 101 clean\n"
+                f"/dirty 101 - Mark room 101 dirty\n"
+                f"/help - Show this help"
+            )
+            
+            if TELEGRAM_BOT_TOKEN:
+                try:
+                    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+                    async with httpx.AsyncClient() as http_client:
+                        await http_client.post(url, json={
+                            "chat_id": chat_id,
+                            "text": response,
+                            "parse_mode": "HTML"
+                        })
+                except Exception as e:
+                    logging.error(f"Failed to send Telegram response: {e}")
+            
+            return {"ok": True}
+    
+    # Handle callback queries (button clicks)
     if "callback_query" not in request_data:
         return {"ok": True}
     
