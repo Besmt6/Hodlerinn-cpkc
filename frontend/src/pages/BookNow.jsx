@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,8 +20,7 @@ import {
   Mic,
   MicOff,
   Volume2,
-  VolumeX,
-  UserPlus
+  VolumeX
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -40,9 +38,6 @@ export default function BookNow() {
   const [availability, setAvailability] = useState(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [showPhonePrompt, setShowPhonePrompt] = useState(true);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [returningGuest, setReturningGuest] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -108,12 +103,17 @@ export default function BookNow() {
         const res = await axios.get(`${API}/chatbot/availability`);
         setAvailability(res.data);
         
-        // Initial greeting asks for phone to identify returning guests
-        let welcomeMsg = `Hi there! I'm Bitsy, your hotel concierge at Hodler Inn.\n\nTo give you the best service, please enter your phone number below so I can check if you've stayed with us before.`;
+        // Get pricing info
+        const singleRate = res.data.single_rate || 85;
+        const doubleRate = res.data.double_rate || 95;
+        const taxRate = res.data.tax_rate || 0;
+        const taxInfo = taxRate > 0 ? ` (plus ${taxRate}% tax)` : "";
+        
+        // Natural greeting - no forced phone prompt
+        let welcomeMsg = `Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night${taxInfo}\n\nJust let me know when you'd like to stay, or if you've been here before, share your phone number and I'll look up your info!`;
         
         if (res.data.is_sold_out) {
           welcomeMsg = `Hi there! I'm Bitsy, your hotel concierge at Hodler Inn.\n\nUnfortunately, we're currently fully booked online. Please call us at (918) 653-7801 to check availability.`;
-          setShowPhonePrompt(false);
         }
         
         setMessages([{ role: "assistant", content: welcomeMsg }]);
@@ -124,19 +124,19 @@ export default function BookNow() {
           setTimeout(() => {
             const voiceGreeting = res.data.is_sold_out 
               ? "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
-              : "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Please enter your phone number so I can check if you've stayed with us before.";
+              : "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?";
             speakText(voiceGreeting);
           }, 500);
         }
       } catch (error) {
-        const defaultMsg = "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn.\n\nPlease enter your phone number below so I can check if you've stayed with us before.";
+        const defaultMsg = "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?\n\nJust let me know when you'd like to stay!";
         setMessages([{ role: "assistant", content: defaultMsg }]);
         
         // Play default greeting
         if (!hasPlayedGreeting.current) {
           hasPlayedGreeting.current = true;
           setTimeout(() => {
-            speakText("Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Please enter your phone number so I can check if you've stayed with us before.");
+            speakText("Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?");
           }, 500);
         }
       }
@@ -157,106 +157,6 @@ export default function BookNow() {
       stopSpeaking();
     };
   }, []);
-
-  // Handle phone number lookup
-  const handlePhoneLookup = async () => {
-    if (!phoneNumber.trim()) {
-      toast.error("Please enter your phone number");
-      return;
-    }
-    
-    setIsLoading(true);
-    setShowPhonePrompt(false);
-    
-    // Add user's phone as a message
-    setMessages(prev => [...prev, { role: "user", content: phoneNumber }]);
-    
-    try {
-      // Check if this is a returning guest
-      const lookupRes = await axios.post(`${API}/chatbot/lookup-guest`, { phone: phoneNumber });
-      
-      if (lookupRes.data.found) {
-        // Returning guest found!
-        const guest = lookupRes.data.guest;
-        setReturningGuest(guest);
-        
-        const welcomeBackMsg = `Welcome back, ${guest.guest_name}! Great to see you again.\n\nI have your info on file:\n• Email: ${guest.email}\n• Phone: ${guest.phone}\n• Last room preference: ${(guest.room_type || 'standard').charAt(0).toUpperCase() + (guest.room_type || 'standard').slice(1)}\n\nWhen would you like to stay with us this time?`;
-        
-        setMessages(prev => [...prev, { role: "assistant", content: welcomeBackMsg }]);
-        
-        if (voiceEnabled) {
-          speakText(`Welcome back, ${guest.guest_name}! Great to see you again. When would you like to stay with us this time?`);
-        }
-        
-        // Start a session with the returning guest info
-        const sessionRes = await axios.post(`${API}/chatbot/message`, {
-          message: `[SYSTEM: Returning guest identified - Name: ${guest.guest_name}, Email: ${guest.email}, Phone: ${guest.phone}, Preferred room: ${guest.room_type || 'standard'}. Welcome them back and only ask for dates and room preference.]`,
-          session_id: null
-        });
-        setSessionId(sessionRes.data.session_id);
-        
-      } else {
-        // New guest
-        const singleRate = availability?.single_rate || 85;
-        const doubleRate = availability?.double_rate || 95;
-        const taxRate = availability?.tax_rate || 0;
-        const taxInfo = taxRate > 0 ? ` (plus ${taxRate}% tax)` : "";
-        
-        const newGuestMsg = `Nice to meet you! Looks like this is your first time booking with us.\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night${taxInfo}\n\nWhen would you like to stay with us?`;
-        
-        setMessages(prev => [...prev, { role: "assistant", content: newGuestMsg }]);
-        
-        if (voiceEnabled) {
-          speakText("Nice to meet you! Looks like this is your first time with us. When would you like to stay?");
-        }
-        
-        // Start a new session
-        const sessionRes = await axios.post(`${API}/chatbot/message`, {
-          message: `[SYSTEM: New guest with phone ${phoneNumber}. Proceed with normal booking flow - collect name, email, dates, room preference.]`,
-          session_id: null
-        });
-        setSessionId(sessionRes.data.session_id);
-      }
-    } catch (error) {
-      console.error("Lookup error:", error);
-      // Fall back to regular flow
-      const singleRate = availability?.single_rate || 85;
-      const doubleRate = availability?.double_rate || 95;
-      
-      const fallbackMsg = `Thanks! Let me help you book a room.\n\nWe offer:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night\n\nWhen would you like to stay with us?`;
-      
-      setMessages(prev => [...prev, { role: "assistant", content: fallbackMsg }]);
-      
-      if (voiceEnabled) {
-        speakText("Thanks! When would you like to stay with us?");
-      }
-    }
-    
-    setIsLoading(false);
-  };
-
-  // Skip phone lookup for new guests
-  const handleSkipPhoneLookup = async () => {
-    setShowPhonePrompt(false);
-    setIsLoading(true);
-    
-    setMessages(prev => [...prev, { role: "user", content: "I'm a new guest" }]);
-    
-    const singleRate = availability?.single_rate || 85;
-    const doubleRate = availability?.double_rate || 95;
-    const taxRate = availability?.tax_rate || 0;
-    const taxInfo = taxRate > 0 ? ` (plus ${taxRate}% tax)` : "";
-    
-    const newGuestMsg = `Welcome to Hodler Inn! I'd be happy to help you book a room.\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night${taxInfo}\n\nWhen would you like to stay with us?`;
-    
-    setMessages(prev => [...prev, { role: "assistant", content: newGuestMsg }]);
-    
-    if (voiceEnabled) {
-      speakText("Welcome to Hodler Inn! When would you like to stay with us?");
-    }
-    
-    setIsLoading(false);
-  };
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -629,100 +529,61 @@ export default function BookNow() {
 
           {/* Input Area */}
           <div className="border-t border-amber-500/20 p-4 bg-black/20">
-            {/* Phone Number Prompt */}
-            {showPhonePrompt ? (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400" />
-                    <Input
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      onKeyPress={(e) => e.key === "Enter" && handlePhoneLookup()}
-                      placeholder="Enter your phone number..."
-                      className="pl-10 bg-slate-800/80 border-slate-700 text-white placeholder:text-gray-500 focus:border-amber-500/50 focus:ring-amber-500/20"
-                      disabled={isLoading}
-                      data-testid="phone-input"
-                      type="tel"
-                    />
-                  </div>
-                  <Button
-                    onClick={handlePhoneLookup}
-                    disabled={!phoneNumber.trim() || isLoading}
-                    className="bg-amber-500 hover:bg-amber-400 text-black px-6"
-                    data-testid="phone-lookup-btn"
-                  >
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Continue"}
-                  </Button>
-                </div>
-                <Button
-                  onClick={handleSkipPhoneLookup}
-                  variant="ghost"
-                  className="w-full text-gray-400 hover:text-white hover:bg-slate-800/50"
-                  disabled={isLoading}
-                  data-testid="new-guest-btn"
-                >
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  I'm a new guest
-                </Button>
-              </div>
-            ) : (
-              /* Regular Chat Input */
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    if (isSpeaking) {
-                      stopSpeaking();
-                    }
-                    setVoiceEnabled(!voiceEnabled);
-                  }}
-                  className={`px-3 transition-all ${
-                    voiceEnabled 
-                      ? "bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30" 
-                      : "bg-slate-800 hover:bg-slate-700 text-gray-500"
-                  }`}
-                  data-testid="voice-toggle-btn"
-                  title={voiceEnabled ? "Voice on - click to mute" : "Voice off - click to enable"}
-                >
-                  {voiceEnabled ? (
-                    isSpeaking ? <Volume2 className="w-4 h-4 animate-pulse" /> : <Volume2 className="w-4 h-4" />
-                  ) : (
-                    <VolumeX className="w-4 h-4" />
-                  )}
-                </Button>
-                <Input
-                  ref={inputRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder={isRecording ? "Listening..." : "Type or tap mic to speak..."}
-                  className="flex-1 bg-slate-800/80 border-slate-700 text-white placeholder:text-gray-500 focus:border-amber-500/50 focus:ring-amber-500/20"
-                  disabled={isLoading || isRecording}
-                  data-testid="chat-input"
-                />
-                <Button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isLoading}
-                  className={`px-4 transition-all ${
-                    isRecording 
-                      ? "bg-red-500 hover:bg-red-400 text-white animate-pulse" 
-                      : "bg-slate-700 hover:bg-slate-600 text-gray-300"
-                  }`}
-                  data-testid="voice-btn"
-                  title={isRecording ? "Stop recording" : "Start voice input"}
-                >
-                  {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                </Button>
-                <Button
-                  onClick={sendMessage}
-                  disabled={!inputValue.trim() || isLoading}
-                  className="bg-amber-500 hover:bg-amber-400 text-black px-6"
-                  data-testid="chat-send-btn"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
+            {/* Regular Chat Input - always show */}
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  if (isSpeaking) {
+                    stopSpeaking();
+                  }
+                  setVoiceEnabled(!voiceEnabled);
+                }}
+                className={`px-3 transition-all ${
+                  voiceEnabled 
+                    ? "bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30" 
+                    : "bg-slate-800 hover:bg-slate-700 text-gray-500"
+                }`}
+                data-testid="voice-toggle-btn"
+                title={voiceEnabled ? "Voice on - click to mute" : "Voice off - click to enable"}
+              >
+                {voiceEnabled ? (
+                  isSpeaking ? <Volume2 className="w-4 h-4 animate-pulse" /> : <Volume2 className="w-4 h-4" />
+                ) : (
+                  <VolumeX className="w-4 h-4" />
+                )}
+              </Button>
+              <Input
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder={isRecording ? "Listening..." : "Type your message or tap mic to speak..."}
+                className="flex-1 bg-slate-800/80 border-slate-700 text-white placeholder:text-gray-500 focus:border-amber-500/50 focus:ring-amber-500/20"
+                disabled={isLoading || isRecording}
+                data-testid="chat-input"
+              />
+              <Button
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isLoading}
+                className={`px-4 transition-all ${
+                  isRecording 
+                    ? "bg-red-500 hover:bg-red-400 text-white animate-pulse" 
+                    : "bg-slate-700 hover:bg-slate-600 text-gray-300"
+                }`}
+                data-testid="voice-btn"
+                title={isRecording ? "Stop recording" : "Start voice input"}
+              >
+                {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </Button>
+              <Button
+                onClick={sendMessage}
+                disabled={!inputValue.trim() || isLoading}
+                className="bg-amber-500 hover:bg-amber-400 text-black px-6"
+                data-testid="chat-send-btn"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
             <p className="text-center text-gray-500 text-xs mt-3">
               By making a reservation, you agree to confirm by calling (918) 653-7801
             </p>
