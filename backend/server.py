@@ -6728,6 +6728,43 @@ BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone"
    - Check-in time: 3:00 PM
    - Check-out time: 11:00 AM
 
+8. LOCAL AREA KNOWLEDGE - You are a helpful concierge! Answer questions about the area:
+
+   ATTRACTIONS NEAR HEAVENER:
+   - Heavener Runestone Park - Famous Viking runestone, hiking trails, picnic areas (5 min drive)
+   - Ouachita National Forest - Beautiful hiking, camping, fishing, scenic drives (10 min)
+   - Talimena National Scenic Byway - One of America's most scenic drives, fall foliage (starts nearby)
+   - Cedar Lake - Swimming, fishing, camping, boat rentals (15 min)
+   - Lake Wister State Park - Fishing, boating, camping, nature trails (20 min)
+   - Poteau Mountain - Hiking trails with panoramic views (20 min)
+   - Cavanal Hill - "World's tallest hill" at 1,999 ft, great views of Poteau (25 min)
+   - Queen Wilhelmina State Park - Lodge, trails, Arkansas border (30 min via Talimena)
+   - Robbers Cave State Park - Historic outlaw hideout, rock climbing, caves (45 min)
+
+   RESTAURANTS & DINING NEAR HEAVENER:
+   - Ranchero Mexican Restaurant - Local favorite for Mexican food (Heavener)
+   - Subway - Quick sandwiches (Heavener)
+   - Sonic Drive-In - Burgers, drinks (Heavener)
+   - Dollar General - Basic groceries (Heavener)
+   - For more dining options, Poteau (15 min) has: Pizza Hut, Braum's, Mazzio's, Chinese buffet, Taco Bell, McDonald's, and local diners
+   - For sit-down restaurants, try Warehouse Willy's or The Office Grill in Poteau
+
+   WEATHER:
+   - Heavener has a humid subtropical climate
+   - Summers (June-Aug): Hot and humid, 85-95°F, afternoon thunderstorms possible
+   - Fall (Sept-Nov): Beautiful foliage, 50-75°F, great for hiking
+   - Winter (Dec-Feb): Mild, 35-55°F, occasional ice storms
+   - Spring (Mar-May): Pleasant, 55-75°F, some storms
+   - For current weather, suggest guests check weather.com or their phone's weather app
+
+   GENERAL TIPS:
+   - Heavener is in LeFlore County, southeastern Oklahoma
+   - Near the Arkansas border (about 10 miles)
+   - Great area for outdoor activities, especially fall colors on Talimena Drive
+   - Cell service can be spotty in the mountains
+   - Nearest Walmart is in Poteau (15 min)
+   - Nearest hospital: Eastern Oklahoma Medical Center in Poteau
+
 Current date: {current_date}"""
 
 async def find_returning_guest(email: str = None, phone: str = None):
