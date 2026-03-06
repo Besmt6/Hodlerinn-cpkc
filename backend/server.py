@@ -7722,14 +7722,22 @@ async def import_cpkc_guest(emp_id: str, emp_name: str, check_in_str: str, check
             except:
                 check_out_date = check_out_str
         
-        # Check if already imported (avoid duplicates)
+        # Check if already imported (avoid duplicates) - match by employee name + date only
+        # Ignore booking_id since revisions have different IDs but same employee/date
+        # Clean employee name for matching (remove newlines, extra spaces)
+        clean_emp_name = emp_name.replace('\n', ' ').strip()
+        
         existing = await db.expected_arrivals.find_one({
-            "booking_id": booking_id,
-            "employee_name": emp_name,
-            "check_in_date": check_in_date
+            "check_in_date": check_in_date,
+            "$or": [
+                {"employee_name": emp_name},
+                {"employee_name": clean_emp_name},
+                {"last_name": last_name, "first_name": first_name}
+            ]
         })
         
         if existing:
+            logging.info(f"Skipping duplicate: {emp_name} already expected on {check_in_date}")
             return None
         
         # Create expected arrival record
@@ -7811,6 +7819,26 @@ async def delete_expected_arrival(arrival_id: str):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Arrival not found")
     return {"message": "Expected arrival deleted"}
+
+@cpkc_router.post("/expected-arrivals/cleanup-duplicates")
+async def cleanup_duplicate_arrivals():
+    """Remove duplicate expected arrivals (keep first entry per employee+date)."""
+    arrivals = await db.expected_arrivals.find({}).to_list(500)
+    
+    seen = {}
+    duplicates_removed = 0
+    
+    for a in arrivals:
+        # Create key from last_name + check_in_date
+        key = (a.get('last_name', '').upper(), a.get('check_in_date'))
+        if key in seen:
+            # This is a duplicate - remove it
+            await db.expected_arrivals.delete_one({"id": a.get('id')})
+            duplicates_removed += 1
+        else:
+            seen[key] = a.get('id')
+    
+    return {"message": f"Removed {duplicates_removed} duplicate entries"}
 
 @cpkc_router.post("/expected-arrivals/{arrival_id}/checked-in")
 async def mark_arrival_checked_in(arrival_id: str, room_number: str):
