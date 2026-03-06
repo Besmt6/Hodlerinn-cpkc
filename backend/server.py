@@ -3231,6 +3231,143 @@ async def cancel_reservation(reservation_id: str):
     return {"message": "Reservation cancelled"}
 
 
+@api_router.post("/admin/rooms/booking/{booking_id}/send-confirmation")
+async def send_booking_confirmation(booking_id: str):
+    """Send booking confirmation email to guest with cancellation policy."""
+    # Get the booking
+    booking = await db.blocked_rooms.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    guest_email = booking.get("email")
+    if not guest_email:
+        raise HTTPException(status_code=400, detail="Guest email not provided")
+    
+    # Get hotel settings for email
+    settings = await db.settings.find_one({}, {"_id": 0}) or {}
+    email_settings = settings.get("email_settings", {})
+    
+    if not email_settings.get("smtp_host"):
+        raise HTTPException(status_code=400, detail="Email not configured. Please set up SMTP in settings.")
+    
+    # Build email content
+    guest_name = booking.get("guest_name", "Guest")
+    room_info = booking.get("room_number") or booking.get("room_type") or "To be assigned"
+    check_in = booking.get("check_in_date", "TBD")
+    check_out = booking.get("check_out_date", "TBD")
+    room_rate = booking.get("room_rate", 0)
+    total = booking.get("total_revenue", 0)
+    nights = booking.get("nights", 0)
+    is_reservation = booking.get("is_reservation", False)
+    
+    booking_type = "Reservation Confirmation" if is_reservation else "Check-In Confirmation"
+    
+    email_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #1a1a2e; color: #ffd700; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0;">🏨 Hodler Inn</h1>
+            <p style="margin: 5px 0 0 0; color: #ccc;">820 Hwy 59 N, Heavener, OK 74937</p>
+        </div>
+        
+        <div style="background-color: #f5f5f5; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #1a1a2e; margin-top: 0;">{booking_type}</h2>
+            
+            <p>Dear <strong>{guest_name}</strong>,</p>
+            
+            <p>Thank you for choosing Hodler Inn! Here are your booking details:</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr style="background-color: #1a1a2e; color: white;">
+                    <th colspan="2" style="padding: 10px; text-align: left;">Booking Details</th>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Room:</strong></td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">{room_info}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Check-In Date:</strong></td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">{check_in}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Check-Out Date:</strong></td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">{check_out}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Number of Nights:</strong></td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">{nights}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Rate per Night:</strong></td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">${room_rate:.2f}</td>
+                </tr>
+                <tr style="background-color: #e8f5e9;">
+                    <td style="padding: 10px;"><strong>Total Amount:</strong></td>
+                    <td style="padding: 10px;"><strong style="color: #2e7d32;">${total:.2f}</strong></td>
+                </tr>
+            </table>
+            
+            <div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0;">
+                <h3 style="color: #e65100; margin: 0 0 10px 0;">⚠️ Cancellation Policy</h3>
+                <p style="margin: 0; color: #333;">
+                    <strong>Cancellations must be made at least 48 hours prior to check-in date.</strong>
+                    <br><br>
+                    Cancellations made less than 48 hours before check-in may be subject to a one-night charge.
+                </p>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <h3>Hotel Information:</h3>
+                <p>
+                    <strong>Hodler Inn</strong><br>
+                    820 Hwy 59 N<br>
+                    Heavener, OK 74937<br>
+                    Phone: (918) 653-2100
+                </p>
+            </div>
+            
+            <p>If you have any questions or need to modify your reservation, please contact us.</p>
+            
+            <p>We look forward to welcoming you!</p>
+            
+            <p style="color: #666; font-size: 12px; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 15px;">
+                This is an automated confirmation email from Hodler Inn booking system.
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"Hodler Inn - {booking_type}"
+        msg['From'] = email_settings.get("from_email", email_settings.get("smtp_username"))
+        msg['To'] = guest_email
+        
+        msg.attach(MIMEText(email_body, 'html'))
+        
+        with smtplib.SMTP(email_settings.get("smtp_host"), email_settings.get("smtp_port", 587)) as server:
+            server.starttls()
+            server.login(email_settings.get("smtp_username"), email_settings.get("smtp_password"))
+            server.sendmail(msg['From'], guest_email, msg.as_string())
+        
+        # Update booking to mark email sent
+        await db.blocked_rooms.update_one(
+            {"id": booking_id},
+            {"$set": {"confirmation_sent": True, "confirmation_sent_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        return {"message": f"Confirmation email sent to {guest_email}"}
+        
+    except Exception as e:
+        logging.error(f"Failed to send confirmation email: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+
 @api_router.get("/admin/rooms/blocked/stats")
 async def get_blocked_rooms_stats():
     """Get statistics for blocked rooms - revenue and occupancy."""

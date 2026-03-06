@@ -393,6 +393,21 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSendConfirmationEmail = async (bookingId, guestEmail) => {
+    if (!guestEmail) {
+      toast.error("No email address for this guest");
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/rooms/booking/${bookingId}/send-confirmation`);
+      toast.success(`Confirmation email sent to ${guestEmail}`);
+      fetchBlockedRooms();
+      fetchReservations();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to send email");
+    }
+  };
+
   const handleMarkRoomDirty = async (roomNumber) => {
     try {
       await axios.post(`${API}/admin/rooms/${roomNumber}/mark-dirty`);
@@ -2076,12 +2091,24 @@ export default function AdminDashboard() {
                               <td className="py-2 px-3 text-vault-text-secondary">{block.check_out_date || '-'}</td>
                               <td className="py-2 px-3 text-vault-text-secondary">${block.room_rate || 0}</td>
                               <td className="py-2 px-3 text-green-400 font-medium">${block.total_revenue || 0}</td>
-                              <td className="py-2 px-3">
+                              <td className="py-2 px-3 flex gap-1">
+                                {block.email && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+                                    onClick={() => handleSendConfirmationEmail(block.id, block.email)}
+                                    title="Send confirmation email"
+                                  >
+                                    <Mail className="w-4 h-4" />
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="ghost"
                                   className="text-red-400 hover:text-red-300 hover:bg-red-900/30"
                                   onClick={() => handleUnblockRoom(block.room_number)}
+                                  title="Check out guest"
                                 >
                                   <XCircle className="w-4 h-4 mr-1" />
                                   Check Out
@@ -2132,21 +2159,33 @@ export default function AdminDashboard() {
                               <td className="py-2 px-3 text-vault-text-secondary">{res.check_in_date || '-'}</td>
                               <td className="py-2 px-3 text-vault-text-secondary">{res.check_out_date || '-'}</td>
                               <td className="py-2 px-3 text-green-400 font-medium">${res.total_revenue || 0}</td>
-                              <td className="py-2 px-3 flex gap-2">
+                              <td className="py-2 px-3 flex gap-1">
+                                {res.email && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+                                    onClick={() => handleSendConfirmationEmail(res.id, res.email)}
+                                    title="Send confirmation email"
+                                  >
+                                    <Mail className="w-4 h-4" />
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="ghost"
                                   className="text-green-400 hover:text-green-300 hover:bg-green-900/30"
                                   onClick={() => handleCheckinReservation(res.id, res.room_number)}
+                                  title="Check in guest"
                                 >
-                                  <CheckCircle className="w-4 h-4 mr-1" />
-                                  Check In
+                                  <CheckCircle className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   size="sm"
                                   variant="ghost"
                                   className="text-red-400 hover:text-red-300 hover:bg-red-900/30"
                                   onClick={() => handleCancelReservation(res.id)}
+                                  title="Cancel reservation"
                                 >
                                   <XCircle className="w-4 h-4" />
                                 </Button>
