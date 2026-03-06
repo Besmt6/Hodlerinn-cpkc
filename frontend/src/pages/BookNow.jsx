@@ -43,6 +43,7 @@ export default function BookNow() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const hasPlayedGreeting = useRef(false);
+  const isRecordingRef = useRef(false); // Track recording state for closure
 
   // Text-to-Speech function using Web Speech API
   const speakText = (text) => {
@@ -222,18 +223,71 @@ export default function BookNow() {
     }
   };
 
-  // Voice recording functions
+  // Voice recording with automatic silence detection
+  const silenceTimeoutRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const streamRef = useRef(null);
+
   const startRecording = async () => {
     try {
+      // Stop any currently playing speech
+      stopSpeaking();
+      
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
+
+      // Set up audio analysis for silence detection
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+      analyserRef.current.fftSize = 512;
+      
+      const bufferLength = analyserRef.current.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      let silenceStart = null;
+      const SILENCE_THRESHOLD = 15; // Audio level below this is considered silence
+      const SILENCE_DURATION = 1500; // Stop after 1.5 seconds of silence
+      
+      // Monitor for silence
+      const checkSilence = () => {
+        if (!isRecordingRef.current || !analyserRef.current) return;
+        
+        analyserRef.current.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b, 0) / bufferLength;
+        
+        if (average < SILENCE_THRESHOLD) {
+          if (!silenceStart) {
+            silenceStart = Date.now();
+          } else if (Date.now() - silenceStart > SILENCE_DURATION) {
+            // Silence detected for long enough, stop recording
+            stopRecording();
+            return;
+          }
+        } else {
+          silenceStart = null; // Reset if sound detected
+        }
+        
+        silenceTimeoutRef.current = requestAnimationFrame(checkSilence);
+      };
 
       mediaRecorderRef.current.ondataavailable = (event) => {
         audioChunksRef.current.push(event.data);
       };
 
       mediaRecorderRef.current.onstop = async () => {
+        // Clean up silence detection
+        if (silenceTimeoutRef.current) {
+          cancelAnimationFrame(silenceTimeoutRef.current);
+        }
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+        }
+        
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         stream.getTracks().forEach(track => track.stop());
         await transcribeAudio(audioBlob);
@@ -241,6 +295,13 @@ export default function BookNow() {
 
       mediaRecorderRef.current.start();
       setIsRecording(true);
+      isRecordingRef.current = true;
+      
+      // Start silence detection after a brief delay (to allow user to start speaking)
+      setTimeout(() => {
+        checkSilence();
+      }, 1000);
+      
     } catch (error) {
       console.error("Microphone access denied:", error);
       alert("Please allow microphone access to use voice input.");
@@ -248,9 +309,18 @@ export default function BookNow() {
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && isRecordingRef.current) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      isRecordingRef.current = false;
+      
+      // Clean up
+      if (silenceTimeoutRef.current) {
+        cancelAnimationFrame(silenceTimeoutRef.current);
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
     }
   };
 
