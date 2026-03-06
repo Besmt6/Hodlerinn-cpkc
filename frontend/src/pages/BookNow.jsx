@@ -38,16 +38,29 @@ export default function BookNow() {
   const [availability, setAvailability] = useState(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [pendingGreeting, setPendingGreeting] = useState(null); // For mobile - needs tap to play
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const hasPlayedGreeting = useRef(false);
   const isRecordingRef = useRef(false);
+  const userHasInteracted = useRef(false);
 
-  // Speak text using Web Speech API (autoplays without user interaction)
-  const speakText = (text) => {
+  // Detect if mobile device
+  const isMobile = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  // Speak text using Web Speech API
+  const speakText = (text, isGreeting = false) => {
     if (!voiceEnabled || !('speechSynthesis' in window)) return;
+    
+    // On mobile, if user hasn't interacted yet and this is the greeting, save it for later
+    if (isMobile() && isGreeting && !userHasInteracted.current) {
+      setPendingGreeting(text);
+      return;
+    }
     
     // Stop any currently playing
     stopSpeaking();
@@ -112,14 +125,14 @@ export default function BookNow() {
         
         setMessages([{ role: "assistant", content: welcomeMsg }]);
         
-        // Play voice greeting using Web Speech API (autoplays)
+        // Play voice greeting using Web Speech API (autoplays on desktop, needs tap on mobile)
         if (!hasPlayedGreeting.current) {
           hasPlayedGreeting.current = true;
           setTimeout(() => {
             const greeting = res.data.is_sold_out 
               ? "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
               : "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?";
-            speakText(greeting);
+            speakText(greeting, true); // true = isGreeting
           }, 500);
         }
       } catch (error) {
@@ -130,7 +143,7 @@ export default function BookNow() {
         if (!hasPlayedGreeting.current) {
           hasPlayedGreeting.current = true;
           setTimeout(() => {
-            speakText("Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?");
+            speakText("Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?", true);
           }, 500);
         }
       }
@@ -152,6 +165,26 @@ export default function BookNow() {
     };
   }, []);
 
+  // Handle first user interaction on mobile - play pending greeting
+  const handleUserInteraction = () => {
+    if (!userHasInteracted.current) {
+      userHasInteracted.current = true;
+      if (pendingGreeting) {
+        speakText(pendingGreeting, false); // Now safe to play
+        setPendingGreeting(null);
+      }
+    }
+  };
+
+  // Play pending greeting when user taps the button
+  const playPendingGreeting = () => {
+    userHasInteracted.current = true;
+    if (pendingGreeting) {
+      speakText(pendingGreeting, false);
+      setPendingGreeting(null);
+    }
+  };
+
   // Auto scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
@@ -161,6 +194,9 @@ export default function BookNow() {
 
   const sendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
+    
+    // Mark user as having interacted
+    handleUserInteraction();
 
     const userMessage = inputValue.trim();
     setInputValue("");
@@ -468,6 +504,23 @@ export default function BookNow() {
           {/* Messages Area */}
           <ScrollArea className="h-[400px] p-4" ref={scrollRef}>
             <div className="space-y-4">
+              {/* Tap to hear greeting button for mobile */}
+              {pendingGreeting && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex justify-center"
+                >
+                  <button
+                    onClick={playPendingGreeting}
+                    className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-black px-4 py-2 rounded-full text-sm font-medium hover:from-amber-400 hover:to-amber-500 transition-all shadow-lg"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    <span>Tap to hear Bitsy</span>
+                  </button>
+                </motion.div>
+              )}
+              
               <AnimatePresence mode="popLayout">
                 {messages.map((msg, idx) => (
                   <motion.div
