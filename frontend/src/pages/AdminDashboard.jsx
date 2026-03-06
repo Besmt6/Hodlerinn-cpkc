@@ -79,7 +79,8 @@ import {
   UserX,
   TrendingUp,
   Bell,
-  MessageCircle
+  MessageCircle,
+  Phone
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -432,6 +433,16 @@ export default function AdminDashboard() {
       fetchReservations();
     } catch (error) {
       toast.error("Failed to cancel reservation");
+    }
+  };
+
+  const handleConfirmReservation = async (reservationId) => {
+    try {
+      await axios.post(`${API}/admin/rooms/reservations/${reservationId}/confirm`);
+      toast.success("Reservation confirmed! Guest called to confirm booking.");
+      fetchReservations();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to confirm reservation");
     }
   };
 
@@ -2636,12 +2647,13 @@ export default function AdminDashboard() {
                             <th className="text-left py-2 px-3 text-blue-400 text-sm">Check-In</th>
                             <th className="text-left py-2 px-3 text-blue-400 text-sm">Check-Out</th>
                             <th className="text-left py-2 px-3 text-blue-400 text-sm">Total</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Status</th>
                             <th className="text-left py-2 px-3 text-blue-400 text-sm">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {reservations.map((res) => (
-                            <tr key={res.id} className="border-b border-blue-600/20 hover:bg-blue-900/20">
+                            <tr key={res.id} className={`border-b border-blue-600/20 hover:bg-blue-900/20 ${res.confirmation_status === 'confirmed' ? 'bg-green-900/10' : ''}`}>
                               <td className="py-2 px-3 text-vault-text font-bold">
                                 {res.room_number || res.room_type || 'Any'}
                               </td>
@@ -2650,7 +2662,18 @@ export default function AdminDashboard() {
                               <td className="py-2 px-3 text-vault-text-secondary">{res.phone || '-'}</td>
                               <td className="py-2 px-3 text-vault-text-secondary">{res.check_in_date || '-'}</td>
                               <td className="py-2 px-3 text-vault-text-secondary">{res.check_out_date || '-'}</td>
-                              <td className="py-2 px-3 text-green-400 font-medium">${res.total_revenue || 0}</td>
+                              <td className="py-2 px-3 text-green-400 font-medium">${res.total_amount || res.total_revenue || 0}</td>
+                              <td className="py-2 px-3">
+                                {res.confirmation_status === 'confirmed' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">
+                                    <CheckCircle className="w-3 h-3" /> Confirmed
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-medium">
+                                    <Clock className="w-3 h-3" /> Pending
+                                  </span>
+                                )}
+                              </td>
                               <td className="py-2 px-3 flex gap-1">
                                 {res.email && (
                                   <Button
@@ -2661,6 +2684,17 @@ export default function AdminDashboard() {
                                     title="Send confirmation email"
                                   >
                                     <Mail className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {res.confirmation_status !== 'confirmed' && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/30"
+                                    onClick={() => handleConfirmReservation(res.id)}
+                                    title="Mark as phone confirmed"
+                                  >
+                                    <Phone className="w-4 h-4" />
                                   </Button>
                                 )}
                                 <Button

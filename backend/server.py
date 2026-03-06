@@ -3749,10 +3749,10 @@ async def get_blocked_rooms():
 
 @api_router.get("/admin/rooms/reservations")
 async def get_reservations():
-    """Get future reservations for non-railroad guests"""
+    """Get future reservations for non-railroad guests (including pending and confirmed)"""
     reservations = await db.blocked_rooms.find({
-        "is_active": True,
-        "is_reservation": True
+        "is_reservation": True,
+        "confirmation_status": {"$ne": "cancelled"}  # Show pending and confirmed, not cancelled
     }, {"_id": 0}).sort("check_in_date", 1).to_list(100)
     return reservations
 
@@ -3805,11 +3805,71 @@ async def cancel_reservation(reservation_id: str):
     """Cancel a reservation"""
     result = await db.blocked_rooms.update_one(
         {"id": reservation_id, "is_reservation": True},
-        {"$set": {"is_active": False, "status": "cancelled", "cancelled_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {"is_active": False, "status": "cancelled", "confirmation_status": "cancelled", "cancelled_at": datetime.now(timezone.utc).isoformat()}}
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Reservation not found")
     return {"message": "Reservation cancelled"}
+
+@api_router.post("/admin/rooms/reservations/{reservation_id}/confirm")
+async def confirm_reservation(reservation_id: str):
+    """Confirm a reservation (guest called to confirm)"""
+    reservation = await db.blocked_rooms.find_one({"id": reservation_id, "is_reservation": True}, {"_id": 0})
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+    
+    result = await db.blocked_rooms.update_one(
+        {"id": reservation_id},
+        {"$set": {
+            "is_confirmed": True, 
+            "confirmation_status": "confirmed",
+            "confirmed_at": datetime.now(timezone.utc).isoformat(),
+            "notes": "Phone confirmed - Reservation is guaranteed"
+        }}
+    )
+    
+    # Send Telegram notification
+    await send_telegram_notification(
+        f"✅ <b>RESERVATION CONFIRMED</b>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"👤 {reservation.get('guest_name')}\n"
+        f"📅 {reservation.get('check_in_date')} → {reservation.get('check_out_date')}\n"
+        f"🛏️ {reservation.get('room_type', 'standard').title()}\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"Guest called and confirmed their booking!"
+    )
+    
+    return {"message": "Reservation confirmed", "reservation_id": reservation_id}
+
+@api_router.post("/admin/rooms/reservations/{reservation_id}/cancel")
+async def manual_cancel_reservation(reservation_id: str, reason: str = "Cancelled by admin"):
+    """Manually cancel a confirmed reservation"""
+    reservation = await db.blocked_rooms.find_one({"id": reservation_id, "is_reservation": True}, {"_id": 0})
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+    
+    result = await db.blocked_rooms.update_one(
+        {"id": reservation_id},
+        {"$set": {
+            "is_active": False,
+            "is_confirmed": False, 
+            "confirmation_status": "cancelled",
+            "cancelled_at": datetime.now(timezone.utc).isoformat(),
+            "cancellation_reason": reason,
+            "notes": f"Cancelled: {reason}"
+        }}
+    )
+    
+    # Send Telegram notification
+    await send_telegram_notification(
+        f"❌ <b>RESERVATION CANCELLED</b>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"👤 {reservation.get('guest_name')}\n"
+        f"📅 {reservation.get('check_in_date')} → {reservation.get('check_out_date')}\n"
+        f"📝 Reason: {reason}"
+    )
+    
+    return {"message": "Reservation cancelled", "reservation_id": reservation_id}
 
 
 @api_router.post("/admin/rooms/send-dirty-list")
@@ -6592,7 +6652,7 @@ async def get_chatbot_pricing():
         "tax_rate": settings.get("sales_tax_rate", 0.0) if settings else 0.0
     }
 
-def get_chatbot_system_prompt(current_date: str, pricing: dict, availability: dict):
+def get_chatbot_system_prompt(current_date: str, pricing: dict, availability: dict, returning_guest: dict = None):
     """Generate dynamic system prompt with current pricing and availability."""
     single_rate = pricing["single_rate"]
     double_rate = pricing["double_rate"]
@@ -6614,11 +6674,30 @@ AVAILABILITY: We have railroad crew expected today ({expected} arriving). Only {
         availability_note = f"""
 AVAILABILITY: We have {rooms_left} room(s) available for online booking today. If guest asks about availability, you can confirm we have rooms available."""
 
+    # Returning guest info
+    returning_guest_note = ""
+    if returning_guest:
+        returning_guest_note = f"""
+RETURNING GUEST DETECTED:
+- Name: {returning_guest.get('guest_name', 'N/A')}
+- Email: {returning_guest.get('email', 'N/A')}
+- Phone: {returning_guest.get('phone', 'N/A')}
+- Last stay: {returning_guest.get('last_stay', 'Previously')}
+- Preferred room: {returning_guest.get('room_type', 'single').title()}
+
+When you recognize them, warmly welcome them back by name! You already have their contact info, so you ONLY need to collect:
+- Check-in date
+- Check-out date  
+- Room preference (or ask if they want the same as last time)
+
+Skip asking for name, email, and phone - use the stored info above for the booking."""
+
     return f"""You are Bitsy, a friendly and professional reservation assistant for Hodler Inn, a comfortable hotel in Heavener, Oklahoma. Your job is to help guests make room reservations through natural conversation.
 {availability_note}
+{returning_guest_note}
 
 IMPORTANT BOOKING RULES:
-1. You MUST collect ALL of these details before creating a reservation:
+1. For NEW guests, collect ALL of these details before creating a reservation:
    - Guest full name
    - Email address
    - Phone number
@@ -6626,25 +6705,80 @@ IMPORTANT BOOKING RULES:
    - Check-out date
    - Room preference (single bed ${single_rate}/night or double bed ${double_rate}/night){tax_info}
 
-2. After collecting all information, summarize the booking including the total with tax if applicable, and ask for confirmation.
+2. For RETURNING guests (if info provided above), you already have their name, email, and phone. Just ask for:
+   - Check-in date
+   - Check-out date
+   - Room preference
 
-3. CRITICAL: When the guest confirms, respond with EXACTLY this JSON format on a new line (the system will parse this):
+3. After collecting all information, summarize the booking including the total with tax if applicable, and ask for confirmation.
+
+4. CRITICAL: When the guest confirms, respond with EXACTLY this JSON format on a new line (the system will parse this):
 BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone":"1234567890","check_in":"YYYY-MM-DD","check_out":"YYYY-MM-DD","room_type":"single","rate":{single_rate}}}
 
-4. Important policies to communicate:
+5. Important policies to communicate:
    - Reservations MUST be confirmed by calling the hotel at (918) 653-7801
    - Unconfirmed reservations will be automatically cancelled 48 hours before arrival
    - No payment is collected online - payment is made at check-in
 
-5. Be conversational, warm, and helpful. Introduce yourself as Bitsy. Don't overwhelm guests with all questions at once - ask naturally in conversation.
+6. Be conversational, warm, and helpful. Introduce yourself as "I'm Bitsy". Don't overwhelm guests with all questions at once - ask naturally in conversation.
 
-6. Hotel info if asked:
+7. Hotel info if asked:
    - Address: 820 US-59, Heavener, OK 74937
    - Phone: (918) 653-7801
    - Check-in time: 3:00 PM
    - Check-out time: 11:00 AM
 
 Current date: {current_date}"""
+
+async def find_returning_guest(email: str = None, phone: str = None):
+    """Find a returning guest by email or phone from previous reservations."""
+    try:
+        query = {}
+        if email:
+            query["email"] = {"$regex": email, "$options": "i"}
+        elif phone:
+            # Normalize phone number
+            clean_phone = ''.join(filter(str.isdigit, phone))
+            query["phone"] = {"$regex": clean_phone}
+        else:
+            return None
+        
+        # Check blocked_rooms (reservations) first
+        reservation = await db.blocked_rooms.find_one(
+            {**query, "source": "chatbot"},
+            {"_id": 0},
+            sort=[("created_at", -1)]
+        )
+        
+        if reservation:
+            return {
+                "guest_name": reservation.get("guest_name"),
+                "email": reservation.get("email"),
+                "phone": reservation.get("phone"),
+                "room_type": reservation.get("room_type", "single"),
+                "last_stay": reservation.get("check_in_date", "Previously")
+            }
+        
+        # Check bookings (checked in guests)
+        booking = await db.bookings.find_one(
+            query,
+            {"_id": 0},
+            sort=[("check_in_time", -1)]
+        )
+        
+        if booking:
+            return {
+                "guest_name": booking.get("guest_name"),
+                "email": booking.get("email"),
+                "phone": booking.get("phone"),
+                "room_type": booking.get("room_type", "single"),
+                "last_stay": booking.get("check_in_time", "Previously")
+            }
+        
+        return None
+    except Exception as e:
+        logging.error(f"Error finding returning guest: {e}")
+        return None
 
 class ChatMessage(BaseModel):
     message: str
@@ -6671,7 +6805,20 @@ async def chatbot_message(chat_input: ChatMessage):
             current_date = datetime.now().strftime("%Y-%m-%d")
             pricing = await get_chatbot_pricing()
             availability = await get_chatbot_availability(current_date)
-            system_prompt = get_chatbot_system_prompt(current_date, pricing, availability)
+            
+            # Check if user message contains email to identify returning guest
+            returning_guest = None
+            user_msg_lower = chat_input.message.lower()
+            
+            # Look for email pattern in message
+            import re
+            email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+            email_match = re.search(email_pattern, chat_input.message)
+            if email_match:
+                email = email_match.group()
+                returning_guest = await find_returning_guest(email=email)
+            
+            system_prompt = get_chatbot_system_prompt(current_date, pricing, availability, returning_guest)
             
             chat = LlmChat(
                 api_key=llm_key,
@@ -6683,8 +6830,23 @@ async def chatbot_message(chat_input: ChatMessage):
                 "chat": chat,
                 "messages": [],
                 "created_at": datetime.now(timezone.utc),
-                "pricing": pricing
+                "pricing": pricing,
+                "returning_guest": returning_guest
             }
+        else:
+            # Check for returning guest in subsequent messages if not found yet
+            session = chat_sessions[session_id]
+            if not session.get("returning_guest"):
+                import re
+                email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+                email_match = re.search(email_pattern, chat_input.message)
+                if email_match:
+                    email = email_match.group()
+                    returning_guest = await find_returning_guest(email=email)
+                    if returning_guest:
+                        session["returning_guest"] = returning_guest
+                        # Add context to the conversation
+                        chat_input.message = f"[SYSTEM: This is a returning guest - {returning_guest['guest_name']}, email: {returning_guest['email']}, phone: {returning_guest['phone']}. Welcome them back!]\n\nUser said: {chat_input.message}"
         
         session = chat_sessions[session_id]
         chat = session["chat"]
@@ -6813,6 +6975,8 @@ async def create_chatbot_reservation(booking_data: dict):
             "is_reservation": True,
             "source": "chatbot",
             "requires_confirmation": True,
+            "is_confirmed": False,  # False until phone confirmation
+            "confirmation_status": "pending",  # pending, confirmed, cancelled
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         

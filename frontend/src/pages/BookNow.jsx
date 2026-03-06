@@ -109,10 +109,11 @@ export default function BookNow() {
         const taxRate = res.data.tax_rate || 0;
         const taxInfo = taxRate > 0 ? ` (plus ${taxRate}% tax)` : "";
         
-        let welcomeMsg = `Hi there! I'm Bitsy, your booking assistant at Hodler Inn! 🏨\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night${taxInfo}\n\n`;
+        // Greeting text matches voice greeting
+        let welcomeMsg = `Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night${taxInfo}\n\n`;
         
         if (res.data.is_sold_out) {
-          welcomeMsg += "⚠️ Unfortunately, we're currently fully booked online. Please call us at (918) 653-7801 to check availability.";
+          welcomeMsg = `Hi there! I'm Bitsy, your hotel concierge at Hodler Inn.\n\nUnfortunately, we're currently fully booked online. Please call us at (918) 653-7801 to check availability.`;
         } else {
           welcomeMsg += "When would you like to stay with us?";
         }
@@ -124,20 +125,20 @@ export default function BookNow() {
           hasPlayedGreeting.current = true;
           setTimeout(() => {
             const voiceGreeting = res.data.is_sold_out 
-              ? "Hi there! This is Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
-              : "Hi there! This is Bitsy, your hotel concierge at Hodler Inn. How may I help you today?";
+              ? "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
+              : "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?";
             speakText(voiceGreeting);
           }, 500);
         }
       } catch (error) {
-        const defaultMsg = "Hi there! I'm Bitsy, your booking assistant at Hodler Inn! 🏨\n\nWhen would you like to stay with us?";
+        const defaultMsg = "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?\n\nWhen would you like to stay with us?";
         setMessages([{ role: "assistant", content: defaultMsg }]);
         
         // Play default greeting
         if (!hasPlayedGreeting.current) {
           hasPlayedGreeting.current = true;
           setTimeout(() => {
-            speakText("Hi there! This is Bitsy, your hotel concierge at Hodler Inn. How may I help you today?");
+            speakText("Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?");
           }, 500);
         }
       }

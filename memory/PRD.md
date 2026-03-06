@@ -28,13 +28,13 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 - [x] Guest Verification
 - [x] Guarantee Report
 - [x] Portal Settings
-- [x] **Documentation** (NEW - March 2025)
+- [x] Documentation page
 
 ### Room Management
 - [x] Room status tracking (clean/dirty)
 - [x] Occupancy management
 - [x] Other guests (non-railroad) booking
-- [x] Reservations system
+- [x] Reservations system with confirm/cancel
 - [x] Auto-dirty marking (20 min after checkout)
 
 ### Billing & Reports
@@ -45,6 +45,25 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 - [x] Guarantee report
 - [x] Turned-away guests tracking
 
+### AI Chatbot (Bitsy) - UPDATED March 6, 2025
+- [x] Conversational booking flow
+- [x] Voice greeting on page load ("I'm Bitsy, your hotel concierge...")
+- [x] Voice responses (Bitsy speaks all replies)
+- [x] Voice input with auto-stop (silence detection)
+- [x] Voice on/off toggle button
+- [x] Real-time availability checking
+- [x] Dynamic pricing (single/double bed)
+- [x] **Returning guest recognition** - skips name/email/phone for repeat guests
+- [x] Email confirmations
+- [x] Telegram notifications to admin
+
+### Reservation Management - UPDATED March 6, 2025
+- [x] Pending/Confirmed status tracking
+- [x] **Confirm button** - Mark as phone confirmed
+- [x] **Manual cancel** - Cancel confirmed reservations
+- [x] Auto-cancel only applies to unconfirmed reservations
+- [x] Telegram notifications for confirm/cancel
+
 ### Integrations
 - [x] API Global railroad portal sync
 - [x] Auto-sync at 3 PM Central
@@ -54,14 +73,6 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 - [x] Zoho WorkDrive backup
 - [x] CPKC Email Scraper (expected arrivals)
 
-### AI Features
-- [x] **Bitsy Chatbot** - Conversational booking agent
-- [x] Voice input support
-- [x] Real-time availability
-- [x] Dynamic pricing
-- [x] Email confirmations
-- [x] Telegram notifications to admin
-
 ### Demo Mode
 - [x] Sandboxed demo environment
 - [x] Separate demo database
@@ -69,51 +80,18 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 - [x] Demo Admin Panel (/demo/admin)
 - [x] Sample data (EMP001, EMP002, EMP003)
 
-### Documentation System (NEW)
-- [x] Documentation page (/admin/docs)
-- [x] Overview tab
-- [x] Features tab
-- [x] Demo Mode tab
-- [x] Billing API tab
-- [x] Bitsy Chatbot tab with embed code
-
 ## API Endpoints
 
-### Public
-- `GET /api/health` - Health check
-- `POST /api/checkin` - Check in guest
-- `POST /api/checkout` - Check out guest
-- `GET /api/guests/{employee_number}` - Get guest info
-
-### Admin - Billing
-- `GET /api/admin/records` - Get all records
-- `GET /api/admin/export-billing` - Export billing (Excel)
-- `GET /api/admin/export-billing-pdf` - Export billing (PDF)
-- `GET /api/admin/export-billing-png` - Export billing (PNG)
-- `GET /api/admin/guarantee-report` - Guarantee report
-
-### Admin - Rooms
-- `GET /api/admin/rooms` - Get all rooms
-- `POST /api/admin/rooms` - Create room
-- `POST /api/admin/rooms/{number}/mark-dirty` - Mark dirty
-- `POST /api/admin/rooms/{number}/mark-clean` - Mark clean
-- `POST /api/admin/rooms/block` - Block for other guest
-
-### Admin - Sync
-- `GET /api/admin/sync/status` - Sync status
-- `POST /api/admin/sync/run` - Run sync
-- `GET /api/admin/settings` - Get settings
-- `POST /api/admin/settings` - Update settings
-
 ### Chatbot
-- `POST /api/chatbot/message` - Send message
-- `GET /api/chatbot/availability` - Check availability
-- `POST /api/chatbot/transcribe` - Voice to text
+- `POST /api/chatbot/message` - Send message to chatbot
+- `GET /api/chatbot/availability` - Check room availability
+- `POST /api/chatbot/transcribe` - Voice to text (OpenAI Whisper)
 
-### Demo
-- `POST /api/demo/init` - Initialize demo data
-- `GET /api/demo/rooms` - Get demo rooms
-- `GET /api/demo/guests` - Get demo guests
+### Reservations (NEW)
+- `GET /api/admin/rooms/reservations` - Get all reservations
+- `POST /api/admin/rooms/reservations/{id}/confirm` - Mark as confirmed
+- `POST /api/admin/rooms/reservations/{id}/cancel` - Manual cancel
+- `DELETE /api/admin/rooms/reservations/{id}` - Delete reservation
 
 ## Pending Verifications (P0)
 1. Auto-Sync v11 Logic - User verification pending
@@ -127,37 +105,22 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 
 ## Future/Backlog (P2-P3)
 1. HODL Rewards Token system
-2. Code refactoring (server.py ~6000+ lines, AdminDashboard.jsx ~5600+ lines)
+2. Code refactoring (server.py ~7700 lines, AdminDashboard.jsx ~5600 lines)
 3. White-Label SaaS Version
 
 ## Tech Stack
 - **Frontend**: React, Tailwind CSS, Shadcn UI
 - **Backend**: FastAPI, Motor (async MongoDB)
 - **Database**: MongoDB Atlas
-- **AI/LLM**: emergentintegrations (GPT-5.2)
-- **Voice**: OpenAI TTS-1
+- **AI/LLM**: emergentintegrations (GPT-5.2, Whisper)
+- **Voice**: Web Speech API (TTS), OpenAI Whisper (STT)
 - **Deployment**: Docker, AWS EC2
 
-## File Structure
-```
-/app/
-├── backend/
-│   ├── server.py (main monolith)
-│   ├── sync_agent.py
-│   └── requirements.txt
-└── frontend/
-    └── src/
-        ├── App.js
-        └── pages/
-            ├── AdminDashboard.jsx
-            ├── GuestPortal.jsx
-            ├── BookNow.jsx (Bitsy)
-            ├── Documentation.jsx (NEW)
-            ├── DemoPortal.jsx
-            └── DemoAdmin.jsx
-```
-
 ## Changelog
-- **March 6, 2025**: Added comprehensive Documentation page with 5 tabs (Overview, Features, Demo Mode, Billing API, Bitsy Chatbot)
-- **March 5, 2025**: Added Bitsy chatbot, Demo mode, CPKC email scraper, per-recipient alerts
-- **March 4, 2025**: Auto-sync v11, email notifications, guarantee reports
+- **March 6, 2025 (Session 2)**: 
+  - Fixed Bitsy greeting ("I'm Bitsy" for both voice and text)
+  - Added automatic silence detection for voice input
+  - Added returning guest recognition
+  - Added reservation confirm/cancel system with Status column
+- **March 6, 2025 (Session 1)**: Added Documentation page with 5 tabs
+- **March 5, 2025**: Added Bitsy chatbot, Demo mode, CPKC email scraper
