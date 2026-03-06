@@ -4389,13 +4389,14 @@ async def collect_employees_from_portal_endpoint():
         raise HTTPException(status_code=400, detail="Portal credentials not configured")
     
     try:
-        from sync_agent import collect_employees_from_portal
+        # Use v2 function with improved month-by-month flow
+        from sync_agent import collect_employees_from_portal_v2
         
         username = settings.get("api_global_username")
         password = decrypt_data(settings.get("api_global_password_encrypted"))
         
-        logging.info(f"Starting portal import for username: {username}")
-        result = await collect_employees_from_portal(username, password)
+        logging.info(f"Starting portal import v2 for username: {username}")
+        result = await collect_employees_from_portal_v2(username, password)
         logging.info(f"Portal import result: success={result.get('success')}, employees={len(result.get('employees', []))}")
         
         if result["success"] and result["employees"]:

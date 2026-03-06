@@ -2461,3 +2461,361 @@ async def collect_employees_daily(username: str, password: str, days_back: int =
         return {"success": False, "message": f"Error: {str(e)}", "employees": []}
     finally:
         await agent.stop()
+
+
+
+async def collect_employees_from_portal_v2(username: str, password: str) -> dict:
+    """
+    Collect employee names and IDs from Sign-in Reports (v2 - improved flow).
+    
+    Based on user video description:
+    1. Login to portal
+    2. Navigate to Sign-in Reports page  
+    3. Select month date range (e.g., Feb 1 - Feb 28 2026)
+    4. Click blue "Create" button
+    5. Report table shows dates with "View Detail" links
+    6. Click each "View Detail" - opens popup with employee data
+    7. Extract Employee ID and Name from first two columns
+    8. Go back, select previous month
+    9. Repeat until Sep 2025 (oldest available data)
+    """
+    agent = APIGlobalSyncAgent(username, password)
+    employees = []
+    seen_ids = set()
+    
+    try:
+        await agent.start()
+        page = agent.page
+        
+        # Step 1: Login
+        logger.info("="*60)
+        logger.info("EMPLOYEE COLLECTION v2: Starting...")
+        logger.info("="*60)
+        
+        if not await agent.login():
+            return {"success": False, "message": "Login failed - check credentials", "employees": []}
+        logger.info("✓ Login successful!")
+        
+        await page.wait_for_timeout(2000)
+        
+        # Step 2: Navigate to Sign-in Reports
+        logger.info("\n--- Step 2: Navigate to Sign-in Reports ---")
+        
+        # Try clicking Sign-in Sheets menu first
+        menu_selectors = [
+            "a:has-text('Sign-in Sheets')",
+            "span:has-text('Sign-in Sheets')",
+            "[class*='menu'] >> text=Sign-in",
+            "text=Sign-in Sheets"
+        ]
+        
+        for selector in menu_selectors:
+            try:
+                menu = page.locator(selector).first
+                if await menu.count() > 0:
+                    await menu.click()
+                    await page.wait_for_timeout(1500)
+                    logger.info(f"✓ Clicked Sign-in Sheets menu")
+                    break
+            except:
+                continue
+        
+        # Click Sign-in Report submenu
+        report_selectors = [
+            "a:has-text('Sign-in Report')",
+            "span:has-text('Sign-in Report')",
+            "text=Sign-in Report"
+        ]
+        
+        for selector in report_selectors:
+            try:
+                report = page.locator(selector).first
+                if await report.count() > 0:
+                    await report.click()
+                    await page.wait_for_load_state("networkidle", timeout=30000)
+                    await page.wait_for_timeout(2000)
+                    logger.info(f"✓ Clicked Sign-in Report")
+                    break
+            except:
+                continue
+        
+        # Step 3: Process months from current month back to Sep 2025
+        logger.info("\n--- Step 3: Processing months ---")
+        
+        from datetime import datetime, timedelta
+        from calendar import monthrange
+        
+        # Start from current month and go back to Sep 2025
+        current_date = datetime.now()
+        end_date = datetime(2025, 9, 1)  # Sep 2025 is the oldest
+        
+        months_processed = 0
+        max_months = 18  # Limit to avoid very long runs
+        
+        while current_date >= end_date and months_processed < max_months:
+            # Calculate month start and end dates
+            month_start = current_date.replace(day=1)
+            _, last_day = monthrange(current_date.year, current_date.month)
+            month_end = current_date.replace(day=last_day)
+            
+            month_str = month_start.strftime("%B %Y")
+            start_str = month_start.strftime("%m/%d/%Y")
+            end_str = month_end.strftime("%m/%d/%Y")
+            
+            logger.info(f"\n>>> Processing {month_str} ({start_str} - {end_str})")
+            
+            try:
+                # Navigate to Sign-in Report page (fresh start for each month)
+                for selector in report_selectors:
+                    try:
+                        report = page.locator(selector).first
+                        if await report.count() > 0:
+                            await report.click()
+                            await page.wait_for_load_state("networkidle", timeout=30000)
+                            await page.wait_for_timeout(1500)
+                            break
+                    except:
+                        continue
+                
+                # Find and set date range inputs
+                date_inputs = page.locator("input[type='text'][size='10'], input.ui-inputfield, input[id*='date'], input.hasDatepicker")
+                input_count = await date_inputs.count()
+                logger.info(f"Found {input_count} date inputs")
+                
+                if input_count >= 2:
+                    # Set start date
+                    start_input = date_inputs.nth(0)
+                    await start_input.click()
+                    await start_input.fill("")
+                    await start_input.type(start_str)
+                    await page.wait_for_timeout(300)
+                    
+                    # Set end date  
+                    end_input = date_inputs.nth(1)
+                    await end_input.click()
+                    await end_input.fill("")
+                    await end_input.type(end_str)
+                    await page.wait_for_timeout(300)
+                    
+                    logger.info(f"✓ Set date range: {start_str} to {end_str}")
+                elif input_count == 1:
+                    date_input = date_inputs.first
+                    await date_input.click()
+                    await date_input.fill("")
+                    await date_input.type(start_str)
+                    await page.wait_for_timeout(300)
+                
+                # Click Create button
+                create_selectors = [
+                    "input[value='Create']",
+                    "button:has-text('Create')",
+                    "input[type='submit'][value='Create']",
+                    ".ui-button:has-text('Create')",
+                    "button.btn-primary"
+                ]
+                
+                create_clicked = False
+                for selector in create_selectors:
+                    try:
+                        create_btn = page.locator(selector).first
+                        if await create_btn.count() > 0:
+                            await create_btn.click()
+                            await page.wait_for_load_state("networkidle", timeout=60000)
+                            await page.wait_for_timeout(2000)
+                            logger.info("✓ Clicked Create button")
+                            create_clicked = True
+                            break
+                    except:
+                        continue
+                
+                if not create_clicked:
+                    logger.warning(f"Could not click Create button for {month_str}")
+                    current_date = (month_start - timedelta(days=1))
+                    months_processed += 1
+                    continue
+                
+                # Process all "View Detail" links for this month
+                month_employees = await process_view_detail_links_v2(page, seen_ids)
+                employees.extend(month_employees)
+                logger.info(f"✓ Found {len(month_employees)} new employees in {month_str}")
+                
+            except Exception as month_err:
+                logger.error(f"Error processing {month_str}: {month_err}")
+            
+            # Move to previous month
+            current_date = (month_start - timedelta(days=1))
+            months_processed += 1
+        
+        logger.info("\n" + "="*60)
+        logger.info(f"COLLECTION COMPLETE: {len(employees)} unique employees from {months_processed} months")
+        logger.info("="*60)
+        
+        return {
+            "success": len(employees) > 0,
+            "message": f"Found {len(employees)} unique employees from {months_processed} months",
+            "employees": employees,
+            "months_processed": months_processed
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in collect_employees_from_portal_v2: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"success": False, "message": f"Error: {str(e)}", "employees": []}
+    finally:
+        await agent.stop()
+
+
+async def process_view_detail_links_v2(page, seen_ids: set) -> list:
+    """Click each View Detail link and extract employee ID + Name."""
+    employees = []
+    
+    try:
+        # Find all View Detail links
+        view_detail_selectors = [
+            "a:has-text('View Detail')",
+            "a:has-text('view detail')",  
+            "td a:has-text('View')",
+            "a:has-text('Details')",
+        ]
+        
+        view_links = None
+        link_count = 0
+        working_selector = None
+        
+        for selector in view_detail_selectors:
+            try:
+                view_links = page.locator(selector)
+                link_count = await view_links.count()
+                if link_count > 0:
+                    working_selector = selector
+                    logger.info(f"Found {link_count} View Detail links")
+                    break
+            except:
+                continue
+        
+        if link_count == 0:
+            logger.info("No View Detail links found")
+            page_text = await page.inner_text("body")
+            logger.info(f"Page preview: {page_text[:500]}...")
+            return employees
+        
+        # Process each View Detail link
+        for i in range(link_count):
+            try:
+                # Re-find links each time (DOM changes)
+                view_links = page.locator(working_selector)
+                current_count = await view_links.count()
+                
+                if i >= current_count:
+                    break
+                
+                link = view_links.nth(i)
+                logger.info(f"  Clicking View Detail {i+1}/{link_count}")
+                
+                await link.click()
+                await page.wait_for_timeout(1500)
+                
+                # Extract employees from detail popup/page
+                detail_employees = await extract_id_and_name_from_detail_v2(page, seen_ids)
+                employees.extend(detail_employees)
+                logger.info(f"    → {len(detail_employees)} employees extracted")
+                
+                # Close popup or go back
+                close_selectors = [
+                    "button:has-text('Close')",
+                    ".ui-dialog-titlebar-close",
+                    "a:has-text('Close')",
+                    "[aria-label='Close']"
+                ]
+                
+                closed = False
+                for selector in close_selectors:
+                    try:
+                        close_btn = page.locator(selector).first
+                        if await close_btn.count() > 0:
+                            await close_btn.click()
+                            await page.wait_for_timeout(500)
+                            closed = True
+                            break
+                    except:
+                        continue
+                
+                if not closed:
+                    try:
+                        await page.keyboard.press("Escape")
+                        await page.wait_for_timeout(500)
+                    except:
+                        pass
+                
+            except Exception as link_err:
+                logger.warning(f"  Error on link {i}: {link_err}")
+                continue
+        
+    except Exception as e:
+        logger.error(f"Error processing View Detail links: {e}")
+    
+    return employees
+
+
+async def extract_id_and_name_from_detail_v2(page, seen_ids: set) -> list:
+    """Extract Employee ID and Name from first two columns of detail table."""
+    employees = []
+    
+    try:
+        await page.wait_for_timeout(500)
+        
+        tables = await page.locator("table").all()
+        logger.info(f"    Found {len(tables)} tables")
+        
+        for table in tables:
+            try:
+                rows = await table.locator("tr").all()
+                if len(rows) < 2:
+                    continue
+                
+                # Process data rows (skip header)
+                for row in rows[1:]:
+                    try:
+                        cells = await row.locator("td").all()
+                        if len(cells) < 2:
+                            continue
+                        
+                        # First two columns: ID and Name
+                        col1 = (await cells[0].inner_text()).strip()
+                        col2 = (await cells[1].inner_text()).strip()
+                        
+                        # Validate ID
+                        if not col1 or col1 == "" or col1.upper() == "NO ID":
+                            continue
+                        if len(col1) > 15 or ":" in col1:
+                            continue
+                        if not col1.replace('-', '').replace('.', '').replace(' ', '').isalnum():
+                            continue
+                        
+                        # Validate Name
+                        if not col2 or len(col2) < 2:
+                            continue
+                        
+                        # Skip duplicates
+                        if col1 in seen_ids:
+                            continue
+                        
+                        seen_ids.add(col1)
+                        formatted_name = format_crew_name(col2)
+                        employees.append({
+                            "employee_number": col1,
+                            "name": formatted_name,
+                            "original_name": col2
+                        })
+                        
+                    except:
+                        continue
+                        
+            except:
+                continue
+                
+    except Exception as e:
+        logger.error(f"Error extracting ID/Name: {e}")
+    
+    return employees
