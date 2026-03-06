@@ -6769,6 +6769,13 @@ BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone"
    - Nearest Walmart is in Poteau (15 min)
    - Nearest hospital: Eastern Oklahoma Medical Center in Poteau
 
+9. HOTEL POLICIES (Important - Always mention when booking):
+   - 100% Non-Smoking property - No smoking anywhere on premises
+   - No Pets allowed
+   - Check-in: 3:00 PM, Check-out: 11:00 AM
+   - Payment collected at check-in
+   - Reservations must be confirmed by phone
+
 Current date: {current_date}"""
 
 async def find_returning_guest(email: str = None, phone: str = None):

@@ -165,7 +165,7 @@ export default function BookNow() {
         const taxRate = res.data.tax_rate || 0;
         const taxInfo = taxRate > 0 ? ` (plus ${taxRate}% tax)` : "";
         
-        // Natural greeting - no forced phone prompt
+        // Natural greeting with policy note
         let welcomeMsg = `Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night${taxInfo}\n\nJust let me know when you'd like to stay, or if you've been here before, share your phone number and I'll look up your info!`;
         
         if (res.data.is_sold_out) {
@@ -174,13 +174,16 @@ export default function BookNow() {
         
         setMessages([{ role: "assistant", content: welcomeMsg }]);
         
-        // Play voice greeting using backend TTS (OpenAI voice)
+        // Try to play voice greeting - will show button if autoplay blocked
         if (!hasPlayedGreeting.current) {
           hasPlayedGreeting.current = true;
+          const messageId = res.data.is_sold_out ? "bitsy_greeting_sold_out" : "bitsy_greeting";
+          setGreetingMessageId(messageId);
+          
+          // Try autoplay after short delay
           setTimeout(() => {
-            const messageId = res.data.is_sold_out ? "bitsy_greeting_sold_out" : "bitsy_greeting";
-            playVoiceMessage(messageId, true); // true = autoplay attempt
-          }, 500);
+            playVoiceMessage(messageId, true);
+          }, 800);
         }
       } catch (error) {
         const defaultMsg = "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?\n\nJust let me know when you'd like to stay!";
@@ -694,6 +697,9 @@ export default function BookNow() {
           </p>
           <p className="text-gray-600 text-xs mt-2">
             820 US-59, Heavener, OK 74937
+          </p>
+          <p className="text-amber-500/80 text-xs mt-3 font-medium">
+            100% Non-Smoking Property • No Pets Allowed
           </p>
         </div>
       </footer>
