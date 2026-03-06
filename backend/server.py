@@ -7523,8 +7523,7 @@ import imaplib
 import email
 from email.header import decode_header
 import pdfplumber
-import io
-import re
+# io is already imported at top of file
 
 # Create CPKC router
 cpkc_router = APIRouter(prefix="/admin")
@@ -7622,16 +7621,15 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
         logging.info(f"Processing PDF for booking: {booking_id}, size: {len(pdf_data)} bytes")
         
         with pdfplumber.open(io.BytesIO(pdf_data)) as pdf:
-            logging.info(f"PDF has {len(pdf.pages)} pages")
-            for page_num, page in enumerate(pdf.pages):
+            # Only process Page 1, Table 1 (main guest list) to avoid duplicates from other tables
+            if pdf.pages:
+                page = pdf.pages[0]
                 tables = page.extract_tables()
-                logging.info(f"Page {page_num + 1}: Found {len(tables)} tables")
                 
-                for table_num, table in enumerate(tables):
-                    logging.info(f"Table {table_num + 1} has {len(table)} rows")
+                if tables:
+                    table = tables[0]  # First table on first page
+                    logging.info(f"Processing table with {len(table)} rows")
                     # Log first few rows for debugging
-                    for row_idx, row in enumerate(table[:3]):
-                        logging.info(f"  Row {row_idx}: {row}")
                     for row in table:
                         if not row or len(row) < 6:
                             continue
@@ -7643,8 +7641,7 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
                             continue
                         
                         try:
-                            # New format: ['row#', 'EMP#1', 'Employee1Name', 'EMP#2', 'Employee2Name', 'Check-In', 'Check-Out']
-                            # Indices:      0        1           2             3            4              5           6
+                            # Format: ['row#', 'EMP#1', 'Employee1Name', 'EMP#2', 'Employee2Name', 'Check-In', 'Check-Out']
                             emp_id_1 = str(row[1]).strip() if len(row) > 1 and row[1] else None
                             emp_name_1 = str(row[2]).strip() if len(row) > 2 and row[2] else None
                             emp_id_2 = str(row[3]).strip() if len(row) > 3 and row[3] else None
@@ -7652,7 +7649,11 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
                             check_in_str = str(row[5]).strip() if len(row) > 5 and row[5] else None
                             check_out_str = str(row[6]).strip() if len(row) > 6 and row[6] else None
                             
-                            logging.info(f"Parsed row: emp1={emp_name_1}, emp2={emp_name_2}, check_in={check_in_str}")
+                            # Clean up employee names (remove newlines from PDF parsing)
+                            if emp_name_1:
+                                emp_name_1 = emp_name_1.replace('\n', ' ').strip()
+                            if emp_name_2:
+                                emp_name_2 = emp_name_2.replace('\n', ' ').strip()
                             
                             # Process first employee
                             if emp_name_1 and check_in_str:

@@ -93,7 +93,7 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 - `POST /api/admin/rooms/reservations/{id}/cancel` - Manual cancel
 - `DELETE /api/admin/rooms/reservations/{id}` - Delete reservation
 
-## Pending Verifications (P0)
+## Pending Verifications (P1)
 1. Auto-Sync v11 Logic - User verification pending
 2. Employee Import v2 - User verification pending
 3. Voice Message Echo - User verification pending
@@ -105,7 +105,7 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 
 ## Future/Backlog (P2-P3)
 1. HODL Rewards Token system
-2. Code refactoring (server.py ~7700 lines, AdminDashboard.jsx ~5600 lines)
+2. Code refactoring (server.py ~7880 lines, AdminDashboard.jsx ~5600 lines)
 3. White-Label SaaS Version
 
 ## Tech Stack
@@ -114,9 +114,16 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 - **Database**: MongoDB Atlas
 - **AI/LLM**: emergentintegrations (GPT-5.2, Whisper)
 - **Voice**: Web Speech API (TTS), OpenAI Whisper (STT)
+- **Email Parsing**: pdfplumber, imaplib (Zoho IMAP)
 - **Deployment**: Docker, AWS EC2
 
 ## Changelog
+- **March 6, 2025 (Session 3)**: 
+  - **FIXED**: CPKC Email Scraper - was broken due to:
+    1. Scheduler async event loop issue (using asyncio.create_task in non-async context)
+    2. IMAP not enabled on Zoho account (user fixed)
+    3. PDF table column mapping was incorrect (table format changed)
+  - Now successfully imports guest arrivals from CPKC Sign-In Sheet emails
 - **March 6, 2025 (Session 2)**: 
   - Fixed Bitsy greeting ("I'm Bitsy" for both voice and text)
   - Added automatic silence detection for voice input
