@@ -175,6 +175,21 @@ export default function AdminDashboard() {
   const [guaranteeLoading, setGuaranteeLoading] = useState(false);
   const [guaranteeDateRange, setGuaranteeDateRange] = useState({ start: "", end: "" });
   
+  // Manual Entry state
+  const [showManualEntryForm, setShowManualEntryForm] = useState(false);
+  const [manualEntryForm, setManualEntryForm] = useState({
+    employee_id: "",
+    first_name: "",
+    last_name: "",
+    room_number: "",
+    check_in_date: new Date().toISOString().split('T')[0],
+    check_in_time: "14:00",
+    check_out_date: "",
+    check_out_time: "11:00",
+    is_checked_out: false
+  });
+  const [manualEntryLoading, setManualEntryLoading] = useState(false);
+  
   // Turned Away Guests state
   const [turnedAwayGuests, setTurnedAwayGuests] = useState([]);
   const [showTurnedAwayForm, setShowTurnedAwayForm] = useState(false);
@@ -972,6 +987,39 @@ export default function AdminDashboard() {
     }
   };
 
+  // Manual Entry functions
+  const handleManualEntry = async () => {
+    if (!manualEntryForm.employee_id || !manualEntryForm.first_name || !manualEntryForm.last_name || !manualEntryForm.room_number) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    
+    setManualEntryLoading(true);
+    try {
+      const response = await axios.post(`${API}/admin/manual-entry`, manualEntryForm);
+      toast.success(response.data.message);
+      if (response.data.billing) {
+        toast.info(`Billing: ${response.data.billing.nights} nights = $${response.data.billing.total}`);
+      }
+      setShowManualEntryForm(false);
+      setManualEntryForm({
+        employee_id: "",
+        first_name: "",
+        last_name: "",
+        room_number: "",
+        check_in_date: new Date().toISOString().split('T')[0],
+        check_in_time: "14:00",
+        check_out_date: "",
+        check_out_time: "11:00",
+        is_checked_out: false
+      });
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to create entry");
+    }
+    setManualEntryLoading(false);
+  };
+
   const handleExportSignIn = async () => {
     try {
       const response = await axios.get(`${API}/admin/export`, {
@@ -1642,6 +1690,14 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button 
+                      onClick={() => setShowManualEntryForm(true)}
+                      className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2"
+                      data-testid="manual-entry-btn"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Entry
+                    </Button>
+                    <Button 
                       onClick={handleExportSignIn}
                       className="vault-btn-primary flex items-center gap-2"
                       data-testid="export-signin-excel-btn"
@@ -1666,6 +1722,131 @@ export default function AdminDashboard() {
                       PDF
                     </Button>
                   </div>
+                  
+                  {/* Manual Entry Dialog */}
+                  <Dialog open={showManualEntryForm} onOpenChange={setShowManualEntryForm}>
+                    <DialogContent className="bg-vault-surface border-vault-border max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle className="text-vault-gold flex items-center gap-2">
+                          <Plus className="w-5 h-5" />
+                          Add Backdated Entry
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-vault-text-secondary text-xs block mb-1">Employee ID *</label>
+                            <Input
+                              value={manualEntryForm.employee_id}
+                              onChange={(e) => setManualEntryForm({...manualEntryForm, employee_id: e.target.value})}
+                              placeholder="EMP001"
+                              className="bg-black/50 border-vault-border text-vault-text"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-vault-text-secondary text-xs block mb-1">Room # *</label>
+                            <Input
+                              value={manualEntryForm.room_number}
+                              onChange={(e) => setManualEntryForm({...manualEntryForm, room_number: e.target.value})}
+                              placeholder="101"
+                              className="bg-black/50 border-vault-border text-vault-text"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-vault-text-secondary text-xs block mb-1">First Name *</label>
+                            <Input
+                              value={manualEntryForm.first_name}
+                              onChange={(e) => setManualEntryForm({...manualEntryForm, first_name: e.target.value})}
+                              placeholder="John"
+                              className="bg-black/50 border-vault-border text-vault-text"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-vault-text-secondary text-xs block mb-1">Last Name *</label>
+                            <Input
+                              value={manualEntryForm.last_name}
+                              onChange={(e) => setManualEntryForm({...manualEntryForm, last_name: e.target.value})}
+                              placeholder="Smith"
+                              className="bg-black/50 border-vault-border text-vault-text"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-vault-text-secondary text-xs block mb-1">Check-In Date *</label>
+                            <Input
+                              type="date"
+                              value={manualEntryForm.check_in_date}
+                              onChange={(e) => setManualEntryForm({...manualEntryForm, check_in_date: e.target.value})}
+                              className="bg-black/50 border-vault-border text-vault-text"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-vault-text-secondary text-xs block mb-1">Check-In Time *</label>
+                            <Input
+                              type="time"
+                              value={manualEntryForm.check_in_time}
+                              onChange={(e) => setManualEntryForm({...manualEntryForm, check_in_time: e.target.value})}
+                              className="bg-black/50 border-vault-border text-vault-text"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 bg-black/30 p-3 rounded-lg">
+                          <input
+                            type="checkbox"
+                            checked={manualEntryForm.is_checked_out}
+                            onChange={(e) => setManualEntryForm({...manualEntryForm, is_checked_out: e.target.checked})}
+                            className="w-4 h-4 accent-vault-gold"
+                          />
+                          <label className="text-vault-text text-sm">Already Checked Out</label>
+                        </div>
+                        
+                        {manualEntryForm.is_checked_out && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-vault-text-secondary text-xs block mb-1">Check-Out Date</label>
+                              <Input
+                                type="date"
+                                value={manualEntryForm.check_out_date}
+                                onChange={(e) => setManualEntryForm({...manualEntryForm, check_out_date: e.target.value})}
+                                className="bg-black/50 border-vault-border text-vault-text"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-vault-text-secondary text-xs block mb-1">Check-Out Time</label>
+                              <Input
+                                type="time"
+                                value={manualEntryForm.check_out_time}
+                                onChange={(e) => setManualEntryForm({...manualEntryForm, check_out_time: e.target.value})}
+                                className="bg-black/50 border-vault-border text-vault-text"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        
+                        <p className="text-vault-text-secondary text-xs">
+                          * Required fields. Entry will be added to billing records.
+                        </p>
+                      </div>
+                      <DialogFooter className="gap-2">
+                        <DialogClose asChild>
+                          <Button variant="outline" className="border-vault-border text-vault-text">
+                            Cancel
+                          </Button>
+                        </DialogClose>
+                        <Button 
+                          onClick={handleManualEntry}
+                          disabled={manualEntryLoading}
+                          className="bg-vault-gold hover:bg-vault-gold/80 text-black"
+                        >
+                          {manualEntryLoading ? "Adding..." : "Add Entry"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 
                 {/* Date Filter */}

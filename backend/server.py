@@ -2164,6 +2164,101 @@ async def check_in(input: CheckInCreate):
     
     return checkin
 
+# Manual/Backdated Entry - Admin can add entries with custom dates
+class ManualEntryInput(BaseModel):
+    employee_id: str
+    first_name: str
+    last_name: str
+    room_number: str
+    check_in_date: str  # YYYY-MM-DD
+    check_in_time: str  # HH:MM
+    check_out_date: Optional[str] = None  # YYYY-MM-DD
+    check_out_time: Optional[str] = "11:00"
+    is_checked_out: Optional[bool] = False
+    notes: Optional[str] = ""
+
+@api_router.post("/admin/manual-entry")
+async def create_manual_entry(input: ManualEntryInput):
+    """Create a manual/backdated guest entry for billing purposes."""
+    try:
+        # Check if employee exists, if not create them
+        employee = await db.employees.find_one({"employee_id": input.employee_id})
+        if not employee:
+            # Create employee record
+            await db.employees.insert_one({
+                "employee_id": input.employee_id,
+                "first_name": input.first_name,
+                "last_name": input.last_name,
+                "status": "active",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "source": "manual_entry"
+            })
+        
+        # Check if guest record exists
+        guest = await db.guests.find_one({"employee_number": input.employee_id})
+        if not guest:
+            # Create guest record with encrypted name
+            full_name = f"{input.first_name} {input.last_name}"
+            encrypted_name = encrypt_data(full_name)
+            
+            await db.guests.insert_one({
+                "employee_number": input.employee_id,
+                "name_encrypted": encrypted_name,
+                "name": encrypted_name,  # For backwards compatibility
+                "first_name": input.first_name,
+                "last_name": input.last_name,
+                "is_verified": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+        
+        # Create the booking record
+        booking_id = str(uuid.uuid4())
+        booking = {
+            "id": booking_id,
+            "employee_number": input.employee_id,
+            "room_number": input.room_number,
+            "check_in_date": input.check_in_date,
+            "check_in_time": input.check_in_time,
+            "check_out_date": input.check_out_date if input.is_checked_out else None,
+            "check_out_time": input.check_out_time if input.is_checked_out else None,
+            "is_checked_out": input.is_checked_out,
+            "is_verified": True,
+            "signature_encrypted": "",
+            "source": "manual_entry",
+            "notes": input.notes,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.bookings.insert_one(booking)
+        
+        # Calculate billing if checked out
+        billing_info = None
+        if input.is_checked_out and input.check_out_date:
+            hours, nights = calculate_stay_duration(
+                input.check_in_date, input.check_in_time,
+                input.check_out_date, input.check_out_time
+            )
+            settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+            nightly_rate = settings.get("nightly_rate", 75.0) if settings else 75.0
+            total = nights * nightly_rate
+            billing_info = {
+                "nights": nights,
+                "hours": hours,
+                "rate": nightly_rate,
+                "total": total
+            }
+        
+        return {
+            "success": True,
+            "message": f"Manual entry created for {input.first_name} {input.last_name} in Room {input.room_number}",
+            "booking_id": booking_id,
+            "billing": billing_info
+        }
+        
+    except Exception as e:
+        logging.error(f"Manual entry error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Verify Check-Out - Verify room and employee number match before checkout
 @api_router.get("/verify-checkout/{room_number}/{employee_number}")
 async def verify_checkout(room_number: str, employee_number: str):
