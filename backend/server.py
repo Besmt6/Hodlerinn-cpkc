@@ -6552,22 +6552,35 @@ async def get_chatbot_availability(target_date: str = None):
         "source": {"$ne": "chatbot"}
     })
     
+    # Count expected CPKC arrivals for this date
+    expected_cpkc = await db.expected_arrivals.count_documents({
+        "check_in_date": target_date,
+        "status": "expected"
+    })
+    
     # Calculate availability
     # Chatbot can only sell up to chatbot_max rooms, and only if there's actual availability
+    # Also reserve rooms for expected CPKC arrivals
+    rooms_needed_for_cpkc = expected_cpkc
     rooms_available_for_chatbot = min(
         chatbot_max - chatbot_reservations,  # Remaining chatbot quota
-        total_rooms - railroad_occupied - other_blocked - chatbot_reservations  # Actual physical availability
+        total_rooms - railroad_occupied - other_blocked - chatbot_reservations - rooms_needed_for_cpkc  # Actual physical availability minus expected CPKC
     )
+    
+    # If CPKC arrivals expected, chatbot should be more restrictive
+    cpkc_restriction = expected_cpkc > 0
     
     return {
         "total_rooms": total_rooms,
         "railroad_occupied": railroad_occupied,
         "chatbot_reservations": chatbot_reservations,
         "other_blocked": other_blocked,
+        "expected_cpkc_arrivals": expected_cpkc,
         "chatbot_max": chatbot_max,
         "guaranteed_rooms": guaranteed_rooms,
         "rooms_available_for_chatbot": max(0, rooms_available_for_chatbot),
-        "is_sold_out": rooms_available_for_chatbot <= 0
+        "is_sold_out": rooms_available_for_chatbot <= 0,
+        "cpkc_restriction": cpkc_restriction
     }
 
 async def get_chatbot_pricing():
@@ -6590,7 +6603,12 @@ def get_chatbot_system_prompt(current_date: str, pricing: dict, availability: di
     availability_note = ""
     if availability["is_sold_out"]:
         availability_note = """
-IMPORTANT: We are currently SOLD OUT. Apologize politely and suggest the guest call the hotel directly at (918) 653-7801 to check for cancellations or future availability. DO NOT attempt to make a reservation."""
+IMPORTANT: We are currently SOLD OUT or have railroad crew expected. Apologize politely and suggest the guest call the hotel directly at (918) 653-7801 to check for cancellations or future availability. DO NOT attempt to make a reservation."""
+    elif availability.get("cpkc_restriction"):
+        expected = availability.get("expected_cpkc_arrivals", 0)
+        rooms_left = availability["rooms_available_for_chatbot"]
+        availability_note = f"""
+AVAILABILITY: We have railroad crew expected today ({expected} arriving). Only {rooms_left} room(s) available for online booking. If guest wants to book, proceed but mention availability is limited."""
     else:
         rooms_left = availability["rooms_available_for_chatbot"]
         availability_note = f"""
@@ -7182,6 +7200,328 @@ async def get_demo_stats():
 
 # Include demo router
 app.include_router(demo_router, prefix="/api")
+
+
+# ==================== CPKC Email Scraper ====================
+import imaplib
+import email
+from email.header import decode_header
+import pdfplumber
+import io
+import re
+
+# Create CPKC router
+cpkc_router = APIRouter(prefix="/admin")
+
+CPKC_SENDER_EMAIL = "aces_support@apiglobalsolutions.com"
+
+async def check_cpkc_emails():
+    """Check Zoho inbox for new CPKC booking emails."""
+    try:
+        settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+        if not settings:
+            logging.warning("No portal settings found for email check")
+            return
+        
+        email_sender = settings.get("email_sender")
+        email_password_encrypted = settings.get("email_password_encrypted")
+        
+        if not email_sender or not email_password_encrypted:
+            logging.warning("Email credentials not configured")
+            return
+        
+        email_password = decrypt_data(email_password_encrypted)
+        
+        # Connect to Zoho IMAP
+        imap = imaplib.IMAP4_SSL("imap.zoho.com", 993)
+        imap.login(email_sender, email_password)
+        imap.select("INBOX")
+        
+        # Search for unread emails from CPKC sender
+        status, messages = imap.search(None, f'(UNSEEN FROM "{CPKC_SENDER_EMAIL}")')
+        
+        if status != "OK":
+            imap.logout()
+            return
+        
+        email_ids = messages[0].split()
+        
+        for email_id in email_ids:
+            try:
+                status, msg_data = imap.fetch(email_id, "(RFC822)")
+                if status != "OK":
+                    continue
+                
+                email_body = msg_data[0][1]
+                msg = email.message_from_bytes(email_body)
+                
+                subject = decode_header(msg["Subject"])[0][0]
+                if isinstance(subject, bytes):
+                    subject = subject.decode()
+                
+                # Check if it's a CPKC Sign-In Sheet email
+                if "CPKC Sign-In Sheet" not in subject and "Revise" not in subject:
+                    continue
+                
+                logging.info(f"Processing CPKC email: {subject}")
+                
+                # Extract booking ID from subject
+                booking_id_match = re.search(r'CP#[\w-]+#[\d\-T:.]+', subject)
+                booking_id = booking_id_match.group(0) if booking_id_match else None
+                
+                # Process attachments
+                for part in msg.walk():
+                    if part.get_content_maintype() == "multipart":
+                        continue
+                    
+                    filename = part.get_filename()
+                    if filename and filename.endswith(".pdf"):
+                        pdf_data = part.get_payload(decode=True)
+                        await process_cpkc_pdf(pdf_data, booking_id, subject)
+                
+                # Mark as read
+                imap.store(email_id, '+FLAGS', '\\Seen')
+                
+            except Exception as e:
+                logging.error(f"Error processing email {email_id}: {e}")
+        
+        imap.logout()
+        
+    except Exception as e:
+        logging.error(f"CPKC email check error: {e}")
+
+async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
+    """Parse CPKC PDF and import expected arrivals."""
+    try:
+        guests_imported = []
+        
+        with pdfplumber.open(io.BytesIO(pdf_data)) as pdf:
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                
+                for table in tables:
+                    for row in table:
+                        if not row or len(row) < 6:
+                            continue
+                        
+                        # Skip header rows
+                        if row[0] == "EMP #1" or not row[0]:
+                            continue
+                        
+                        try:
+                            emp_id_1 = str(row[0]).strip() if row[0] else None
+                            emp_name_1 = str(row[1]).strip() if row[1] else None
+                            emp_id_2 = str(row[2]).strip() if row[2] else None
+                            emp_name_2 = str(row[3]).strip() if row[3] else None
+                            check_in_str = str(row[4]).strip() if row[4] else None
+                            check_out_str = str(row[5]).strip() if row[5] else None
+                            
+                            # Process first employee
+                            if emp_name_1 and check_in_str:
+                                guest = await import_cpkc_guest(emp_id_1, emp_name_1, check_in_str, check_out_str, booking_id)
+                                if guest:
+                                    guests_imported.append(guest)
+                            
+                            # Process second employee if exists
+                            if emp_name_2 and check_in_str:
+                                guest = await import_cpkc_guest(emp_id_2, emp_name_2, check_in_str, check_out_str, booking_id)
+                                if guest:
+                                    guests_imported.append(guest)
+                                    
+                        except Exception as e:
+                            logging.error(f"Error parsing row: {e}")
+        
+        if guests_imported:
+            # Send Telegram notification
+            guest_list = "\n".join([f"• {g['name']} ({g['check_in']})" for g in guests_imported[:10]])
+            if len(guests_imported) > 10:
+                guest_list += f"\n... and {len(guests_imported) - 10} more"
+            
+            await send_telegram_notification(
+                f"📧 <b>CPKC EMAIL RECEIVED</b>\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"📋 {len(guests_imported)} Expected Arrival(s)\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"{guest_list}\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"⚠️ Chatbot sales restricted for these dates"
+            )
+            
+            logging.info(f"Imported {len(guests_imported)} guests from CPKC email")
+        
+    except Exception as e:
+        logging.error(f"PDF processing error: {e}")
+
+async def import_cpkc_guest(emp_id: str, emp_name: str, check_in_str: str, check_out_str: str, booking_id: str):
+    """Import a single CPKC guest as expected arrival."""
+    try:
+        # Parse name format: LASTNAME,(FIRSTNAME)*CODE
+        name_match = re.match(r'([^,]+),?\(?([^)]*)\)?(?:\*\w+)?', emp_name)
+        if name_match:
+            last_name = name_match.group(1).strip()
+            first_name = name_match.group(2).strip() if name_match.group(2) else ""
+        else:
+            last_name = emp_name
+            first_name = ""
+        
+        # Parse check-in date: "06-Mar-2026 10:23"
+        check_in_date = None
+        check_in_time = None
+        if check_in_str:
+            try:
+                dt = datetime.strptime(check_in_str, "%d-%b-%Y %H:%M")
+                check_in_date = dt.strftime("%Y-%m-%d")
+                check_in_time = dt.strftime("%H:%M")
+            except:
+                check_in_date = check_in_str
+        
+        check_out_date = None
+        if check_out_str:
+            try:
+                dt = datetime.strptime(check_out_str, "%d-%b-%Y %H:%M")
+                check_out_date = dt.strftime("%Y-%m-%d")
+            except:
+                check_out_date = check_out_str
+        
+        # Check if already imported (avoid duplicates)
+        existing = await db.expected_arrivals.find_one({
+            "booking_id": booking_id,
+            "employee_name": emp_name,
+            "check_in_date": check_in_date
+        })
+        
+        if existing:
+            return None
+        
+        # Create expected arrival record
+        arrival = {
+            "id": str(uuid.uuid4()),
+            "booking_id": booking_id,
+            "employee_id": emp_id,
+            "employee_name": emp_name,
+            "first_name": first_name,
+            "last_name": last_name,
+            "check_in_date": check_in_date,
+            "check_in_time": check_in_time,
+            "check_out_date": check_out_date,
+            "room_number": None,  # Not allocated
+            "status": "expected",
+            "source": "cpkc_email",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.expected_arrivals.insert_one(arrival)
+        
+        # Also add to employees list if not exists
+        emp_exists = await db.employees.find_one({"employee_id": emp_id})
+        if not emp_exists and emp_id:
+            await db.employees.insert_one({
+                "employee_id": emp_id,
+                "first_name": first_name,
+                "last_name": last_name,
+                "status": "active",
+                "source": "cpkc_email",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+        
+        return {
+            "name": f"{first_name} {last_name}".strip(),
+            "check_in": check_in_date
+        }
+        
+    except Exception as e:
+        logging.error(f"Error importing guest {emp_name}: {e}")
+        return None
+
+async def get_expected_arrivals_for_date(target_date: str):
+    """Get expected CPKC arrivals for a specific date."""
+    arrivals = await db.expected_arrivals.find({
+        "check_in_date": target_date,
+        "status": "expected"
+    }, {"_id": 0}).to_list(100)
+    return arrivals
+
+async def count_expected_arrivals_for_date(target_date: str):
+    """Count expected CPKC arrivals for a specific date."""
+    return await db.expected_arrivals.count_documents({
+        "check_in_date": target_date,
+        "status": "expected"
+    })
+
+# API endpoints for expected arrivals
+@cpkc_router.get("/expected-arrivals")
+async def get_expected_arrivals(date: Optional[str] = None):
+    """Get expected CPKC arrivals."""
+    query = {"status": "expected"}
+    if date:
+        query["check_in_date"] = date
+    
+    arrivals = await db.expected_arrivals.find(query, {"_id": 0}).sort("check_in_date", 1).to_list(500)
+    return arrivals
+
+@cpkc_router.post("/check-cpkc-emails")
+async def manual_check_cpkc_emails():
+    """Manually trigger CPKC email check."""
+    await check_cpkc_emails()
+    return {"message": "Email check completed"}
+
+@cpkc_router.delete("/expected-arrivals/{arrival_id}")
+async def delete_expected_arrival(arrival_id: str):
+    """Delete an expected arrival (e.g., if guest cancelled)."""
+    result = await db.expected_arrivals.delete_one({"id": arrival_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Arrival not found")
+    return {"message": "Expected arrival deleted"}
+
+@cpkc_router.post("/expected-arrivals/{arrival_id}/checked-in")
+async def mark_arrival_checked_in(arrival_id: str, room_number: str):
+    """Mark expected arrival as checked in."""
+    result = await db.expected_arrivals.update_one(
+        {"id": arrival_id},
+        {"$set": {"status": "checked_in", "room_number": room_number, "checked_in_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Arrival not found")
+    return {"message": "Marked as checked in"}
+
+# Track revenue loss for guarantee report
+@cpkc_router.post("/revenue-loss")
+async def log_revenue_loss(date: str, reason: str, potential_revenue: float = 85.0):
+    """Log a revenue loss when chatbot can't sell due to CPKC expected arrivals."""
+    loss = {
+        "id": str(uuid.uuid4()),
+        "date": date,
+        "reason": reason,
+        "potential_revenue": potential_revenue,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.revenue_losses.insert_one(loss)
+    return {"message": "Revenue loss logged"}
+
+@cpkc_router.get("/revenue-losses")
+async def get_revenue_losses(start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """Get revenue losses for guarantee report."""
+    query = {}
+    if start_date:
+        query["date"] = {"$gte": start_date}
+    if end_date:
+        query.setdefault("date", {})["$lte"] = end_date
+    
+    losses = await db.revenue_losses.find(query, {"_id": 0}).to_list(500)
+    total = sum(l.get("potential_revenue", 0) for l in losses)
+    return {"losses": losses, "total_potential_revenue": total}
+
+# Include CPKC router
+app.include_router(cpkc_router, prefix="/api")
+
+# Schedule email check every 5 minutes
+scheduler.add_job(
+    lambda: asyncio.create_task(check_cpkc_emails()),
+    'interval',
+    minutes=5,
+    id='cpkc_email_check',
+    replace_existing=True
+)
 
 
 @app.on_event("shutdown")
