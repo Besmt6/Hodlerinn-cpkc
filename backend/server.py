@@ -2127,6 +2127,30 @@ async def check_in(input: CheckInCreate):
     
     await db.bookings.insert_one(doc)
     
+    # Remove from expected arrivals list if they're there (auto-cleanup)
+    # Match by employee name (last name) or employee number
+    try:
+        # Parse the guest name to get last name
+        last_name = None
+        if guest_name and "," in guest_name:
+            last_name = guest_name.split(",")[0].strip().upper()
+        elif guest_name and " " in guest_name:
+            last_name = guest_name.split()[-1].strip().upper()
+        
+        # Try to remove by last name or employee_id
+        removal_query = {"$or": []}
+        if last_name:
+            removal_query["$or"].append({"last_name": {"$regex": f"^{last_name}", "$options": "i"}})
+        if input.employee_number:
+            removal_query["$or"].append({"employee_id": input.employee_number})
+        
+        if removal_query["$or"]:
+            result = await db.expected_arrivals.delete_many(removal_query)
+            if result.deleted_count > 0:
+                logging.info(f"Auto-removed {result.deleted_count} expected arrival(s) for {guest_name} after check-in")
+    except Exception as e:
+        logging.warning(f"Could not auto-remove from expected arrivals: {e}")
+    
     # Update room status to occupied (regardless of previous status - dirty, maintenance, etc.)
     await db.rooms.update_one(
         {"room_number": input.room_number},
