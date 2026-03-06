@@ -545,13 +545,14 @@ async def check_and_mark_dirty_rooms():
                     )
                     logging.info(f"Auto-marked Room {room_number} as dirty (20 min after checkout)")
                     
-                    # Send Telegram notification
-                    await send_telegram_notification(
+                    # Send Telegram notification with clickable button
+                    await send_telegram_with_buttons(
                         f"🧹 <b>ROOM NEEDS CLEANING</b>\n"
                         f"━━━━━━━━━━━━━━━\n"
-                        f"Room {room_number} auto-marked dirty\n"
+                        f"Room <b>{room_number}</b> marked dirty\n"
                         f"(20 min after checkout)\n\n"
-                        f"Reply: <code>/clean {room_number}</code> when done"
+                        f"Tap button when cleaned:",
+                        [[{"text": f"✅ Mark Room {room_number} CLEAN", "callback_data": f"clean_room_{room_number}"}]]
                     )
         
         # Mark these checkouts as processed
@@ -695,6 +696,43 @@ async def send_telegram_notification(message: str):
                     logging.info(f"Telegram notification sent successfully to {cid}")
     except Exception as e:
         logging.error(f"Failed to send Telegram notification: {e}")
+
+
+async def send_telegram_with_buttons(message: str, buttons: list):
+    """Send Telegram notification with inline keyboard buttons.
+    
+    buttons format: [[{"text": "Button Text", "callback_data": "action_data"}]]
+    """
+    chat_id = await get_telegram_chat_id()
+    
+    if not TELEGRAM_BOT_TOKEN:
+        logging.warning("Telegram notification skipped: No bot token configured")
+        return
+    if not chat_id:
+        logging.warning("Telegram notification skipped: No chat ID configured")
+        return
+    
+    # Support multiple chat IDs separated by comma
+    chat_ids = [cid.strip() for cid in chat_id.split(',') if cid.strip()]
+    
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        async with httpx.AsyncClient() as client:
+            for cid in chat_ids:
+                response = await client.post(url, json={
+                    "chat_id": cid,
+                    "text": message,
+                    "parse_mode": "HTML",
+                    "reply_markup": {
+                        "inline_keyboard": buttons
+                    }
+                })
+                if response.status_code != 200:
+                    logging.error(f"Telegram API error for chat {cid}: {response.text}")
+                else:
+                    logging.info(f"Telegram notification with buttons sent to {cid}")
+    except Exception as e:
+        logging.error(f"Failed to send Telegram notification with buttons: {e}")
 
 # ==================== Models ====================
 
@@ -1606,7 +1644,43 @@ async def telegram_webhook(request_data: dict):
     message_id = message.get("message_id")
     
     # Parse the callback data
-    if data.startswith("approve_"):
+    if data.startswith("clean_room_"):
+        room_number = data.replace("clean_room_", "")
+        
+        # Mark room as clean
+        result = await db.rooms.update_one(
+            {"room_number": room_number},
+            {"$set": {
+                "cleaning_status": "clean",
+                "cleaned_at": datetime.now(timezone.utc).isoformat(),
+                "cleaned_via": "telegram_button"
+            }}
+        )
+        
+        if result.modified_count > 0:
+            response_text = f"✅ *ROOM {room_number} CLEANED*\n\nMarked as clean and ready for next guest."
+        else:
+            response_text = f"⚠️ Room {room_number} not found or already clean."
+    
+    elif data.startswith("dirty_room_"):
+        room_number = data.replace("dirty_room_", "")
+        
+        # Mark room as dirty
+        result = await db.rooms.update_one(
+            {"room_number": room_number},
+            {"$set": {
+                "cleaning_status": "dirty",
+                "marked_dirty_at": datetime.now(timezone.utc).isoformat(),
+                "marked_dirty_via": "telegram_button"
+            }}
+        )
+        
+        if result.modified_count > 0:
+            response_text = f"🧹 *ROOM {room_number} DIRTY*\n\nMarked as needs cleaning."
+        else:
+            response_text = f"⚠️ Room {room_number} not found or already dirty."
+    
+    elif data.startswith("approve_"):
         request_id = data.replace("approve_", "")
         
         # Find the pending request in MongoDB
@@ -3610,6 +3684,51 @@ async def cancel_reservation(reservation_id: str):
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Reservation not found")
     return {"message": "Reservation cancelled"}
+
+
+@api_router.post("/admin/rooms/send-dirty-list")
+async def send_dirty_rooms_to_telegram():
+    """Send list of dirty rooms to Telegram with clickable clean buttons."""
+    # Get occupied room numbers
+    occupied_rooms = []
+    bookings = await db.bookings.find({"is_checked_out": False}, {"room_number": 1, "_id": 0}).to_list(100)
+    occupied_rooms.extend([b["room_number"] for b in bookings if b.get("room_number")])
+    blocked = await db.blocked_rooms.find({"is_active": True, "is_reservation": {"$ne": True}}, {"room_number": 1, "_id": 0}).to_list(100)
+    occupied_rooms.extend([b["room_number"] for b in blocked if b.get("room_number")])
+    
+    # Get dirty available rooms
+    dirty_rooms = await db.rooms.find({
+        "room_number": {"$nin": occupied_rooms},
+        "cleaning_status": {"$ne": "clean"}
+    }, {"_id": 0, "room_number": 1}).to_list(50)
+    
+    if not dirty_rooms:
+        return {"message": "No dirty rooms to clean!"}
+    
+    # Build message and buttons
+    room_list = "\n".join([f"• Room {r['room_number']}" for r in dirty_rooms])
+    message = (
+        f"🧹 <b>ROOMS NEEDING CLEANING</b>\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"{room_list}\n\n"
+        f"Tap a room when cleaned:"
+    )
+    
+    # Create buttons for each dirty room (max 10 for UI)
+    buttons = []
+    for room in dirty_rooms[:10]:
+        buttons.append([{"text": f"✅ Clean Room {room['room_number']}", "callback_data": f"clean_room_{room['room_number']}"}])
+    
+    await send_telegram_with_buttons(message, buttons)
+    
+    return {"message": f"Sent {len(dirty_rooms)} dirty rooms to Telegram"}
+
+
+@api_router.post("/admin/rooms/send-status-report")
+async def send_manual_status_report():
+    """Manually trigger sending the status report to Telegram."""
+    await send_daily_status_alert("manual")
+    return {"message": "Status report sent to Telegram"}
 
 
 @api_router.post("/admin/rooms/booking/{booking_id}/send-confirmation")

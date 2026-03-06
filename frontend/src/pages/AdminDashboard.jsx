@@ -77,7 +77,8 @@ import {
   Cloud,
   Upload,
   UserX,
-  TrendingUp
+  TrendingUp,
+  Bell
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -2039,6 +2040,21 @@ export default function AdminDashboard() {
                   >
                     <Users className="w-4 h-4" />
                     Non-Railroad Guest
+                  </Button>
+                  <Button 
+                    onClick={async () => {
+                      try {
+                        await axios.post(`${API}/admin/rooms/send-dirty-list`);
+                        toast.success("Dirty rooms list sent to Telegram");
+                      } catch (error) {
+                        toast.error("Failed to send dirty list");
+                      }
+                    }}
+                    className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+                    data-testid="send-dirty-list-btn"
+                  >
+                    <Bell className="w-4 h-4" />
+                    Send Dirty List to Telegram
                   </Button>
                 </div>
               </div>
