@@ -132,6 +132,16 @@ Full-stack application for managing railroad crew accommodations at Hodler Inn, 
 - [ ] Code Refactoring (decompose large files)
 - [ ] White-Label SaaS Version
 
+### 🪙 Blockchain Integration (Future)
+**User Interest:** Token-based loyalty rewards system
+- Issue `$HODL` or `$INN` reward token
+- Earn tokens: 1 token/night for ALL direct bookings (kiosk, Bitsy chatbot, walk-in, phone)
+- No tokens for third-party OTA bookings (Expedia, etc.)
+- Redeem tokens for discounts (e.g., 10 tokens = $10 off)
+- Return guests can pay small % in tokens for discount
+- Consider: Bitcoin Lightning, Solana token, or Base L2
+- On-chain stay verification as bonus feature
+
 ---
 
 ## Credentials
