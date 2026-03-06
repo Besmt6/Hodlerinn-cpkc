@@ -466,6 +466,32 @@ export default function AdminDashboard() {
     }
   };
 
+  const toggleRecipientAlert = async (email, alertType, currentAlerts) => {
+    const newAlerts = currentAlerts.includes(alertType)
+      ? currentAlerts.filter(a => a !== alertType)
+      : [...currentAlerts, alertType];
+    
+    try {
+      await axios.put(`${API}/admin/email-alerts/recipients/alerts?email=${encodeURIComponent(email)}`, newAlerts);
+      fetchEmailAlertSettings();
+    } catch (error) {
+      toast.error("Failed to update recipient alerts");
+    }
+  };
+
+  // Helper to get recipient alerts (handles both old string format and new object format)
+  const getRecipientAlerts = (recipient) => {
+    if (typeof recipient === 'string') {
+      return ['sold_out', 'rooms_available', 'heads_up', 'daily_status'];
+    }
+    return recipient.alerts || [];
+  };
+
+  const getRecipientEmail = (recipient) => {
+    if (typeof recipient === 'string') return recipient;
+    return recipient.email || '';
+  };
+
   const sendTestAlert = async () => {
     try {
       const res = await axios.post(`${API}/admin/email-alerts/test`);
@@ -4255,27 +4281,80 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                   <div className="border-t border-vault-border pt-4 mt-4">
                     <h4 className="text-sm font-semibold text-vault-gold mb-3">Email Alert Recipients</h4>
                     <p className="text-vault-text-secondary text-xs mb-3">
-                      Manage email recipients for automated alerts (sold out, rooms available, low availability)
+                      Manage email recipients and customize which alerts each person receives
                     </p>
                     
-                    {/* Current Recipients */}
+                    {/* Current Recipients with Per-Recipient Alert Settings */}
                     <div className="bg-black/30 rounded-lg p-3 mb-3">
-                      <p className="text-vault-text-secondary text-xs mb-2">Current Recipients:</p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid grid-cols-[1fr_repeat(4,auto)_auto] gap-2 text-xs text-vault-text-secondary mb-2 px-2">
+                        <span>Email</span>
+                        <span className="text-center w-16">Sold Out</span>
+                        <span className="text-center w-16">Available</span>
+                        <span className="text-center w-16">Low Avail</span>
+                        <span className="text-center w-16">Daily</span>
+                        <span className="w-8"></span>
+                      </div>
+                      <div className="space-y-2">
                         {emailAlertSettings.recipients?.length > 0 ? (
-                          emailAlertSettings.recipients.map((email, idx) => (
-                            <div key={idx} className="bg-vault-surface border border-vault-border rounded-lg px-3 py-1 flex items-center gap-2">
-                              <span className="text-vault-text text-sm">{email}</span>
-                              <button 
-                                onClick={() => removeEmailRecipient(email)}
-                                className="text-red-400 hover:text-red-300"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))
+                          emailAlertSettings.recipients.map((recipient, idx) => {
+                            const email = getRecipientEmail(recipient);
+                            const alerts = getRecipientAlerts(recipient);
+                            return (
+                              <div key={idx} className="grid grid-cols-[1fr_repeat(4,auto)_auto] gap-2 items-center bg-vault-surface border border-vault-border rounded-lg px-2 py-2" data-testid={`recipient-row-${idx}`}>
+                                <span className="text-vault-text text-sm truncate" title={email}>{email}</span>
+                                <div className="flex justify-center w-16">
+                                  <input
+                                    type="checkbox"
+                                    checked={alerts.includes('sold_out')}
+                                    onChange={() => toggleRecipientAlert(email, 'sold_out', alerts)}
+                                    className="w-4 h-4 accent-vault-gold cursor-pointer"
+                                    title="Sold Out alerts"
+                                    data-testid={`alert-sold-out-${idx}`}
+                                  />
+                                </div>
+                                <div className="flex justify-center w-16">
+                                  <input
+                                    type="checkbox"
+                                    checked={alerts.includes('rooms_available')}
+                                    onChange={() => toggleRecipientAlert(email, 'rooms_available', alerts)}
+                                    className="w-4 h-4 accent-vault-gold cursor-pointer"
+                                    title="Rooms Available alerts"
+                                    data-testid={`alert-rooms-available-${idx}`}
+                                  />
+                                </div>
+                                <div className="flex justify-center w-16">
+                                  <input
+                                    type="checkbox"
+                                    checked={alerts.includes('heads_up')}
+                                    onChange={() => toggleRecipientAlert(email, 'heads_up', alerts)}
+                                    className="w-4 h-4 accent-vault-gold cursor-pointer"
+                                    title="Low Availability alerts"
+                                    data-testid={`alert-heads-up-${idx}`}
+                                  />
+                                </div>
+                                <div className="flex justify-center w-16">
+                                  <input
+                                    type="checkbox"
+                                    checked={alerts.includes('daily_status')}
+                                    onChange={() => toggleRecipientAlert(email, 'daily_status', alerts)}
+                                    className="w-4 h-4 accent-vault-gold cursor-pointer"
+                                    title="Daily Status alerts (7AM & 10PM)"
+                                    data-testid={`alert-daily-status-${idx}`}
+                                  />
+                                </div>
+                                <button 
+                                  onClick={() => removeEmailRecipient(email)}
+                                  className="text-red-400 hover:text-red-300 w-8 flex justify-center"
+                                  title="Remove recipient"
+                                  data-testid={`remove-recipient-${idx}`}
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </div>
+                            );
+                          })
                         ) : (
-                          <span className="text-vault-text-secondary text-sm">No recipients configured</span>
+                          <span className="text-vault-text-secondary text-sm px-2">No recipients configured</span>
                         )}
                       </div>
                     </div>
@@ -4288,55 +4367,77 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                         onChange={(e) => setNewRecipientEmail(e.target.value)}
                         placeholder="email@company.com"
                         className="bg-black/50 border-vault-border text-vault-text flex-1"
+                        data-testid="new-recipient-email-input"
                       />
                       <Button
                         onClick={addEmailRecipient}
                         className="bg-vault-gold hover:bg-vault-gold/80 text-black"
+                        data-testid="add-recipient-btn"
                       >
                         Add
                       </Button>
                     </div>
                     
-                    {/* Alert Toggles */}
-                    <div className="grid grid-cols-3 gap-3 mb-4">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={emailAlertSettings.sold_out_enabled}
-                          onChange={(e) => {
-                            const newSettings = {...emailAlertSettings, sold_out_enabled: e.target.checked};
-                            setEmailAlertSettings(newSettings);
-                            updateEmailAlertSettings(newSettings);
-                          }}
-                          className="w-4 h-4"
-                        />
-                        <span className="text-vault-text text-sm">Sold Out</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={emailAlertSettings.rooms_available_enabled}
-                          onChange={(e) => {
-                            const newSettings = {...emailAlertSettings, rooms_available_enabled: e.target.checked};
-                            setEmailAlertSettings(newSettings);
-                            updateEmailAlertSettings(newSettings);
-                          }}
-                          className="w-4 h-4"
-                        />
-                        <span className="text-vault-text text-sm">Rooms Available</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={emailAlertSettings.heads_up_enabled}
-                          onChange={(e) => {
-                            const newSettings = {...emailAlertSettings, heads_up_enabled: e.target.checked};
-                            setEmailAlertSettings(newSettings);
-                            updateEmailAlertSettings(newSettings);
-                          }}
-                          className="w-4 h-4"
-                        />
-                        <span className="text-vault-text text-sm">Low Availability</span>
+                    {/* Global Master Toggles */}
+                    <div className="bg-black/20 rounded-lg p-3 mb-4">
+                      <p className="text-vault-text-secondary text-xs mb-2">Master Alert Switches (disable to stop all alerts of this type):</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={emailAlertSettings.sold_out_enabled}
+                            onChange={(e) => {
+                              const newSettings = {...emailAlertSettings, sold_out_enabled: e.target.checked};
+                              setEmailAlertSettings(newSettings);
+                              updateEmailAlertSettings(newSettings);
+                            }}
+                            className="w-4 h-4 accent-vault-gold"
+                            data-testid="master-sold-out-toggle"
+                          />
+                          <span className="text-vault-text text-sm">Sold Out</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={emailAlertSettings.rooms_available_enabled}
+                            onChange={(e) => {
+                              const newSettings = {...emailAlertSettings, rooms_available_enabled: e.target.checked};
+                              setEmailAlertSettings(newSettings);
+                              updateEmailAlertSettings(newSettings);
+                            }}
+                            className="w-4 h-4 accent-vault-gold"
+                            data-testid="master-rooms-available-toggle"
+                          />
+                          <span className="text-vault-text text-sm">Available</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={emailAlertSettings.heads_up_enabled}
+                            onChange={(e) => {
+                              const newSettings = {...emailAlertSettings, heads_up_enabled: e.target.checked};
+                              setEmailAlertSettings(newSettings);
+                              updateEmailAlertSettings(newSettings);
+                            }}
+                            className="w-4 h-4 accent-vault-gold"
+                            data-testid="master-heads-up-toggle"
+                          />
+                          <span className="text-vault-text text-sm">Low Avail</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={emailAlertSettings.daily_status_enabled !== false}
+                            onChange={(e) => {
+                              const newSettings = {...emailAlertSettings, daily_status_enabled: e.target.checked};
+                              setEmailAlertSettings(newSettings);
+                              updateEmailAlertSettings(newSettings);
+                            }}
+                            className="w-4 h-4 accent-vault-gold"
+                            data-testid="master-daily-status-toggle"
+                          />
+                          <span className="text-vault-text text-sm">Daily Status</span>
+                        </div>
                       </div>
                     </div>
                     
@@ -4345,6 +4446,7 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       onClick={sendTestAlert}
                       disabled={emailAlertSettings.recipients?.length === 0}
                       className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                      data-testid="send-test-alert-btn"
                     >
                       <Mail className="w-4 h-4" />
                       Send Test Alert to All Recipients

@@ -22,36 +22,63 @@ Build a two-part application, Hodler Inn, for managing railroad crew accommodati
 **User's preferred language**: English
 
 **what currently exists?**
-A full-stack application (React frontend, FastAPI backend) with its database now migrated to a shared MongoDB Atlas cluster. This means both the Emergent preview environment and the user's self-hosted AWS EC2 instance read from and write to the same, unified database, ensuring data consistency.
+A full-stack application (React/FastAPI) using a shared MongoDB Atlas database for both the Emergent-hosted production environment and the user's AWS backup server. The application has a sophisticated v11 sync agent, data import/export, and extensive admin features.
 
-The application's critical AI sync agent, which previously had major logic bugs, has been iteratively fixed, enhanced, and is now at version v11. It correctly classifies guests, handles various edge cases (like late arrivals appearing on previous days' reports), and provides detailed real-time progress updates.
-
-Several new features have been added, including a robust data export/import system and a new tool to scan the third-party portal for employee data across a specified date range.
+In this session, the application was significantly enhanced with:
+- A complete booking/reservation system for non-railroad guests, including revenue and occupancy stats.
+- A system to log and manage entries from the railroad portal that are missing from the Hodler Inn database.
+- New scheduled daily status reports (7 AM & 10 PM) sent via email and Telegram.
+- An auto-dirty feature that marks rooms for cleaning 20 minutes after checkout.
+- Interactive Telegram commands and buttons for managing room cleaning status.
+- An admin UI to manage email alert settings and recipients.
 
 **Last working item**:
--   **Last item agent was working:** Creating personalized career and portfolio documents for the user (LinkedIn profile summary, resume summary, and a project portfolio showcase based on the Hodler Inn application).
--   **Status:** COMPLETED
--   **Agent Testing Done:** N/A
--   **Which testing method agent to use?** N/A
--   **User Testing Done:** Y
+-   **Last item agent was working:** The agent was implementing a feature to allow the admin to customize which specific alerts (e.g., 'Sold Out', 'Low Availability', 'Daily Status') each email recipient receives.
+-   **Status:** IN PROGRESS
+-   **Agent Testing Done:** N
+-   **Which testing method agent to use?** both
+-   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
 -   **Issue 1: Final User Verification of Auto-Sync v11 Logic (P0)**
-    -   **Issues Detail:**
-        -   **Issue 1:** The user has intentionally left two guest entries (EWING, HOLLEY) unverified on the railroad portal. These entries have a billing date of March 5th but appear on the March 4th portal page. The v11 auto-sync is scheduled to run for March 5th and is expected to automatically find and verify these two entries by scanning both the March 5th and March 4th portal pages.
-        -   **Attempted fixes:** The agent implemented logic in v11 for the auto-sync to check both the target date and the previous day's portal page specifically to handle this scenario.
-        -   **Next debug checklist:** If the auto-sync fails to verify the two test entries, the next agent should:
-            1.  Check the backend logs for the auto-sync run to see the results and any errors.
-            2.  Examine the  and  functions in  to confirm the two-day logic is executing as expected.
-            3.  Manually run the sync for March 5th with the Include previous day checkbox enabled to reproduce the issue.
-        -   **Why fix this issue and what will be achieved with the fix?** This is the final validation of the most critical and complex business logic in the application. A successful run will confirm the sync agent is fully robust.
-        -   **Status:** USER VERIFICATION PENDING
-        -   **Is recurring issue?** Y (The sync agent has been a persistent problem, but this is a test of its latest, most advanced fix).
-        -   **Should Test frontend/backend/both after fix?** Backend
-        -   **Blocked on other issue:** None
+-   **Issue 2: Untested Employee Import Feature (v2) (P1)**
+-   **Issue 3: Recurring Docker  on AWS (P2)**
+
+**Issues Detail:**
+-   **Issue 1: Final User Verification of Auto-Sync v11 Logic (P0)**
+    -   **Attempted fixes:** The v11 auto-sync was deployed to the user's AWS server. Its logic is designed to scan both the target date and the previous day's portal page to catch late arrivals.
+    -   **Next debug checklist:** The user needs to check the results of the daily auto-sync for March 5th. The agent should ask the user if the two test entries (EWING, HOLLEY) were successfully verified. If not, check the backend logs on the AWS server for errors related to the .
+    -   **Why fix this issue and what will be achieved with the fix?** This is the final validation for the application's most critical and historically problematic feature. Success confirms the sync agent is robust.
+    -   **Status:** USER VERIFICATION PENDING
+    -   **Is recurring issue?** Y
+    -   **Should Test frontend/backend/both after fix?** Backend
+    -   **Blocked on other issue:** None
+
+-   **Issue 2: Untested Employee Import Feature (v2) (P1)**
+    -   **Attempted fixes:** Based on a user's Loom video, the agent created a completely new function  in  to scrape employee data from a monthly report view on the railroad portal. This replaces a previous, non-functional approach.
+    -   **Next debug checklist:** The user needs to test the Import from Portal button on the admin dashboard (on either Emergent or AWS). If it fails, check the backend logs for output from the new  function to see where the Playwright navigation or data extraction is failing.
+    -   **Why fix this issue and what will be achieved with the fix?** This will provide the user with a reliable way to build a comprehensive employee database directly from the portal, a core requirement.
+    -   **Status:** USER VERIFICATION PENDING
+    -   **Is recurring issue?** Y
+    -   **Should Test frontend/backend/both after fix?** Backend
+    -   **Blocked on other issue:** None
+
+-   **Issue 3: Recurring Docker  on AWS (P2)**
+    -   **Attempted fixes:** The user repeatedly encountered this error on their AWS server, forcing multiple full system prunes and rebuilds. The agent eventually identified the root cause as an outdated  version and guided the user to upgrade it.
+    -   **Next debug checklist:** Monitor future AWS deployments. If the error reappears, investigate the  version again () and search for alternative causes related to Docker's state management on the user's specific OS.
+    -   **Why fix this issue and what will be achieved with the fix?** Prevents significant deployment friction and wasted time for the user.
+    -   **Status:** RESOLVED (pending confirmation over time)
+    -   **Is recurring issue?** Y
+    -   **Should Test frontend/backend/both after fix?** N/A (DevOps issue)
+    -   **Blocked on other issue:** None
 
 **In progress Task List**:
-None. All major technical tasks from this session (bug fixes, data migration, Atlas setup) are complete.
+-   **Task 1: Finish Customizable Per-Recipient Email Alerts (P1)**
+    -   **Where to resume:** The backend  was updated with new models and API logic to support storing which alerts each recipient should receive. The frontend in  now needs a UI for this. The current UI only allows adding/removing recipients and toggling entire alert types globally. It needs to be modified so that for each recipient, the admin can check/uncheck specific alerts (e.g., Sold Out, Low Availability, 7 AM Status, 10 PM Status).
+    -   **What will be achieved with this?** This will give the user fine-grained control over who receives which notification, preventing alert fatigue for certain managers.
+    -   **Status:** IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?** Both
+    -   **Blocked on something:** None
 
 **Upcoming and Future Tasks**
 -   **(P0) User Verification for Voice Message Echo:** A fix for voice message overlap was implemented in a previous session and is still awaiting user verification.
@@ -62,22 +89,18 @@ None. All major technical tasks from this session (bug fixes, data migration, At
 -   **(P2) Blockchain Integration:** A user-suggested idea for future exploration.
 
 **Completed work in this session**
--   **AI Sync Agent Overhaul (v4-v11):**
-    -   **Core Bug Fix (v7):** Resolved the main logic error where the agent would exit prematurely if all portal entries were already blue-checked, failing to match them against Hodler Inn records.
-    -   **Data-Fill Fix (v10):** Enhanced the agent to fill in missing Employee IDs and Room Numbers on the portal even for entries that were already blue-checked.
-    -   **Late Arrival Fix (v11):** Added logic and a UI checkbox to scan both the selected date and the previous day's portal page to catch late arrivals. The auto-sync was also updated to use this logic.
-    -   **Enhanced Progress Reporting (v8, v9):** Implemented real-time progress updates on the dashboard, showing the name and count of the entry being processed.
--   **Database & Deployment:**
-    -   **MongoDB Atlas Migration:** Successfully guided the user through setting up a MongoDB Atlas cluster and migrated both the Emergent and AWS deployments to use this shared database, achieving real-time data synchronization between the two environments.
-    -   **AWS Deployment Debugging:** Diagnosed and fixed multiple issues on the user's AWS instance, including incorrect backend URLs in , data import into the wrong database, and mismatched encryption keys causing corrupted data display.
-    -   **Data Portability:** Created robust  and  endpoints to allow for easy data backup and transfer.
--   **Bug Fixes & Enhancements:**
-    -   **Billing Calculation Fix:** Corrected the Nights Billed logic in  to be based on 24-hour periods (), not calendar days.
-    -   **Employee Data Scraper:** Created a new feature with a date-range picker on the admin dashboard to scan the portal day-by-day and import a comprehensive list of employees.
-    -   **UI/UX Improvements:** Added a Last Sync Results card to the main dashboard, a Reset Sync button to handle stuck processes, and improved sync-related user feedback messages.
-    -   **Pronunciation Fix:** Corrected the Text-to-Speech engine's mispronunciation of the name Brian by modifying the phonetics in the pronunciation dictionary in .
--   **User Enablement:**
-    -   **Career Document Generation:** Created a project portfolio, resume summary, and a personalized LinkedIn profile update for the user to showcase their work on the Hodler Inn project.
+-   **AWS Deployment & Debugging:** Guided user through deploying v11 sync agent to their AWS server, fixing numerous issues including Docker permissions, , and a critical missing .
+-   ** Upgrade:** Permanently fixed a recurring Docker error on the user's AWS server by upgrading .
+-   **Employee List Bug Fix:** Fixed a  that caused the Employee List page to be blank.
+-   **Preserve Stay Records on Deletion:** Modified the guest removal logic to soft delete guests, preserving their historical stay and billing records.
+-   **Non-Railroad Guest & Reservation System:** Transformed the Block Room feature into a full booking system for walk-in guests, complete with future reservations, revenue/occupancy stats, and email confirmations with a cancellation policy.
+-   **Advanced Alerting System:**
+    -   Implemented scheduled daily status reports (7 AM & 10 PM) via email and Telegram.
+    -   Created an auto-dirty feature that flags rooms for cleaning 20 minutes after checkout.
+    -   Added an admin UI to manage email alert recipients and toggle master alert switches.
+-   **Interactive Telegram Bot:** Upgraded Telegram notifications to include clickable buttons (e.g., ), replacing the need to type commands.
+-   **Missing Entry Tracking:** The sync agent now automatically records portal entries that don't match any Hodler Inn records into a new  database collection, with a corresponding management API.
+-   **Document Generation:** Created and provided PDF versions of the user's LinkedIn profile and printable guest kiosk instructions.
 
 **Earlier issues found/mentioned but not fixed**
 -   **Issue 1: Voice Message Echo and Overlap**
@@ -86,90 +109,97 @@ None. All major technical tasks from this session (bug fixes, data migration, At
     -   **Should Test frontend/backend/both after fix:** Frontend/User Experience
 
 **Known issue recurrence from previous fork**
--   **AI Sync Agent Failure:** This was the primary recurring issue. It evolved from a simple classification bug to a complex state management problem. It has been extensively refactored and is now on version v11. Its final verification is pending the user's test case.
--   **Recurrence count:** High (at least 4 major iterations in this session)
--   **Status:** RESOLVED (pending final user verification)
+-   **AI Sync Agent Failure:** This was the primary recurring issue. Its final verification is the top priority for the next session.
+-   **Recurrence count:** High.
+-   **Status:** USER VERIFICATION PENDING
+-   ** on AWS:** A new recurring issue in this session.
+-   **Recurrence count:** High (within this session).
+-   **Status:** RESOLVED (pending monitoring).
 
 **Code Architecture**
 
-**Database:** The application now uses a shared **MongoDB Atlas** cluster as its single source of truth for both the Emergent and AWS environments.
 
 **Key Technical Concepts**
 -   **Frontend:** React, Tailwind CSS, Shadcn UI
 -   **Backend:** FastAPI, , 
--   **Database:** **MongoDB Atlas (Shared Cloud DB)**
+-   **Database:** MongoDB Atlas (Shared Cloud DB)
 -   **Automation:** Playwright for web scraping
 -   **Deployment:** Docker, Docker Compose, AWS EC2, Emergent Platform
+-   **Notifications:** Telegram Bot API
 
 **key DB schema**
--   : 
--   : 
--   : 
--   : 
+-   : Stores individual stay records. Now includes a  flag for soft deletes.
+-   : Master list of railroad employees.
+-   : Stores records for non-railroad guests and future reservations.
+-   : Logs entries from the portal sync that couldn't be matched.
+-   : Stores global settings, now includes .
 
 **changes in tech stack**
--   **Database Migration:** The most significant change was moving from separate, local MongoDB instances to a single, shared **MongoDB Atlas** cloud database for both the Emergent and AWS deployments.
+-   The user's AWS instance  was upgraded to v5.1.0 to fix a persistent bug.
 
 **All files of reference**
--   : Contains the critical sync logic (v11). The  function is the entry point.
--   : Contains all API endpoints, including the new ones for data export/import, sync reset, and the employee scraper. The  function orchestrates the sync process.
--   : Contains the UI for all new features, including the sync status card, reset button, include previous day checkbox, and the date-range employee scanner.
--   : File on the user's AWS instance, now configured to use the MongoDB Atlas connection string.
+-   : Heavily modified with new endpoints for reservations, missing entries, email settings, Telegram callbacks, and new scheduled jobs.
+-   : Contains the new  function.
+-   : Heavily modified to add UI for the Non-Railroad Guest/Reservation system, email alert management, and various buttons/stats.
+-   User's AWS server:  was modified to include the .
 
 **Areas that need refactoring**:
--   : Has grown significantly and is a high-priority candidate for being broken into multiple FastAPI routers.
--   : Is now extremely large (>3000 lines) and should be decomposed into smaller, reusable React components.
+-   : Now exceeds 3000 lines. Urgently needs to be broken into FastAPI routers by feature (e.g., , , ).
+-   : Exceeds 4000 lines. Must be decomposed into smaller components (e.g., , , ).
 
 **key api endpoints**
--   : (POST) Triggers the AI sync agent. Now accepts .
--   : (GET) Exports all database collections as a single JSON file.
--   : (POST) Imports a database backup from a JSON file.
--   : (POST) Resets a stuck sync process.
--   : (POST) Triggers the new employee scraper for a given date range.
+-   : (POST) Enhanced to create non-railroad guest records and reservations.
+-   : (GET) List future reservations.
+-   : (POST) Convert a reservation to an active guest.
+-   : (DELETE) Cancel a reservation.
+-   : (POST) Send booking confirmation.
+-   : (GET) View logged missing entries from sync.
+-   : (GET/POST) Manage email alert settings.
+-   : The webhook handler now processes button callbacks ().
 
 **Critical Info for New Agent**
--   **SHARED DATABASE:** The application now runs on a shared MongoDB Atlas cluster. Both the Emergent preview and the user's AWS server point to the same database. Data is always in sync.  in  points to the Atlas cluster.
--   **SYNC AGENT (v11):** The sync agent is now highly advanced. The auto-sync automatically checks both the target date and the previous day to catch late arrivals. A manual sync has a checkbox to enable this behavior.
--   **PENDING TEST:** A crucial test of the v11 sync logic is pending. The daily auto-sync is expected to run and verify two specific entries (EWING, HOLLEY). The outcome of this test is the highest priority follow-up.
--   **AWS DEPLOYMENT:** The user has a fully functional, self-hosted deployment on an AWS EC2 instance at . Its code is managed via a GitHub repository, which may not always have the absolute latest changes from the Emergent environment.
+-   **Production vs. Backup:** The user's production site that guests use is ****, which points to the **Emergent environment**. The AWS server (IP: ) is only a backup/testing environment. The agent has noted the correct AWS Account ID () for future reference.
+-   **Top Priority:** The most important pending item is verifying the success or failure of the v11 auto-sync for the EWING & HOLLEY test case.
+-   **User Feedback:** The user expressed frustration that the agent repeatedly offered a workaround for the Docker  instead of diagnosing the root cause sooner. The next agent should prioritize root cause analysis for recurring issues.
+-   **New Features Untested:** A large number of features were added in this session (reservations, new alerts, Telegram buttons, etc.). They have not been formally tested. The next agent should be prepared to debug them.
 
 **documents and test reports created in this job**
 -   
 -   
--   
--   
--   
--   
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** Asks for help creating a resume/portfolio. (Completed)
-2.  **User:** Asks for a LinkedIn summary. (Completed)
-3.  **User:** Requests that the summary gives credit to the AI for its role. (Completed)
-4.  **User:** Provides LinkedIn profile for personalization. (Completed)
-5.  **User:** Provides location and job title. (Completed)
-6.  **User:** Provides years of experience in the hotel industry. (Completed)
-7.  **User:** The agent presents the final, personalized LinkedIn summary. The user has not yet responded to this final message.
+1.  **User:** Asks if they can customize which alerts are sent to which email recipient. (IN PROGRESS)
+2.  **User:** Requests new daily status alerts (7 AM/10 PM), an auto-dirty room feature, and the ability to change room status from Telegram. (Completed)
+3.  **User:** Asks for Telegram commands to be replaced with clickable buttons. (Completed)
+4.  **User:** Asks if they can manage email alerts from the admin dashboard. (Completed)
+5.  **User:** Details requirements for an enhanced Block Room feature to handle non-railroad guests, reservations, and revenue tracking. (Completed)
+6.  **User:** Reports the sync agent isn't pulling new employee names and provides a Loom video. (A new v2 import script was created but is untested).
+7.  **User:** Reports being unable to connect to the AWS instance, then realizes they are in the wrong AWS account. (Resolved).
+8.  **User:** Asks the agent to create a record of missing entries when the sync runs. (Completed).
+9.  **User:** Praises the agent but criticizes it for not fixing the root cause of the recurring Docker error sooner.
+10. **User:** Asks the agent to remember that  points to Emergent, not AWS. (Acknowledged).
 
 **Project Health Check:**
--   **Broken:** Nothing is critically broken. The core sync agent logic is fixed and awaiting final verification.
+-   **Broken:** Nothing is critically broken, but the frontend may have bugs due to the large number of new, untested features. The employee import feature (v2) is likely non-functional until selectors are fine-tuned.
 -   **Mocked:** None.
 
 **3rd Party Integrations**
 -   **API Global Solutions - Provider Rail Portal:** Integrated via Playwright.
 -   **OpenAI TTS-1:** Integrated for voice guidance.
--   **Telegram:** Integrated for admin notifications.
+-   **Telegram:** Integrated for admin notifications and now interactive commands.
 -   **Zoho WorkDrive:** Integrated for daily backups.
--   **MongoDB Atlas:** The application's primary database is now hosted on MongoDB Atlas.
+-   **MongoDB Atlas:** Primary database.
 
 **Testing status**
--   **Testing agent used after significant changes:** YES (used to validate the initial v4 bug fixes).
+-   **Testing agent used after significant changes:** NO. Many significant features were added without using the testing agent.
 -   **Troubleshoot agent used after agent stuck in loop:** NO
 -   **Test files created:** []
--   **Known regressions:** None. The previous major regression (sync agent classification) has been resolved.
+-   **Known regressions:** The employee import feature is likely regressed/still broken.
 
 **Credentials to test flow:**
 -   **Admin Login:** Access at  with password .
 -   **MongoDB Atlas:** Credentials are in .
 
 **What agent forgot to execute**
--   The agent performed exceptionally well, addressing every user request, including complex debugging, live deployment support on a user's machine, a full database migration, and even non-technical requests like creating a resume. Nothing was forgotten.</analysis>
+-   The agent did not perform a root cause analysis on the recurring Docker error until prompted multiple times by the user. This led to wasted time and user frustration. The next agent should be more proactive in diagnosing recurring environmental or tooling issues.
+-   The agent implemented a large number of complex, interconnected features (reservations, new alerts, Telegram interactions) in a single batch without intermediate testing, increasing the risk of bugs. It would be better to implement and test these features more incrementally.</analysis>

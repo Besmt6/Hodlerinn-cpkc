@@ -1014,23 +1014,39 @@ async def get_email_alert_settings():
     """Get email alert settings from database."""
     settings = await db.email_alert_settings.find_one({"id": "email_alerts"}, {"_id": 0})
     if not settings:
-        # Return defaults
+        # Return defaults with per-recipient alert preferences
         return {
             "id": "email_alerts",
-            "recipients": DEFAULT_CPKC_EMAIL_RECIPIENTS,
+            "recipients": [
+                {"email": "crewtravel@cpkcr.com", "alerts": ["sold_out", "rooms_available", "heads_up", "daily_status"]},
+                {"email": "crewmanagers@cpkcr.com", "alerts": ["sold_out", "rooms_available", "heads_up", "daily_status"]}
+            ],
             "sold_out_enabled": True,
             "rooms_available_enabled": True,
             "heads_up_enabled": True,
-            "heads_up_threshold": 4,  # Alert when 4 or fewer rooms available
+            "daily_status_enabled": True,
+            "heads_up_threshold": 4,
             "custom_subject_prefix": "Hodler Inn"
         }
     return settings
 
 
-async def get_email_recipients():
-    """Get configured email recipients from database."""
+async def get_email_recipients(alert_type: str = None):
+    """Get configured email recipients from database, optionally filtered by alert type."""
     settings = await get_email_alert_settings()
-    return settings.get("recipients", DEFAULT_CPKC_EMAIL_RECIPIENTS)
+    recipients_config = settings.get("recipients", [])
+    
+    # Handle legacy format (list of strings)
+    if recipients_config and isinstance(recipients_config[0], str):
+        return recipients_config
+    
+    # New format with per-recipient preferences
+    if alert_type:
+        # Filter recipients who want this alert type
+        return [r["email"] for r in recipients_config if alert_type in r.get("alerts", [])]
+    else:
+        # Return all emails
+        return [r["email"] for r in recipients_config if isinstance(r, dict) and "email" in r]
 
 
 async def get_notification_state():
@@ -1106,18 +1122,24 @@ async def get_room_availability_details():
     }
 
 
-async def send_email_notification(subject: str, body: str):
-    """Send email notification to configured recipients using SMTP settings."""
+async def send_email_notification(subject: str, body: str, alert_type: str = None):
+    """Send email notification to configured recipients using SMTP settings.
+    
+    Args:
+        subject: Email subject
+        body: Email body text
+        alert_type: Optional alert type to filter recipients (sold_out, rooms_available, heads_up, daily_status)
+    """
     settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
     
     if not settings or not settings.get("email_sender") or not settings.get("email_password_encrypted"):
         logging.warning("Email settings not configured - cannot send notification")
         return False
     
-    # Get recipients from database
-    recipients = await get_email_recipients()
+    # Get recipients filtered by alert type
+    recipients = await get_email_recipients(alert_type)
     if not recipients:
-        logging.warning("No email recipients configured")
+        logging.warning(f"No email recipients configured for alert type: {alert_type}")
         return False
     
     try:
@@ -3937,10 +3959,11 @@ async def get_blocked_rooms_history(start_date: str = None, end_date: str = None
 # ==================== Email Alert Settings ====================
 
 class EmailAlertSettingsInput(BaseModel):
-    recipients: List[str]
+    recipients: Optional[List] = None  # Can be list of strings or list of dicts
     sold_out_enabled: Optional[bool] = True
     rooms_available_enabled: Optional[bool] = True
     heads_up_enabled: Optional[bool] = True
+    daily_status_enabled: Optional[bool] = True
     heads_up_threshold: Optional[int] = 4
     custom_subject_prefix: Optional[str] = "Hodler Inn"
 
@@ -3952,33 +3975,57 @@ async def get_email_alert_settings_endpoint():
 
 @api_router.post("/admin/email-alerts/settings")
 async def update_email_alert_settings(input: EmailAlertSettingsInput):
-    """Update email alert settings."""
+    """Update email alert settings (master toggles only, not recipients)."""
+    # Get current settings to preserve recipients
+    current = await get_email_alert_settings()
+    
+    update_data = {
+        "id": "email_alerts",
+        "sold_out_enabled": input.sold_out_enabled,
+        "rooms_available_enabled": input.rooms_available_enabled,
+        "heads_up_enabled": input.heads_up_enabled,
+        "daily_status_enabled": input.daily_status_enabled,
+        "heads_up_threshold": input.heads_up_threshold,
+        "custom_subject_prefix": input.custom_subject_prefix,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Preserve existing recipients if not provided
+    if input.recipients is not None:
+        update_data["recipients"] = input.recipients
+    else:
+        update_data["recipients"] = current.get("recipients", [])
+    
     await db.email_alert_settings.update_one(
         {"id": "email_alerts"},
-        {"$set": {
-            "id": "email_alerts",
-            "recipients": input.recipients,
-            "sold_out_enabled": input.sold_out_enabled,
-            "rooms_available_enabled": input.rooms_available_enabled,
-            "heads_up_enabled": input.heads_up_enabled,
-            "heads_up_threshold": input.heads_up_threshold,
-            "custom_subject_prefix": input.custom_subject_prefix,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }},
+        {"$set": update_data},
         upsert=True
     )
     return {"message": "Email alert settings updated"}
 
 @api_router.post("/admin/email-alerts/recipients/add")
 async def add_email_recipient(email: str):
-    """Add a new email recipient."""
+    """Add a new email recipient with all alerts enabled by default."""
     settings = await get_email_alert_settings()
     recipients = settings.get("recipients", [])
     
-    if email in recipients:
+    # Check if email already exists (handle both old string format and new object format)
+    existing_emails = []
+    for r in recipients:
+        if isinstance(r, str):
+            existing_emails.append(r)
+        elif isinstance(r, dict) and "email" in r:
+            existing_emails.append(r["email"])
+    
+    if email in existing_emails:
         raise HTTPException(status_code=400, detail="Email already in recipient list")
     
-    recipients.append(email)
+    # Add new recipient with all alerts enabled by default
+    new_recipient = {
+        "email": email,
+        "alerts": ["sold_out", "rooms_available", "heads_up", "daily_status"]
+    }
+    recipients.append(new_recipient)
     
     await db.email_alert_settings.update_one(
         {"id": "email_alerts"},
@@ -3993,17 +4040,68 @@ async def remove_email_recipient(email: str):
     settings = await get_email_alert_settings()
     recipients = settings.get("recipients", [])
     
-    if email not in recipients:
-        raise HTTPException(status_code=404, detail="Email not in recipient list")
+    # Handle both old string format and new object format
+    new_recipients = []
+    found = False
+    for r in recipients:
+        if isinstance(r, str):
+            if r != email:
+                new_recipients.append(r)
+            else:
+                found = True
+        elif isinstance(r, dict) and r.get("email") != email:
+            new_recipients.append(r)
+        else:
+            found = True
     
-    recipients.remove(email)
+    if not found:
+        raise HTTPException(status_code=404, detail="Email not in recipient list")
     
     await db.email_alert_settings.update_one(
         {"id": "email_alerts"},
-        {"$set": {"recipients": recipients, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        {"$set": {"recipients": new_recipients, "updated_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True
     )
-    return {"message": f"Removed {email} from recipients", "recipients": recipients}
+    return {"message": f"Removed {email} from recipients", "recipients": new_recipients}
+
+@api_router.put("/admin/email-alerts/recipients/alerts")
+async def update_recipient_alerts(email: str, alerts: List[str]):
+    """Update which alerts a specific recipient receives."""
+    settings = await get_email_alert_settings()
+    recipients = settings.get("recipients", [])
+    
+    # Valid alert types
+    valid_alerts = {"sold_out", "rooms_available", "heads_up", "daily_status"}
+    invalid = set(alerts) - valid_alerts
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Invalid alert types: {invalid}")
+    
+    # Find and update the recipient
+    found = False
+    new_recipients = []
+    for r in recipients:
+        if isinstance(r, str):
+            # Migrate old format
+            if r == email:
+                new_recipients.append({"email": r, "alerts": alerts})
+                found = True
+            else:
+                new_recipients.append({"email": r, "alerts": list(valid_alerts)})
+        elif isinstance(r, dict):
+            if r.get("email") == email:
+                r["alerts"] = alerts
+                found = True
+            new_recipients.append(r)
+    
+    if not found:
+        raise HTTPException(status_code=404, detail="Email not in recipient list")
+    
+    await db.email_alert_settings.update_one(
+        {"id": "email_alerts"},
+        {"$set": {"recipients": new_recipients, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    return {"message": f"Updated alerts for {email}", "recipients": new_recipients}
 
 @api_router.post("/admin/email-alerts/test")
 async def send_test_email_alert():
