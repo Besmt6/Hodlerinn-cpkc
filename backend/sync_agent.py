@@ -1691,19 +1691,14 @@ class APIGlobalSyncAgent:
                         for bm in best_matches:
                             logger.info(f"  - {bm['name']} (ID: {bm['employee_number']}) - Score: {bm['combined_score']:.2f}")
                         
-                        # Mark as No Bill
-                        logger.info(f"Marking {api_name} as No Bill")
-                        if await self.mark_no_bill(entry):
-                            self.results["no_bill"].append({
-                                "name": api_name,
-                                "best_matches": best_matches
-                            })
-                        else:
-                            self.results["missing_in_hodler"].append({
-                                "name": api_name,
-                                "reason": "Could not find matching employee and No Bill failed",
-                                "best_matches": best_matches
-                            })
+                        # DO NOT automatically click "No Bill" - just report for manual review
+                        # The agent should only verify matched entries, not mark unmatched as No Bill
+                        logger.info(f"SKIPPING {api_name} - not found in Hodler Inn records (requires manual review)")
+                        self.results["missing_in_hodler"].append({
+                            "name": api_name,
+                            "reason": "Not found in Hodler Inn records - requires manual review",
+                            "best_matches": best_matches
+                        })
                     
                     # After each entry, wait a moment for page to stabilize
                     await self.page.wait_for_timeout(500)
