@@ -1389,9 +1389,14 @@ async def bulk_verify_guests(request: BulkVerifyRequest):
 
 @api_router.get("/admin/guests/pending-verification")
 async def get_pending_verification_guests():
-    """Get all guests pending verification"""
+    """Get all guests pending verification (excludes removed guests)"""
     guests = await db.guests.find(
-        {"$or": [{"pending_verification": True}, {"is_verified": False}]},
+        {
+            "$and": [
+                {"$or": [{"pending_verification": True}, {"is_verified": False}]},
+                {"removed_from_verification": {"$ne": True}}  # Exclude removed guests
+            ]
+        },
         {"_id": 0}
     ).to_list(1000)
     
@@ -1486,7 +1491,7 @@ async def unblock_guest(employee_number: str):
 
 @api_router.delete("/admin/guests/{employee_number}")
 async def remove_guest(employee_number: str):
-    """Remove an unverified guest from the system"""
+    """Remove an unverified guest from the system - keeps stay records for billing"""
     guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
     if not guest:
         raise HTTPException(status_code=404, detail="Guest not found")
@@ -1496,8 +1501,18 @@ async def remove_guest(employee_number: str):
     # Check if guest has any bookings
     booking_count = await db.bookings.count_documents({"employee_number": employee_number})
     
-    # Remove from guests collection
-    await db.guests.delete_one({"employee_number": employee_number})
+    # Instead of deleting, mark the guest record as "removed" but keep for billing
+    # Only remove active stay status, preserve check-in/check-out records
+    await db.guests.update_one(
+        {"employee_number": employee_number},
+        {
+            "$set": {
+                "removed_from_verification": True,
+                "removed_at": datetime.now(timezone.utc).isoformat(),
+                "status": "removed"  # Change status so they don't show in active guests
+            }
+        }
+    )
     
     # Remove from employees collection if pending verification
     await db.employees.delete_one({
@@ -1510,10 +1525,11 @@ async def remove_guest(employee_number: str):
         f"━━━━━━━━━━━━━━━\n"
         f"👤 {name}\n"
         f"🆔 {employee_number}\n"
-        f"📋 Had {booking_count} booking(s)"
+        f"📋 Had {booking_count} booking(s)\n"
+        f"📝 Stay records preserved for billing"
     )
     
-    return {"message": f"Guest {name} removed from system", "had_bookings": booking_count}
+    return {"message": f"Guest {name} removed from verification (stay records preserved)", "had_bookings": booking_count}
 
 
 # Check-In (signature captured here)
