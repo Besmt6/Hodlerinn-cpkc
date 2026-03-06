@@ -47,23 +47,29 @@ Create `/etc/nginx/sites-available/hodlerinn`:
 ```nginx
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name cpkc.hodlerinn.com;  # Change to your domain
 
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-
+    # API requests - proxy to backend
     location /api {
         proxy_pass http://localhost:8001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Frontend - proxy to Node serve (handles SPA routing)
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_cache_bypass $http_upgrade;
     }
 }
@@ -72,8 +78,35 @@ server {
 Enable and get SSL:
 ```bash
 sudo ln -s /etc/nginx/sites-available/hodlerinn /etc/nginx/sites-enabled/
-sudo certbot --nginx -d your-domain.com
+sudo nginx -t  # Test config
+sudo certbot --nginx -d cpkc.hodlerinn.com
 sudo systemctl restart nginx
+```
+
+---
+
+## IMPORTANT: Fix for /book URL Issue
+
+If `/book` URL redirects to `/` (guest portal), the issue is that `serve` 
+isn't receiving the request properly. Make sure:
+
+1. The frontend container is using `serve -s` (the -s flag handles SPA routing)
+2. Nginx is correctly proxying ALL paths to the frontend
+
+**Quick check:**
+```bash
+# Test if frontend handles /book directly
+curl -I http://localhost:3000/book
+# Should return: HTTP/1.1 200 OK
+
+# Test through nginx
+curl -I http://cpkc.hodlerinn.com/book
+# Should also return: HTTP/1.1 200 OK
+```
+
+**If /book doesn't work, try rebuilding frontend:**
+```bash
+docker-compose up -d --build frontend
 ```
 
 ---
@@ -101,6 +134,16 @@ git pull
 docker-compose up -d --build
 ```
 
+### Rebuild only frontend (after code changes)
+```bash
+docker-compose up -d --build frontend
+```
+
+### Rebuild only backend (after code changes)
+```bash
+docker-compose up -d --build backend
+```
+
 ---
 
 ## AWS EC2 Quick Setup
@@ -117,6 +160,21 @@ ssh -i your-key.pem ubuntu@your-ec2-ip
 ```
 
 3. Follow the "Quick Start" steps above!
+
+---
+
+## Environment Variables (backend/.env)
+
+Make sure your backend/.env has all required keys:
+```
+MONGO_URL=mongodb://mongodb:27017
+DB_NAME=hodler_inn
+ADMIN_PASSWORD=hodlerinn2024
+EMERGENT_LLM_KEY=sk-emergent-xxxxx
+TELEGRAM_BOT_TOKEN=xxxxx
+TELEGRAM_CHAT_ID=xxxxx
+# ... other keys
+```
 
 ---
 
@@ -137,4 +195,14 @@ docker logs hodlerinn-mongodb
 ### Restart a specific service
 ```bash
 docker-compose restart backend
+```
+
+### Check nginx config
+```bash
+sudo nginx -t
+```
+
+### Check nginx logs
+```bash
+sudo tail -f /var/log/nginx/error.log
 ```

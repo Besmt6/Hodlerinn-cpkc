@@ -20,5 +20,5 @@ RUN yarn global add serve
 # Expose port
 EXPOSE 3000
 
-# Start command - serve the build folder
+# Start command - serve the build folder with SPA mode (-s flag handles client-side routing)
 CMD ["serve", "-s", "build", "-l", "3000"]
