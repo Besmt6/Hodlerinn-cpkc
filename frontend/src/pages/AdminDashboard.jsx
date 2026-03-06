@@ -1378,6 +1378,14 @@ export default function AdminDashboard() {
             <Settings className="w-4 h-4" />
             <span className="font-manrope text-sm">Portal Settings</span>
           </div>
+          <div 
+            className="admin-nav-item cursor-pointer"
+            onClick={() => navigate('/admin/docs')}
+            data-testid="nav-docs-view-btn"
+          >
+            <FileText className="w-4 h-4" />
+            <span className="font-manrope text-sm">Documentation</span>
+          </div>
         </nav>
 
         {/* Logout */}
@@ -1446,6 +1454,12 @@ export default function AdminDashboard() {
             className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'settings' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
           >
             Settings
+          </button>
+          <button 
+            onClick={() => navigate('/admin/docs')}
+            className="px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap bg-vault-surface-highlight text-vault-text-secondary"
+          >
+            Docs
           </button>
         </div>
       </div>

@@ -1,150 +1,163 @@
 # Hodler Inn - Product Requirements Document
 
-## Overview
-Full-stack application for managing railroad crew accommodations at Hodler Inn, Heavener, Oklahoma.
+## Original Problem Statement
+A comprehensive railroad crew accommodation management platform for Hodler Inn in Heavener, OK. The system handles guest check-ins, room management, billing, automated sync with railroad portals, and includes an AI-powered booking chatbot.
 
-**Production URL:** `cpkc.hodlerinn.com`
-**Address:** 820 US-59, Heavener, OK 74937
-**Phone:** (918) 653-7801
+## Business Information
+- **Address**: 820 US-59, Heavener, OK 74937
+- **Property Type**: Railroad Crew Accommodation
+- **Total Rooms**: 28
+- **Railroad Partner**: CPKC (Canadian Pacific Kansas City)
+- **Admin Password**: hodlerinn2024
 
----
+## Core Features Implemented
 
-## Core Features
+### Guest Management
+- [x] Guest Portal - Self-service kiosk for railroad crew
+- [x] Employee ID verification
+- [x] Digital signature capture
+- [x] Check-in/Check-out flow
+- [x] Voice guidance (OpenAI TTS)
 
-### Guest Portal (`/`)
-- Touch-friendly kiosk for railroad crew check-in/checkout
-- Voice guidance with OpenAI TTS
-- Signature capture
-- Employee verification against railroad database
+### Admin Dashboard
+- [x] Dashboard overview with stats
+- [x] Sign-In Sheet view
+- [x] Billing Report view
+- [x] Room Management
+- [x] Employee List management
+- [x] Guest Verification
+- [x] Guarantee Report
+- [x] Portal Settings
+- [x] **Documentation** (NEW - March 2025)
 
-### Admin Dashboard (`/admin`)
-- Password: `hodlerinn2024`
-- Guest records management
-- Room management with cleaning status
-- Billing reports with Excel/PDF/PNG export
-- Employee list management
-- Guarantee report for contract tracking
-- Portal settings configuration
+### Room Management
+- [x] Room status tracking (clean/dirty)
+- [x] Occupancy management
+- [x] Other guests (non-railroad) booking
+- [x] Reservations system
+- [x] Auto-dirty marking (20 min after checkout)
 
-### Bitsy AI Chatbot (`/book`)
-- GPT-5.2 powered booking assistant
-- Voice input support (speech-to-text)
-- Real-time availability checking
-- Respects CPKC expected arrivals (won't oversell)
-- Auto-creates reservations in database
-- Sends email confirmation + Telegram notification
-- Configurable room limits (default 3/day)
+### Billing & Reports
+- [x] Automated billing calculation (24-hour periods)
+- [x] Excel export
+- [x] PDF export
+- [x] PNG export
+- [x] Guarantee report
+- [x] Turned-away guests tracking
 
-### Demo Mode (`/demo`, `/demo/admin`)
-- Separate database for demonstrations
-- Full interactive check-in/checkout
-- Sample data with reset capability
-- Safe for showing to prospects
+### Integrations
+- [x] API Global railroad portal sync
+- [x] Auto-sync at 3 PM Central
+- [x] Telegram notifications
+- [x] Email alerts (sold-out, available, heads-up, daily)
+- [x] Per-recipient email alert preferences
+- [x] Zoho WorkDrive backup
+- [x] CPKC Email Scraper (expected arrivals)
 
----
+### AI Features
+- [x] **Bitsy Chatbot** - Conversational booking agent
+- [x] Voice input support
+- [x] Real-time availability
+- [x] Dynamic pricing
+- [x] Email confirmations
+- [x] Telegram notifications to admin
 
-## Completed Features (March 2026)
+### Demo Mode
+- [x] Sandboxed demo environment
+- [x] Separate demo database
+- [x] Demo Guest Portal (/demo)
+- [x] Demo Admin Panel (/demo/admin)
+- [x] Sample data (EMP001, EMP002, EMP003)
 
-### Session - March 6, 2026
-- [x] **Per-Recipient Email Alerts** - Admins can customize which alerts each recipient receives
-- [x] **Email Preview** - Preview email content before sending
-- [x] **Room # Search** - Quick filter in Guest Records table
-- [x] **Bitsy AI Chatbot** - Full conversational booking system
-- [x] **Voice Input** - Speech-to-text for chatbot
-- [x] **Admin Pricing Settings** - Configurable single/double rates, sales tax
-- [x] **Chatbot Room Limit** - Max 3 rooms/day for online bookings
-- [x] **Demo Mode** - Separate test environment
-- [x] **Manual Backdated Entry** - Add historical check-ins from admin
-- [x] **CPKC Email Scraper** - Auto-import expected arrivals from Zoho
-- [x] **Expected Arrivals UI** - View/manage in Room Management
-- [x] **Revenue Loss Tracking** - For guarantee report when chatbot can't sell
+### Documentation System (NEW)
+- [x] Documentation page (/admin/docs)
+- [x] Overview tab
+- [x] Features tab
+- [x] Demo Mode tab
+- [x] Billing API tab
+- [x] Bitsy Chatbot tab with embed code
 
-### Previous Sessions
-- [x] Non-Railroad Guest & Reservation System
-- [x] Daily Status Reports (7 AM & 10 PM)
-- [x] Auto-dirty room feature (20 min after checkout)
-- [x] Interactive Telegram commands with buttons
-- [x] Missing entry tracking from sync
-- [x] v11 Auto-sync agent for railroad portal
+## API Endpoints
 
----
+### Public
+- `GET /api/health` - Health check
+- `POST /api/checkin` - Check in guest
+- `POST /api/checkout` - Check out guest
+- `GET /api/guests/{employee_number}` - Get guest info
 
-## Key API Endpoints
+### Admin - Billing
+- `GET /api/admin/records` - Get all records
+- `GET /api/admin/export-billing` - Export billing (Excel)
+- `GET /api/admin/export-billing-pdf` - Export billing (PDF)
+- `GET /api/admin/export-billing-png` - Export billing (PNG)
+- `GET /api/admin/guarantee-report` - Guarantee report
+
+### Admin - Rooms
+- `GET /api/admin/rooms` - Get all rooms
+- `POST /api/admin/rooms` - Create room
+- `POST /api/admin/rooms/{number}/mark-dirty` - Mark dirty
+- `POST /api/admin/rooms/{number}/mark-clean` - Mark clean
+- `POST /api/admin/rooms/block` - Block for other guest
+
+### Admin - Sync
+- `GET /api/admin/sync/status` - Sync status
+- `POST /api/admin/sync/run` - Run sync
+- `GET /api/admin/settings` - Get settings
+- `POST /api/admin/settings` - Update settings
 
 ### Chatbot
-- `POST /api/chatbot/message` - Send message to Bitsy
-- `POST /api/chatbot/transcribe` - Voice-to-text
-- `GET /api/chatbot/availability` - Check room availability
+- `POST /api/chatbot/message` - Send message
+- `GET /api/chatbot/availability` - Check availability
+- `POST /api/chatbot/transcribe` - Voice to text
 
-### CPKC Email Integration
-- `POST /api/admin/check-cpkc-emails` - Manual email check
-- `GET /api/admin/expected-arrivals` - List expected arrivals
-- `DELETE /api/admin/expected-arrivals/{id}` - Remove cancelled
-- `POST /api/admin/revenue-loss` - Log chatbot denial
-- `GET /api/admin/revenue-losses` - For guarantee report
+### Demo
+- `POST /api/demo/init` - Initialize demo data
+- `GET /api/demo/rooms` - Get demo rooms
+- `GET /api/demo/guests` - Get demo guests
 
-### Email Alerts
-- `GET /api/admin/email-alerts/settings` - Get settings
-- `POST /api/admin/email-alerts/recipients/add` - Add recipient
-- `PUT /api/admin/email-alerts/recipients/alerts` - Update per-recipient alerts
-- `GET /api/admin/email-alerts/preview/{type}` - Preview email
+## Pending Verifications (P0)
+1. Auto-Sync v11 Logic - User verification pending
+2. Employee Import v2 - User verification pending
+3. Voice Message Echo - User verification pending
 
-### Manual Entry
-- `POST /api/admin/manual-entry` - Add backdated check-in
+## Upcoming Tasks (P1)
+1. Deploy all features to production
+2. AI Phone Agent (blocked on Virtual PBX info)
+3. Smart Lock Integration (blocked on vendor API)
 
----
+## Future/Backlog (P2-P3)
+1. HODL Rewards Token system
+2. Code refactoring (server.py ~6000+ lines, AdminDashboard.jsx ~5600+ lines)
+3. White-Label SaaS Version
 
-## Database Collections
+## Tech Stack
+- **Frontend**: React, Tailwind CSS, Shadcn UI
+- **Backend**: FastAPI, Motor (async MongoDB)
+- **Database**: MongoDB Atlas
+- **AI/LLM**: emergentintegrations (GPT-5.2)
+- **Voice**: OpenAI TTS-1
+- **Deployment**: Docker, AWS EC2
 
-- `bookings` - Guest stay records
-- `guests` - Guest profiles
-- `employees` - Railroad employee list
-- `rooms` - Room inventory
-- `blocked_rooms` - Non-railroad guests & reservations
-- `expected_arrivals` - CPKC email imports
-- `revenue_losses` - Chatbot denial tracking
-- `settings` - Portal configuration
-- `email_alert_settings` - Alert recipients & preferences
+## File Structure
+```
+/app/
+├── backend/
+│   ├── server.py (main monolith)
+│   ├── sync_agent.py
+│   └── requirements.txt
+└── frontend/
+    └── src/
+        ├── App.js
+        └── pages/
+            ├── AdminDashboard.jsx
+            ├── GuestPortal.jsx
+            ├── BookNow.jsx (Bitsy)
+            ├── Documentation.jsx (NEW)
+            ├── DemoPortal.jsx
+            └── DemoAdmin.jsx
+```
 
----
-
-## Integrations
-
-- **MongoDB Atlas** - Database
-- **OpenAI GPT-5.2** - Chatbot AI (via Emergent LLM Key)
-- **OpenAI Whisper** - Voice transcription
-- **OpenAI TTS** - Voice guidance
-- **Telegram Bot** - Admin notifications
-- **Zoho Mail** - Email alerts & CPKC scraping
-- **Zoho WorkDrive** - Daily backups
-- **API Global Solutions Portal** - Railroad employee sync
-
----
-
-## Pending Verification
-- [ ] Auto-Sync v11 results (EWING, HOLLEY test)
-- [ ] Employee Import v2 via portal
-- [ ] Voice message echo fix
-
-## Future/Backlog
-- [ ] AI Phone Agent (blocked on Virtual PBX info)
-- [ ] Smart Lock Integration (blocked on vendor API)
-- [ ] Code Refactoring (decompose large files)
-- [ ] White-Label SaaS Version
-
-### 🪙 Blockchain Integration (Future)
-**User Interest:** Token-based loyalty rewards system
-- Issue `$HODL` or `$INN` reward token
-- Earn tokens: 1 token/night for ALL direct bookings (kiosk, Bitsy chatbot, walk-in, phone)
-- No tokens for third-party OTA bookings (Expedia, etc.)
-- Redeem tokens for discounts (e.g., 10 tokens = $10 off)
-- Return guests can pay small % in tokens for discount
-- Consider: Bitcoin Lightning, Solana token, or Base L2
-- On-chain stay verification as bonus feature
-
----
-
-## Credentials
-- **Admin:** `/admin` with password `hodlerinn2024`
-- **CPKC Email Sender:** `aces_support@apiglobalsolutions.com`
-- **Frontdesk Email:** `frontdesk@hodlerinn.com`
+## Changelog
+- **March 6, 2025**: Added comprehensive Documentation page with 5 tabs (Overview, Features, Demo Mode, Billing API, Bitsy Chatbot)
+- **March 5, 2025**: Added Bitsy chatbot, Demo mode, CPKC email scraper, per-recipient alerts
+- **March 4, 2025**: Auto-sync v11, email notifications, guarantee reports

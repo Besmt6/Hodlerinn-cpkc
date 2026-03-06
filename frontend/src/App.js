@@ -7,6 +7,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import BookNow from "@/pages/BookNow";
 import DemoPortal from "@/pages/DemoPortal";
 import DemoAdmin from "@/pages/DemoAdmin";
+import Documentation from "@/pages/Documentation";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/" element={<GuestPortal />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/docs" element={<Documentation />} />
           <Route path="/book" element={<BookNow />} />
           <Route path="/demo" element={<DemoPortal />} />
           <Route path="/demo/admin" element={<DemoAdmin />} />
