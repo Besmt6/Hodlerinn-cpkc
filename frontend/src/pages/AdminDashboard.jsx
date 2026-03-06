@@ -543,6 +543,24 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleCollectDailyFromPortal = async () => {
+    setCollectingEmployees(true);
+    try {
+      toast.info("AI Agent scanning last 30 days of portal entries... This may take several minutes.");
+      const response = await axios.post(`${API}/admin/collect-employees-daily?days_back=30`);
+      if (response.data.success) {
+        toast.success(response.data.message);
+        fetchEmployees();
+      } else {
+        toast.error(response.data.message || "Failed to collect employees");
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to collect employees from portal");
+    } finally {
+      setCollectingEmployees(false);
+    }
+  };
+
   const handleImportFromGuests = async () => {
     try {
       toast.info("Importing employees from your guest records...");
@@ -2057,6 +2075,15 @@ export default function AdminDashboard() {
                   >
                     <Download className="w-4 h-4 mr-2" />
                     {collectingEmployees ? "Collecting..." : "Import from Portal"}
+                  </Button>
+                  <Button
+                    onClick={handleCollectDailyFromPortal}
+                    disabled={collectingEmployees}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    data-testid="collect-daily-from-portal-btn"
+                  >
+                    <Calendar className="w-4 h-4 mr-2" />
+                    {collectingEmployees ? "Scanning..." : "Scan 30 Days"}
                   </Button>
                   <Button
                     onClick={() => setShowBulkImport(true)}

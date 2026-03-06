@@ -4426,6 +4426,80 @@ async def collect_employees_from_portal_endpoint():
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to collect employees: {str(e)}")
 
+
+@api_router.post("/admin/collect-employees-daily")
+async def collect_employees_daily_endpoint(days_back: int = Query(30, description="Number of days to scan back")):
+    """Use AI agent to collect employee names and IDs by scanning daily entries for the past X days."""
+    settings = await db.settings.find_one({}, {"_id": 0}) or {}
+    
+    if not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
+        raise HTTPException(status_code=400, detail="Portal credentials not configured")
+    
+    try:
+        from sync_agent import collect_employees_daily
+        
+        username = settings.get("api_global_username")
+        password = decrypt_data(settings.get("api_global_password_encrypted"))
+        
+        logging.info(f"Starting daily employee collection for {days_back} days")
+        result = await collect_employees_daily(username, password, days_back)
+        logging.info(f"Daily collection result: success={result.get('success')}, employees={len(result.get('employees', []))}")
+        
+        if result["success"] and result["employees"]:
+            # Import employees with their actual IDs from the portal
+            imported = 0
+            skipped = 0
+            
+            for emp in result["employees"]:
+                employee_number = emp.get("employee_number", "").strip()
+                name = emp.get("name", "").strip()
+                
+                if not name:
+                    skipped += 1
+                    continue
+                
+                # If we have an employee number, check by that
+                if employee_number:
+                    existing = await db.employees.find_one({
+                        "employee_number": employee_number
+                    }, {"_id": 0})
+                    
+                    if existing:
+                        skipped += 1
+                        continue
+                else:
+                    # No employee number, check by name
+                    existing = await db.employees.find_one({
+                        "name": name
+                    }, {"_id": 0})
+                    
+                    if existing:
+                        skipped += 1
+                        continue
+                
+                employee = {
+                    "id": str(uuid.uuid4()),
+                    "employee_number": employee_number or f"UNKNOWN_{uuid.uuid4().hex[:8]}",
+                    "name": name,
+                    "is_active": True,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "source": "portal_daily_import"
+                }
+                await db.employees.insert_one(employee)
+                imported += 1
+            
+            result["imported"] = imported
+            result["skipped"] = skipped
+            result["message"] = f"Scanned {days_back} days. Found {len(result['employees'])} employees. Imported {imported}, skipped {skipped} duplicates."
+        
+        return result
+    except Exception as e:
+        logging.error(f"Daily collection error: {str(e)}")
+        import traceback
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to collect employees: {str(e)}")
+
+
 # ==================== PDF Export ====================
 
 @api_router.get("/admin/export-pdf")
