@@ -87,9 +87,20 @@ export default function BookNow() {
     
     setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    utterance.onerror = (e) => {
+      console.log('Speech error:', e);
+      setIsSpeaking(false);
+    };
     
-    window.speechSynthesis.speak(utterance);
+    // On mobile, resume speechSynthesis in case it's paused
+    if (isMobile()) {
+      window.speechSynthesis.cancel(); // Clear any stuck utterances
+      setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+      }, 100);
+    } else {
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   // Stop speaking
