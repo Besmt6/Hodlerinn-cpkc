@@ -28,8 +28,14 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 ## Technology Stack
 - **Frontend:** React, Tailwind CSS, Shadcn UI
 - **Backend:** FastAPI, pymongo, apscheduler
-- **Database:** MongoDB
+- **Database:** MongoDB Atlas (shared cloud database)
 - **Automation:** Playwright for web scraping
+
+## Deployment Architecture
+- **Production Domain:** cpkc.hodlerinn.com → Points to **Emergent** (this is what guests use!)
+- **Emergent Preview:** hodler-preview.preview.emergentagent.com
+- **AWS Backup Server:** 3.149.0.151 (EC2 instance, for testing/backup only)
+- **Database:** Both Emergent and AWS connect to the same MongoDB Atlas cluster (shared data)
 
 ## Key Database Schema
 - `guests`: `{ employee_number, name, room_number, check_in, check_out }`
