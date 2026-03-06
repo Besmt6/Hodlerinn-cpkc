@@ -234,7 +234,7 @@ export default function BookNow() {
             </div>
             <div>
               <p className="text-white font-medium text-sm">Location</p>
-              <p className="text-gray-400 text-xs">1003 S 1st St, Heavener</p>
+              <p className="text-gray-400 text-xs">820 US-59, Heavener</p>
             </div>
           </div>
           <div className="bg-black/30 backdrop-blur border border-amber-500/20 rounded-xl p-4 flex items-center gap-3">
@@ -431,7 +431,7 @@ export default function BookNow() {
             © {new Date().getFullYear()} Hodler Inn. All rights reserved.
           </p>
           <p className="text-gray-600 text-xs mt-2">
-            1003 S 1st St, Heavener, OK 74937
+            820 US-59, Heavener, OK 74937
           </p>
         </div>
       </footer>

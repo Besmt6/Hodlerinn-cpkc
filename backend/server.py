@@ -6523,7 +6523,7 @@ BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone"
 5. Be conversational, warm, and helpful. Introduce yourself as Bitsy. Don't overwhelm guests with all questions at once - ask naturally in conversation.
 
 6. Hotel info if asked:
-   - Address: 1003 S 1st St, Heavener, OK 74937
+   - Address: 820 US-59, Heavener, OK 74937
    - Phone: (918) 653-7801
    - Check-in time: 3:00 PM
    - Check-out time: 11:00 AM
@@ -6790,7 +6790,7 @@ cancelled 48 hours before the scheduled arrival date.
 
 HOTEL INFORMATION:
 Hodler Inn
-1003 S 1st St
+820 US-59
 Heavener, OK 74937
 Phone: (918) 653-7801
 
