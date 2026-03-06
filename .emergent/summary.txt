@@ -1,120 +1,115 @@
 <analysis>**original_problem_statement:**
-Build a two-part application, Hodler Inn, for managing railroad crew accommodations.
+The user requested a series of new features to be added to the Hodler Inn application. The core requirements implemented in this session were:
 
-**Guest Portal Requirements:**
-1.  Unified check-in/checkout flow.
-2.  Allow check-in for non-pre-approved guests (pending verification).
-3.  Voice guidance and visual feedback.
-4.  How to Use section.
-
-**Admin Backend Requirements:**
-1.  Guest activity dashboard with reporting (Excel, PNG, PDF).
-2.  Full CRUD for employee management, including bulk import from a third-party railroad portal.
-3.  An AI daily sync agent to verify stays against the railroad portal.
-4.  Telegram notifications for check-ins.
-5.  Bulk verification for pending guests.
-6.  An AI Phone Agent for wake-up calls.
-7.  Automatic daily data backups.
-8.  Automatic sold out email notifications.
-9.  Room management features (blocking, cleaning status).
-10. A Guarantee Report for contract tracking.
+**Feature Requests:**
+1.  **Per-Recipient Email Alerts:** Allow admins to customize which email alerts each recipient receives.
+2.  **Email Preview:** Add a feature to preview the content of each email alert before it is sent.
+3.  **Dashboard Room Search:** Implement a search bar on the admin dashboard to filter guest records by room number.
+4.  **AI Booking Chatbot (Bitsy):**
+    *   Create a new  page with a conversational AI chatbot for making reservations.
+    *   The chatbot should be named Bitsy.
+    *   It must handle the entire booking flow: collecting guest details, checking availability, and creating a reservation.
+    *   It should not collect payment but should inform guests to confirm by phone.
+    *   It must send email confirmations and Telegram notifications.
+    *   The chatbot needs to support voice input.
+5.  **Admin-Managed Chatbot Settings:**
+    *   Create a UI for admins to set rates (single/double), sales tax, and the maximum number of rooms the chatbot can sell per day.
+    *   The chatbot must use these settings for real-time pricing and availability checks.
+6.  **Demo Mode:** Create a sandboxed version of the guest and admin portals (, ) that uses a separate test database to allow for safe, interactive demonstrations without affecting production data.
+7.  **Manual Back-Dated Entry:** Add a form in the admin panel to allow for the manual entry of past check-ins, which should be included in billing records.
+8.  **CPKC Email Scraper:**
+    *   Build a service to automatically connect to a Zoho email account, find emails from , and parse the attached PDF booking sheets.
+    *   Import these guests as Expected Arrivals into the system.
+    *   The chatbot's availability logic must be updated to block sales when these arrivals are expected.
+    *   Create a UI in the admin dashboard to view and manage these expected arrivals.
+9.  **Blockchain/Token Rewards Idea:** The user expressed interest in a future loyalty token system. This has been noted but not implemented.
 
 **User's preferred language**: English
 
 **what currently exists?**
-A full-stack application (React/FastAPI) using a shared MongoDB Atlas database for both the Emergent-hosted production environment and the user's AWS backup server. The application has a sophisticated v11 sync agent, data import/export, and extensive admin features.
+The application is a feature-rich, full-stack platform for managing railroad crew accommodations. In this session, it was significantly expanded with numerous high-level features. Key additions include:
 
-In this session, the application was significantly enhanced with:
-- A complete booking/reservation system for non-railroad guests, including revenue and occupancy stats.
-- A system to log and manage entries from the railroad portal that are missing from the Hodler Inn database.
-- New scheduled daily status reports (7 AM & 10 PM) sent via email and Telegram.
-- An auto-dirty feature that marks rooms for cleaning 20 minutes after checkout.
-- Interactive Telegram commands and buttons for managing room cleaning status.
-- An admin UI to manage email alert settings and recipients.
+1.  **AI Booking Chatbot (Bitsy):** A complete conversational booking agent at the  endpoint, featuring voice input, dynamic pricing, and real-time availability checks.
+2.  **CPKC Email Scraper:** An automated background service that checks a Zoho inbox every 5 minutes, parses PDF attachments from CPKC, and imports them as Expected Arrivals.
+3.  **Advanced Admin Controls:** New UI sections for managing per-recipient email alerts, chatbot pricing/limits, manual back-dated entries, and viewing expected arrivals.
+4.  **Full Demo Mode:** A complete, interactive, and sandboxed version of the application accessible via  and  routes, using a separate database.
+5.  **UI/UX Enhancements:** A search filter for rooms on the main dashboard and an email preview modal.
+
+The backend monolith () and frontend monolith () have grown substantially to accommodate this new logic.
 
 **Last working item**:
--   **Last item agent was working:** The agent was implementing a feature to allow the admin to customize which specific alerts (e.g., 'Sold Out', 'Low Availability', 'Daily Status') each email recipient receives.
--   **Status:** IN PROGRESS
--   **Agent Testing Done:** N
--   **Which testing method agent to use?** both
--   **User Testing Done:** N
+-   **Last item agent was working:** Generating a PDF file containing the HTML/CSS code for embedding the Bitsy chatbot onto a WordPress site.
+-   **Status:** FINISHED
+-   **Agent Testing Done:** N/A
+-   **Which testing method agent to use?** NA
+-   **User Testing Done:** Y
 
 **All Pending/In progress Issue list**:
 -   **Issue 1: Final User Verification of Auto-Sync v11 Logic (P0)**
 -   **Issue 2: Untested Employee Import Feature (v2) (P1)**
--   **Issue 3: Recurring Docker  on AWS (P2)**
+-   **Issue 3: Voice Message Echo and Overlap (P2)**
 
 **Issues Detail:**
 -   **Issue 1: Final User Verification of Auto-Sync v11 Logic (P0)**
-    -   **Attempted fixes:** The v11 auto-sync was deployed to the user's AWS server. Its logic is designed to scan both the target date and the previous day's portal page to catch late arrivals.
-    -   **Next debug checklist:** The user needs to check the results of the daily auto-sync for March 5th. The agent should ask the user if the two test entries (EWING, HOLLEY) were successfully verified. If not, check the backend logs on the AWS server for errors related to the .
-    -   **Why fix this issue and what will be achieved with the fix?** This is the final validation for the application's most critical and historically problematic feature. Success confirms the sync agent is robust.
+    -   **Attempted fixes:** The v11 logic was deployed to AWS. The user was supposed to verify if test entries (EWING, HOLLEY) were correctly synced on March 5th.
+    -   **Next debug checklist:** Ask the user for the results of the verification. If it failed, inspect the  logs on the user's AWS server.
+    -   **Why fix this issue and what will be achieved with the fix?** This is the final validation for the app's most critical feature.
     -   **Status:** USER VERIFICATION PENDING
     -   **Is recurring issue?** Y
     -   **Should Test frontend/backend/both after fix?** Backend
     -   **Blocked on other issue:** None
 
 -   **Issue 2: Untested Employee Import Feature (v2) (P1)**
-    -   **Attempted fixes:** Based on a user's Loom video, the agent created a completely new function  in  to scrape employee data from a monthly report view on the railroad portal. This replaces a previous, non-functional approach.
-    -   **Next debug checklist:** The user needs to test the Import from Portal button on the admin dashboard (on either Emergent or AWS). If it fails, check the backend logs for output from the new  function to see where the Playwright navigation or data extraction is failing.
-    -   **Why fix this issue and what will be achieved with the fix?** This will provide the user with a reliable way to build a comprehensive employee database directly from the portal, a core requirement.
+    -   **Attempted fixes:** A new function  was created in .
+    -   **Next debug checklist:** Ask the user to test the Import from Portal button on the admin dashboard and report the results.
+    -   **Why fix this issue and what will be achieved with the fix?** Provides a core required feature for building the employee database.
     -   **Status:** USER VERIFICATION PENDING
     -   **Is recurring issue?** Y
     -   **Should Test frontend/backend/both after fix?** Backend
     -   **Blocked on other issue:** None
 
--   **Issue 3: Recurring Docker  on AWS (P2)**
-    -   **Attempted fixes:** The user repeatedly encountered this error on their AWS server, forcing multiple full system prunes and rebuilds. The agent eventually identified the root cause as an outdated  version and guided the user to upgrade it.
-    -   **Next debug checklist:** Monitor future AWS deployments. If the error reappears, investigate the  version again () and search for alternative causes related to Docker's state management on the user's specific OS.
-    -   **Why fix this issue and what will be achieved with the fix?** Prevents significant deployment friction and wasted time for the user.
-    -   **Status:** RESOLVED (pending confirmation over time)
+-   **Issue 3: Voice Message Echo and Overlap (P2)**
+    -   **Attempted fixes:** A fix was implemented in a prior session.
+    -   **Next debug checklist:** Ask the user to test the voice message feature on the guest portal.
+    -   **Why fix this issue and what will be achieved with the fix?** Ensures a smooth user experience on the guest-facing kiosk.
+    -   **Status:** USER VERIFICATION PENDING
     -   **Is recurring issue?** Y
-    -   **Should Test frontend/backend/both after fix?** N/A (DevOps issue)
+    -   **Should Test frontend/backend/both after fix?** Frontend
     -   **Blocked on other issue:** None
 
 **In progress Task List**:
--   **Task 1: Finish Customizable Per-Recipient Email Alerts (P1)**
-    -   **Where to resume:** The backend  was updated with new models and API logic to support storing which alerts each recipient should receive. The frontend in  now needs a UI for this. The current UI only allows adding/removing recipients and toggling entire alert types globally. It needs to be modified so that for each recipient, the admin can check/uncheck specific alerts (e.g., Sold Out, Low Availability, 7 AM Status, 10 PM Status).
-    -   **What will be achieved with this?** This will give the user fine-grained control over who receives which notification, preventing alert fatigue for certain managers.
-    -   **Status:** IN PROGRESS
-    -   **Should Test frontend/backend/both after fix?** Both
-    -   **Blocked on something:** None
+None. All tasks initiated in this session were completed.
 
 **Upcoming and Future Tasks**
--   **(P0) User Verification for Voice Message Echo:** A fix for voice message overlap was implemented in a previous session and is still awaiting user verification.
--   **(P1) AI Phone Agent Implementation:** Blocked pending information from the user's Virtual PBX provider.
--   **(P2) Smart Lock Integration:** Blocked pending user research on their vendor's API.
--   **(P2) Code Refactoring:** Decompose the monolithic  and  files for better maintainability.
--   **(P2) White-Label SaaS Version:** A long-term goal to productize the application.
--   **(P2) Blockchain Integration:** A user-suggested idea for future exploration.
+- **Upcoming Tasks:**
+    - (P0) Deploy all newly created features (Chatbot, Demo Mode, Email Scraper, etc.) to the production environment.
+    - (P0) Conduct thorough user verification of all new features on the production environment after deployment.
+    - (P1) AI Phone Agent Implementation (Blocked: pending info from user's Virtual PBX provider).
+    - (P1) Smart Lock Integration (Blocked: pending user research on vendor API).
+
+- **Future Tasks:**
+    - (P2) **HODL Rewards Token:** Implement the discussed blockchain/loyalty token system.
+    - (P2) **Code Refactoring:** Decompose the monolithic  and  files. This is now critical due to the significant additions in this session.
+    - (P3) White-Label SaaS Version.
 
 **Completed work in this session**
--   **AWS Deployment & Debugging:** Guided user through deploying v11 sync agent to their AWS server, fixing numerous issues including Docker permissions, , and a critical missing .
--   ** Upgrade:** Permanently fixed a recurring Docker error on the user's AWS server by upgrading .
--   **Employee List Bug Fix:** Fixed a  that caused the Employee List page to be blank.
--   **Preserve Stay Records on Deletion:** Modified the guest removal logic to soft delete guests, preserving their historical stay and billing records.
--   **Non-Railroad Guest & Reservation System:** Transformed the Block Room feature into a full booking system for walk-in guests, complete with future reservations, revenue/occupancy stats, and email confirmations with a cancellation policy.
--   **Advanced Alerting System:**
-    -   Implemented scheduled daily status reports (7 AM & 10 PM) via email and Telegram.
-    -   Created an auto-dirty feature that flags rooms for cleaning 20 minutes after checkout.
-    -   Added an admin UI to manage email alert recipients and toggle master alert switches.
--   **Interactive Telegram Bot:** Upgraded Telegram notifications to include clickable buttons (e.g., ), replacing the need to type commands.
--   **Missing Entry Tracking:** The sync agent now automatically records portal entries that don't match any Hodler Inn records into a new  database collection, with a corresponding management API.
--   **Document Generation:** Created and provided PDF versions of the user's LinkedIn profile and printable guest kiosk instructions.
+- **Per-Recipient Email Alerts:** Implemented and tested a UI for admins to control which alerts each recipient gets.
+- **Email Preview Modal:** Added a feature to preview alert emails before sending.
+- **Dashboard Room # Search:** Created a search filter on the admin dashboard.
+- **AI Booking Chatbot (Bitsy):** Built a complete conversational booking agent with voice input, dynamic admin-controlled pricing/tax, real-time availability, email/Telegram notifications, and a new  page.
+- **Full Demo Mode:** Created sandboxed  and  routes that use a separate, resettable test database.
+- **Manual Entry Form:** Added a modal for admins to add back-dated guest check-ins.
+- **CPKC Email Scraper:** Built an automated service to check a Zoho inbox, parse PDF attachments, and import Expected Arrivals.
+- **Expected Arrivals UI:** Added a section in the admin dashboard to view and manage guests imported from emails.
+- **Application-wide Address Correction:** Updated the business address to 820 US-59, Heavener, OK 74937 across all relevant parts of the application.
+- **Generated Documentation:** Created a PDF with embed code for the chatbot.
 
 **Earlier issues found/mentioned but not fixed**
--   **Issue 1: Voice Message Echo and Overlap**
-    -   A fix was implemented in a previous session, but it has not been verified by the user. This should be confirmed as working.
-    -   **Status:** USER VERIFICATION PENDING
-    -   **Should Test frontend/backend/both after fix:** Frontend/User Experience
+None.
 
 **Known issue recurrence from previous fork**
--   **AI Sync Agent Failure:** This was the primary recurring issue. Its final verification is the top priority for the next session.
--   **Recurrence count:** High.
--   **Status:** USER VERIFICATION PENDING
--   ** on AWS:** A new recurring issue in this session.
--   **Recurrence count:** High (within this session).
--   **Status:** RESOLVED (pending monitoring).
+-   **AI Sync Agent Failure:** Verification is still pending. Status: USER VERIFICATION PENDING.
+-   ** on AWS:** Believed to be resolved by a  upgrade, but requires long-term monitoring. Status: RESOLVED (pending monitoring).
 
 **Code Architecture**
 
@@ -122,84 +117,168 @@ In this session, the application was significantly enhanced with:
 **Key Technical Concepts**
 -   **Frontend:** React, Tailwind CSS, Shadcn UI
 -   **Backend:** FastAPI, , 
--   **Database:** MongoDB Atlas (Shared Cloud DB)
--   **Automation:** Playwright for web scraping
--   **Deployment:** Docker, Docker Compose, AWS EC2, Emergent Platform
--   **Notifications:** Telegram Bot API
+-   **Database:** MongoDB Atlas
+-   **LLM Integration:**  for GPT-5.2.
+-   **Email Scraping:**  (for IMAP) and usage: pdfplumber [-h] [--structure | --structure-text]
+                  [--format {csv,json,text}] [--types TYPES [TYPES ...]]
+                  [--include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]]
+                  [--exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]]
+                  [--laparams LAPARAMS] [--precision PRECISION]
+                  [--pages PAGES [PAGES ...]] [--indent INDENT]
+                  [infile]
+
+positional arguments:
+  infile
+
+options:
+  -h, --help            show this help message and exit
+  --structure           Write the structure tree as JSON. All other arguments
+                        except --pages, --laparams, and --indent will be
+                        ignored
+  --structure-text      Write the structure tree as JSON including text
+                        contents. All other arguments except --pages,
+                        --laparams, and --indent will be ignored
+  --format {csv,json,text}
+  --types TYPES [TYPES ...]
+  --include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]
+                        Include *only* these object attributes in output.
+  --exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]
+                        Exclude these object attributes from output.
+  --laparams LAPARAMS
+  --precision PRECISION
+  --pages PAGES [PAGES ...]
+  --indent INDENT       Indent level for JSON pretty-printing. (for PDF parsing).
+-   **Web Automation:** Playwright (for sync agent).
+-   **Deployment:** Docker, Docker Compose, AWS EC2.
 
 **key DB schema**
--   : Stores individual stay records. Now includes a  flag for soft deletes.
--   : Master list of railroad employees.
--   : Stores records for non-railroad guests and future reservations.
--   : Logs entries from the portal sync that couldn't be matched.
--   : Stores global settings, now includes .
-
-**changes in tech stack**
--   The user's AWS instance  was upgraded to v5.1.0 to fix a persistent bug.
+-   ****: Heavily modified to include , , , , .
+-   ****: (New) Stores guest data parsed from CPKC emails before they check in.
+-   ****: (New) Logs instances where the chatbot could not make a sale due to CPKC priority.
+-   **Demo Collections**: All collections can now be prefixed with  (e.g., ) when accessed via the demo mode routes.
 
 **All files of reference**
--   : Heavily modified with new endpoints for reservations, missing entries, email settings, Telegram callbacks, and new scheduled jobs.
--   : Contains the new  function.
--   : Heavily modified to add UI for the Non-Railroad Guest/Reservation system, email alert management, and various buttons/stats.
--   User's AWS server:  was modified to include the .
+-   : Massively expanded with chatbot, demo, manual entry, and email scraping logic.
+-   : Massively expanded with UI for all new admin features.
+-   : New file for the chatbot interface.
+-   : New file, wrapper for demo mode.
+-   : New file, wrapper for demo mode.
+-   : Modified to include new  and  routes.
+-   : Updated with  and usage: pdfplumber [-h] [--structure | --structure-text]
+                  [--format {csv,json,text}] [--types TYPES [TYPES ...]]
+                  [--include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]]
+                  [--exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]]
+                  [--laparams LAPARAMS] [--precision PRECISION]
+                  [--pages PAGES [PAGES ...]] [--indent INDENT]
+                  [infile]
+
+positional arguments:
+  infile
+
+options:
+  -h, --help            show this help message and exit
+  --structure           Write the structure tree as JSON. All other arguments
+                        except --pages, --laparams, and --indent will be
+                        ignored
+  --structure-text      Write the structure tree as JSON including text
+                        contents. All other arguments except --pages,
+                        --laparams, and --indent will be ignored
+  --format {csv,json,text}
+  --types TYPES [TYPES ...]
+  --include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]
+                        Include *only* these object attributes in output.
+  --exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]
+                        Exclude these object attributes from output.
+  --laparams LAPARAMS
+  --precision PRECISION
+  --pages PAGES [PAGES ...]
+  --indent INDENT       Indent level for JSON pretty-printing..
 
 **Areas that need refactoring**:
--   : Now exceeds 3000 lines. Urgently needs to be broken into FastAPI routers by feature (e.g., , , ).
--   : Exceeds 4000 lines. Must be decomposed into smaller components (e.g., , , ).
+-   : Now critically oversized (estimated 3500+ lines). Urgently needs to be broken down into feature-specific routers (e.g., , , ).
+-   : Also critically oversized (estimated 5000+ lines). Must be decomposed into smaller, manageable components. The technical debt has increased significantly.
 
 **key api endpoints**
--   : (POST) Enhanced to create non-railroad guest records and reservations.
--   : (GET) List future reservations.
--   : (POST) Convert a reservation to an active guest.
--   : (DELETE) Cancel a reservation.
--   : (POST) Send booking confirmation.
--   : (GET) View logged missing entries from sync.
--   : (GET/POST) Manage email alert settings.
--   : The webhook handler now processes button callbacks ().
+-    (POST),  (POST),  (GET)
+-    (POST)
+-    (POST)
+-    (POST)
+-    (POST),  (GET/DELETE),  (POST/GET)
+-    (GET)
 
 **Critical Info for New Agent**
--   **Production vs. Backup:** The user's production site that guests use is ****, which points to the **Emergent environment**. The AWS server (IP: ) is only a backup/testing environment. The agent has noted the correct AWS Account ID () for future reference.
--   **Top Priority:** The most important pending item is verifying the success or failure of the v11 auto-sync for the EWING & HOLLEY test case.
--   **User Feedback:** The user expressed frustration that the agent repeatedly offered a workaround for the Docker  instead of diagnosing the root cause sooner. The next agent should prioritize root cause analysis for recurring issues.
--   **New Features Untested:** A large number of features were added in this session (reservations, new alerts, Telegram buttons, etc.). They have not been formally tested. The next agent should be prepared to debug them.
+-   **Deploy and Verify:** The immediate next step is for the user to deploy the massive number of new features. Post-deployment, a thorough verification of every new feature on the production domain () is the highest priority.
+-   **Technical Debt:** Be aware that the two main files (, ) are now extremely large and difficult to maintain. Any future work should ideally start with refactoring.
+-   **User Verification Items:** Do not forget the three pending user verification items from previous sessions (v11 sync, employee import, voice echo). These are still high-priority.
+-   **Future Ideas:** The user is interested in a blockchain-based rewards token ( or ). This has been saved to memory and should be brought up again after the current feature set is stable.
 
 **documents and test reports created in this job**
 -   
 -   
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** Asks if they can customize which alerts are sent to which email recipient. (IN PROGRESS)
-2.  **User:** Requests new daily status alerts (7 AM/10 PM), an auto-dirty room feature, and the ability to change room status from Telegram. (Completed)
-3.  **User:** Asks for Telegram commands to be replaced with clickable buttons. (Completed)
-4.  **User:** Asks if they can manage email alerts from the admin dashboard. (Completed)
-5.  **User:** Details requirements for an enhanced Block Room feature to handle non-railroad guests, reservations, and revenue tracking. (Completed)
-6.  **User:** Reports the sync agent isn't pulling new employee names and provides a Loom video. (A new v2 import script was created but is untested).
-7.  **User:** Reports being unable to connect to the AWS instance, then realizes they are in the wrong AWS account. (Resolved).
-8.  **User:** Asks the agent to create a record of missing entries when the sync runs. (Completed).
-9.  **User:** Praises the agent but criticizes it for not fixing the root cause of the recurring Docker error sooner.
-10. **User:** Asks the agent to remember that  points to Emergent, not AWS. (Acknowledged).
+1.  **User:** Asks for blockchain/reward token ideas. (Agent provided ideas, user deferred).
+2.  **User:** Confirms how the auto-dirty room status feature works. (Agent confirmed).
+3.  **User:** Asks for the code to add the Bitsy chatbot to their WordPress site. (Agent provided multiple options).
+4.  **User:** Asks for a PDF version of the embed code. (Agent created it).
+5.  **User:** Acknowledges the agent's work with Ok thanks.
+6.  **User:** States they will wait for the verifications at 3 PM Central.
+7.  **User:** Asks what the Enhancement Suggestion was. (Agent explained Email Preview).
+8.  **User:** Approves the implementation of the Email Preview feature.
+9.  **User:** Provides requirements for dashboard search and an AI chatbot for reservations.
+10. **User:** Specifies that the chatbot should open on a Book Now page.
 
 **Project Health Check:**
--   **Broken:** Nothing is critically broken, but the frontend may have bugs due to the large number of new, untested features. The employee import feature (v2) is likely non-functional until selectors are fine-tuned.
+-   **Broken:** Nothing is broken in the preview environment. However, a massive number of new, complex, and largely untested (by testing agent) features are pending deployment. There is a high risk of bugs on production.
 -   **Mocked:** None.
 
 **3rd Party Integrations**
--   **API Global Solutions - Provider Rail Portal:** Integrated via Playwright.
--   **OpenAI TTS-1:** Integrated for voice guidance.
--   **Telegram:** Integrated for admin notifications and now interactive commands.
--   **Zoho WorkDrive:** Integrated for daily backups.
+-   **API Global Solutions - Rail Portal:** Integrated via Playwright.
+-   **OpenAI TTS-1 & GPT-5.2:** Integrated via  for voice guidance and the chatbot.
+-   **Telegram:** Integrated for admin notifications.
+-   **Zoho WorkDrive/Mail:** Integrated via  for daily backups and now email scraping.
 -   **MongoDB Atlas:** Primary database.
+-   **usage: pdfplumber [-h] [--structure | --structure-text]
+                  [--format {csv,json,text}] [--types TYPES [TYPES ...]]
+                  [--include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]]
+                  [--exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]]
+                  [--laparams LAPARAMS] [--precision PRECISION]
+                  [--pages PAGES [PAGES ...]] [--indent INDENT]
+                  [infile]
+
+positional arguments:
+  infile
+
+options:
+  -h, --help            show this help message and exit
+  --structure           Write the structure tree as JSON. All other arguments
+                        except --pages, --laparams, and --indent will be
+                        ignored
+  --structure-text      Write the structure tree as JSON including text
+                        contents. All other arguments except --pages,
+                        --laparams, and --indent will be ignored
+  --format {csv,json,text}
+  --types TYPES [TYPES ...]
+  --include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]
+                        Include *only* these object attributes in output.
+  --exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]
+                        Exclude these object attributes from output.
+  --laparams LAPARAMS
+  --precision PRECISION
+  --pages PAGES [PAGES ...]
+  --indent INDENT       Indent level for JSON pretty-printing.**: New dependency for parsing PDF attachments.
 
 **Testing status**
--   **Testing agent used after significant changes:** NO. Many significant features were added without using the testing agent.
+-   **Testing agent used after significant changes:** NO. The agent used the testing agent once for the initial email alert feature but did not use it for any of the subsequent, much larger features (chatbot, demo mode, email scraper). This is a significant testing gap.
 -   **Troubleshoot agent used after agent stuck in loop:** NO
 -   **Test files created:** []
--   **Known regressions:** The employee import feature is likely regressed/still broken.
+-   **Known regressions:** The employee import feature (v2) is untested and likely non-functional.
 
 **Credentials to test flow:**
--   **Admin Login:** Access at  with password .
--   **MongoDB Atlas:** Credentials are in .
+-   **Admin Login:** Access at  (or  for demo) with password .
+-   **Zoho Credentials:** Required for the email scraper. They are in .
+-   **Emergent LLM Key:** Required for the chatbot. It is in .
 
 **What agent forgot to execute**
--   The agent did not perform a root cause analysis on the recurring Docker error until prompted multiple times by the user. This led to wasted time and user frustration. The next agent should be more proactive in diagnosing recurring environmental or tooling issues.
--   The agent implemented a large number of complex, interconnected features (reservations, new alerts, Telegram interactions) in a single batch without intermediate testing, increasing the risk of bugs. It would be better to implement and test these features more incrementally.</analysis>
+- The agent did not use the  after implementing several large, critical features like the AI chatbot, demo mode, and the email scraper. Self-testing with  and screenshots is insufficient for features of this complexity.
+- The agent continued to add thousands of lines of code to the monolithic  and  files without prioritizing the refactoring task mentioned in the handoff summary. This has significantly worsened the application's technical debt.</analysis>

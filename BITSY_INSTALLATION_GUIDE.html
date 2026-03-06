@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Bitsy Chat Button - Installation Guide for Hodler Inn</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+            line-height: 1.6;
+            color: #333;
+        }
+        h1 {
+            color: #d97706;
+            border-bottom: 3px solid #f59e0b;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #1f2937;
+            margin-top: 30px;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo-text {
+            font-size: 32px;
+            font-weight: bold;
+            color: #f59e0b;
+        }
+        .code-block {
+            background: #1f2937;
+            color: #10b981;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .step {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .step-number {
+            background: #f59e0b;
+            color: #000;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .success {
+            background: #ecfdf5;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .preview {
+            text-align: center;
+            padding: 30px;
+            background: #111827;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .preview-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #000;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        footer {
+            margin-top: 50px;
+            text-align: center;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="logo">
+    <div class="logo-text">🏨 Hodler Inn</div>
+    <p>Bitsy Chat Button - WordPress Installation Guide</p>
+</div>
+
+<h1>Floating Chat Button Installation</h1>
+
+<p>This guide will help you add the <strong>Bitsy AI Booking Assistant</strong> floating button to the Hodler Inn WordPress website. The button will appear on every page, allowing visitors to easily book rooms.</p>
+
+<h2>Preview</h2>
+<div class="preview">
+    <span class="preview-btn">💬 Chat with Bitsy</span>
+    <p style="color: #9ca3af; margin-top: 15px;">Button appears in bottom-right corner of every page</p>
+</div>
+
+<h2>Installation Steps</h2>
+
+<div class="step">
+    <span class="step-number">1</span>
+    <strong>Log in to WordPress Admin</strong><br>
+    Go to: <code>hodlerinn.com/wp-admin</code>
+</div>
+
+<div class="step">
+    <span class="step-number">2</span>
+    <strong>Navigate to Theme Editor or use a Plugin</strong><br>
+    <strong>Option A:</strong> Go to <em>Appearance → Theme Editor → footer.php</em><br>
+    <strong>Option B:</strong> Install plugin "Insert Headers and Footers" and add code to Footer section
+</div>
+
+<div class="step">
+    <span class="step-number">3</span>
+    <strong>Copy and Paste the Code Below</strong><br>
+    Add this code just before the closing <code>&lt;/body&gt;</code> tag
+</div>
+
+<h2>The Code</h2>
+
+<div class="code-block">&lt;!-- Bitsy Chat Button - Hodler Inn --&gt;
+&lt;style&gt;
+#bitsy-chat-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(245,158,11,0.5);
+  z-index: 9999;
+  transition: transform 0.3s, box-shadow 0.3s;
+  text-decoration: none;
+}
+#bitsy-chat-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 25px rgba(245,158,11,0.7);
+}
+#bitsy-chat-btn svg {
+  width: 30px;
+  height: 30px;
+  fill: #000;
+}
+#bitsy-chat-btn .badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #10b981;
+  color: white;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 10px;
+  font-weight: bold;
+}
+&lt;/style&gt;
+
+&lt;a id="bitsy-chat-btn" href="https://cpkc.hodlerinn.com/book" title="Chat with Bitsy - Book Your Room"&gt;
+  &lt;span class="badge"&gt;Online&lt;/span&gt;
+  &lt;svg viewBox="0 0 24 24"&gt;&lt;path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/&gt;&lt;/svg&gt;
+&lt;/a&gt;
+&lt;!-- End Bitsy Chat Button --&gt;</div>
+
+<div class="step">
+    <span class="step-number">4</span>
+    <strong>Save Changes</strong><br>
+    Click "Update File" or "Save" button
+</div>
+
+<div class="step">
+    <span class="step-number">5</span>
+    <strong>Test the Button</strong><br>
+    Visit hodlerinn.com and look for the golden chat button in the bottom-right corner
+</div>
+
+<h2>What the Button Does</h2>
+
+<div class="success">
+    <strong>✅ When visitors click the button:</strong>
+    <ul>
+        <li>Opens the Bitsy AI booking assistant</li>
+        <li>Guests can book rooms through natural conversation</li>
+        <li>Collects: Name, Email, Phone, Check-in/out dates, Room preference</li>
+        <li>Creates reservation automatically</li>
+        <li>Sends confirmation email to guest</li>
+        <li>Notifies admin via Telegram</li>
+    </ul>
+</div>
+
+<h2>Troubleshooting</h2>
+
+<div class="warning">
+    <strong>⚠️ Button not showing?</strong>
+    <ul>
+        <li>Clear your browser cache (Ctrl+Shift+R)</li>
+        <li>Clear WordPress cache if using caching plugin</li>
+        <li>Make sure code is placed before &lt;/body&gt; tag</li>
+        <li>Check for JavaScript errors in browser console (F12)</li>
+    </ul>
+</div>
+
+<h2>Customization Options</h2>
+
+<p><strong>Change button position:</strong> Edit <code>bottom: 20px; right: 20px;</code> to adjust placement</p>
+<p><strong>Change button size:</strong> Edit <code>width: 60px; height: 60px;</code></p>
+<p><strong>Change colors:</strong> Edit <code>#f59e0b</code> (gold) and <code>#d97706</code> (dark gold)</p>
+
+<h2>Support</h2>
+
+<p>If you need help with installation, contact:</p>
+<ul>
+    <li><strong>Phone:</strong> (918) 653-7801</li>
+    <li><strong>Hotel Address:</strong> 820 US-59, Heavener, OK 74937</li>
+</ul>
+
+<footer>
+    <p><strong>Hodler Inn</strong> - 820 US-59, Heavener, OK 74937</p>
+    <p>Powered by Bitsy AI Booking Assistant</p>
+    <p>Document created: March 2026</p>
+</footer>
+
+</body>
+</html>
