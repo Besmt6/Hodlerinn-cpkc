@@ -690,6 +690,24 @@ export default function BookNow() {
             <p className="text-center text-gray-500 text-xs mt-3">
               By making a reservation, you agree to confirm by calling (918) 653-7801
             </p>
+            
+            {/* Policy Notice - visible in chat */}
+            <div className="flex items-center justify-center gap-4 mt-3 py-2 px-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <div className="flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                </svg>
+                <span className="text-red-400 text-xs font-medium">100% Non-Smoking</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                </svg>
+                <span className="text-red-400 text-xs font-medium">No Pets</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -720,16 +738,12 @@ export default function BookNow() {
       {/* Footer */}
       <footer className="mt-8 py-6 bg-slate-900/50 border-t border-slate-800">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4">
             <div className="flex items-center gap-3">
               <MapPin className="w-4 h-4 text-amber-500/60" />
               <span className="text-gray-500 text-sm">820 US-59, Heavener, OK 74937</span>
             </div>
-            <div className="flex items-center gap-2 bg-amber-500/10 px-4 py-2 rounded-full">
-              <span className="text-amber-400 text-xs font-medium">100% Non-Smoking</span>
-              <span className="text-gray-600">•</span>
-              <span className="text-amber-400 text-xs font-medium">No Pets</span>
-            </div>
+            <span className="text-gray-600 hidden md:inline">•</span>
             <p className="text-gray-600 text-xs">
               © {new Date().getFullYear()} Hodler Inn
             </p>
