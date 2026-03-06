@@ -29,6 +29,13 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 import asyncio
 import json
 
+# Optional telegram import
+try:
+    from telegram import Bot
+except ImportError:
+    Bot = None
+    logging.warning("python-telegram-bot not installed, Telegram notifications disabled")
+
 ROOT_DIR = Path(__file__).parent
 AUDIO_DIR = ROOT_DIR / "audio"
 AUDIO_DIR.mkdir(exist_ok=True)
@@ -587,18 +594,10 @@ def update_auto_sync_schedule(enabled: bool, start_date: str = None):
             # Schedule for 3 PM Central Time (America/Chicago) every day
             from pytz import timezone
             central_tz = timezone('America/Chicago')
-            def run_auto_sync():
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        asyncio.ensure_future(auto_sync_task())
-                    else:
-                        asyncio.run(auto_sync_task())
-                except RuntimeError:
-                    asyncio.run(auto_sync_task())
             
+            # Pass async function directly - AsyncIOScheduler handles it
             scheduler.add_job(
-                run_auto_sync,
+                auto_sync_task,
                 CronTrigger(hour=15, minute=0, start_date=trigger_start, timezone=central_tz),
                 id=AUTO_SYNC_JOB_ID,
                 replace_existing=True
@@ -621,54 +620,24 @@ async def start_scheduler():
     scheduler.add_job(monthly_data_reset, CronTrigger(day=1, hour=0, minute=0))
     
     # Daily status alerts at 7 AM and 10 PM Central Time
-    def run_morning_alert():
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(send_daily_status_alert("morning"))
-            else:
-                asyncio.run(send_daily_status_alert("morning"))
-        except RuntimeError:
-            asyncio.run(send_daily_status_alert("morning"))
-    
-    def run_evening_alert():
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(send_daily_status_alert("evening"))
-            else:
-                asyncio.run(send_daily_status_alert("evening"))
-        except RuntimeError:
-            asyncio.run(send_daily_status_alert("evening"))
-    
+    # Pass async functions directly - AsyncIOScheduler handles them
     scheduler.add_job(
-        run_morning_alert,
+        lambda: asyncio.create_task(send_daily_status_alert("morning")),
         CronTrigger(hour=7, minute=0, timezone=central_tz),
         id="morning_status_alert",
         replace_existing=True
     )
     scheduler.add_job(
-        run_evening_alert,
+        lambda: asyncio.create_task(send_daily_status_alert("evening")),
         CronTrigger(hour=22, minute=0, timezone=central_tz),
         id="evening_status_alert",
         replace_existing=True
     )
     logging.info("Daily status alerts scheduled for 7 AM and 10 PM Central Time")
     
-    # Auto-dirty checker every 5 minutes
-    def run_check_dirty_rooms():
-        """Wrapper to run async check_and_mark_dirty_rooms in scheduler context."""
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(check_and_mark_dirty_rooms())
-            else:
-                asyncio.run(check_and_mark_dirty_rooms())
-        except RuntimeError:
-            asyncio.run(check_and_mark_dirty_rooms())
-    
+    # Auto-dirty checker every 5 minutes - pass async function directly
     scheduler.add_job(
-        run_check_dirty_rooms,
+        check_and_mark_dirty_rooms,
         'interval',
         minutes=5,
         id="auto_dirty_checker",
@@ -1036,7 +1005,7 @@ async def register_guest_pending(input: GuestRegistrationCreate):
     
     # Send Telegram notification about new unverified employee
     chat_id = await get_telegram_chat_id()
-    if TELEGRAM_BOT_TOKEN and chat_id:
+    if Bot and TELEGRAM_BOT_TOKEN and chat_id:
         try:
             bot = Bot(token=TELEGRAM_BOT_TOKEN)
             message = (
@@ -7523,6 +7492,7 @@ import imaplib
 import email
 from email.header import decode_header
 import pdfplumber
+import re
 # io is already imported at top of file
 
 # Create CPKC router
@@ -7881,25 +7851,19 @@ async def get_revenue_losses(start_date: Optional[str] = None, end_date: Optiona
 # Include CPKC router
 app.include_router(cpkc_router, prefix="/api")
 
-# Schedule email check every 5 minutes
-def run_check_cpkc_emails():
-    """Wrapper to run async check_cpkc_emails in scheduler context."""
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(check_cpkc_emails())
-        else:
-            asyncio.run(check_cpkc_emails())
-    except RuntimeError:
-        asyncio.run(check_cpkc_emails())
+# CPKC email check will be scheduled in the startup event below
 
-scheduler.add_job(
-    run_check_cpkc_emails,
-    'interval',
-    minutes=5,
-    id='cpkc_email_check',
-    replace_existing=True
-)
+@app.on_event("startup")
+async def schedule_cpkc_email_check():
+    """Schedule CPKC email check after app startup when event loop is ready."""
+    scheduler.add_job(
+        check_cpkc_emails,  # Pass async function directly - AsyncIOScheduler handles it
+        'interval',
+        minutes=5,
+        id='cpkc_email_check',
+        replace_existing=True
+    )
+    logging.info("CPKC email check scheduled every 5 minutes")
 
 
 @app.on_event("shutdown")
