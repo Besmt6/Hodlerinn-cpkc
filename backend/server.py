@@ -344,6 +344,30 @@ async def auto_sync_task():
             "names_updated": names_updated
         })
         
+        # Store missing entries record for tracking
+        missing_entries = results.get("missing_in_hodler", [])
+        if missing_entries:
+            for missing in missing_entries:
+                await db.missing_entries.update_one(
+                    {
+                        "name": missing.get("name"),
+                        "date": yesterday
+                    },
+                    {
+                        "$set": {
+                            "name": missing.get("name"),
+                            "date": yesterday,
+                            "reason": missing.get("reason", "Not found in Hodler Inn records"),
+                            "best_matches": missing.get("best_matches", []),
+                            "recorded_at": datetime.now(timezone.utc).isoformat(),
+                            "auto_sync": True,
+                            "resolved": False
+                        }
+                    },
+                    upsert=True
+                )
+            logging.info(f"Auto-sync: Recorded {len(missing_entries)} missing entries")
+        
         # Update sync status
         global sync_status
         sync_status["last_run"] = datetime.now(timezone.utc).isoformat()
@@ -3981,6 +4005,31 @@ async def run_sync(
                 "results": results
             })
             
+            # Store missing entries record for tracking (manual sync)
+            missing_entries = all_results.get("missing_in_hodler", [])
+            if missing_entries:
+                for missing in missing_entries:
+                    await db.missing_entries.update_one(
+                        {
+                            "name": missing.get("name"),
+                            "date": sync_params["target"]
+                        },
+                        {
+                            "$set": {
+                                "id": str(uuid.uuid4()),
+                                "name": missing.get("name"),
+                                "date": sync_params["target"],
+                                "reason": missing.get("reason", "Not found in Hodler Inn records"),
+                                "best_matches": missing.get("best_matches", []),
+                                "recorded_at": datetime.now(timezone.utc).isoformat(),
+                                "auto_sync": False,
+                                "resolved": False
+                            }
+                        },
+                        upsert=True
+                    )
+                logging.info(f"Manual sync: Recorded {len(missing_entries)} missing entries")
+            
         except Exception as e:
             logging.error(f"Sync task failed: {str(e)}")
             sync_status["progress"] = f"Sync failed: {str(e)}"
@@ -4312,6 +4361,65 @@ async def delete_name_alias(alias_id: str):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Alias not found")
     return {"message": "Alias deleted"}
+
+
+# ==================== Missing Entries Tracking ====================
+
+@api_router.get("/admin/missing-entries")
+async def get_missing_entries(resolved: bool = None):
+    """Get all missing entries recorded during sync runs."""
+    query = {}
+    if resolved is not None:
+        query["resolved"] = resolved
+    
+    entries = await db.missing_entries.find(query, {"_id": 0}).sort("recorded_at", -1).to_list(500)
+    return entries
+
+
+@api_router.post("/admin/missing-entries/{entry_id}/resolve")
+async def resolve_missing_entry(entry_id: str, employee_number: str = None):
+    """Mark a missing entry as resolved, optionally linking to an employee."""
+    result = await db.missing_entries.update_one(
+        {"id": entry_id},
+        {
+            "$set": {
+                "resolved": True,
+                "resolved_at": datetime.now(timezone.utc).isoformat(),
+                "linked_employee": employee_number
+            }
+        }
+    )
+    if result.matched_count == 0:
+        # Try matching by name
+        result = await db.missing_entries.update_one(
+            {"name": entry_id},
+            {
+                "$set": {
+                    "resolved": True,
+                    "resolved_at": datetime.now(timezone.utc).isoformat(),
+                    "linked_employee": employee_number
+                }
+            }
+        )
+    
+    return {"message": "Missing entry marked as resolved"}
+
+
+@api_router.delete("/admin/missing-entries/{entry_id}")
+async def delete_missing_entry(entry_id: str):
+    """Delete a missing entry record."""
+    result = await db.missing_entries.delete_one({"id": entry_id})
+    if result.deleted_count == 0:
+        result = await db.missing_entries.delete_one({"name": entry_id})
+    return {"message": "Missing entry deleted"}
+
+
+@api_router.delete("/admin/missing-entries")
+async def clear_missing_entries(resolved_only: bool = True):
+    """Clear missing entries (resolved ones by default, or all if resolved_only=False)."""
+    query = {"resolved": True} if resolved_only else {}
+    result = await db.missing_entries.delete_many(query)
+    return {"message": f"Deleted {result.deleted_count} missing entries"}
 
 
 @api_router.post("/admin/import-from-guests")
