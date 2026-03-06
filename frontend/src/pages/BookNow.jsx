@@ -38,81 +38,21 @@ export default function BookNow() {
   const [availability, setAvailability] = useState(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [showPlayButton, setShowPlayButton] = useState(false);
-  const [greetingMessageId, setGreetingMessageId] = useState("bitsy_greeting");
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const hasPlayedGreeting = useRef(false);
-  const isRecordingRef = useRef(false); // Track recording state for closure
+  const isRecordingRef = useRef(false);
 
-  // Play voice message from backend (OpenAI TTS)
-  const playVoiceMessage = (messageId, isAutoplay = false) => {
-    if (!voiceEnabled) return;
-    
-    // Stop any currently playing audio
-    stopSpeaking();
-    
-    const audio = new Audio(`${API}/voice/${messageId}`);
-    audio.volume = 0.9;
-    currentAudio = audio;
-    
-    setIsSpeaking(true);
-    setShowPlayButton(false);
-    
-    audio.onended = () => {
-      setIsSpeaking(false);
-      currentAudio = null;
-    };
-    
-    audio.onerror = () => {
-      setIsSpeaking(false);
-      currentAudio = null;
-      // Fallback to Web Speech API if backend TTS fails
-      fallbackSpeak(messageId);
-    };
-    
-    audio.play().catch(err => {
-      console.log("Audio autoplay blocked by browser:", err);
-      setIsSpeaking(false);
-      currentAudio = null;
-      // If autoplay was blocked, show a play button
-      if (isAutoplay) {
-        setShowPlayButton(true);
-        setGreetingMessageId(messageId);
-      }
-    });
-  };
-
-  // Fallback Web Speech API for greeting
-  const fallbackSpeak = (messageId) => {
-    if (!('speechSynthesis' in window)) return;
-    
-    const messages = {
-      "bitsy_greeting": "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?",
-      "bitsy_greeting_sold_out": "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
-    };
-    
-    const text = messages[messageId];
-    if (text) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.95;
-      utterance.volume = 0.9;
-      setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  // Text-to-Speech function using Web Speech API (for dynamic responses)
+  // Speak text using Web Speech API (autoplays without user interaction)
   const speakText = (text) => {
     if (!voiceEnabled || !('speechSynthesis' in window)) return;
     
-    // Stop any currently playing audio
+    // Stop any currently playing
     stopSpeaking();
     
-    // Clean text for speech (remove emojis and special chars)
+    // Clean text for speech
     const cleanText = text.replace(/[🏨⚠️•\n\*]/g, ' ').replace(/\$/g, ' dollars ').replace(/\s+/g, ' ').trim();
     
     const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -120,17 +60,16 @@ export default function BookNow() {
     utterance.pitch = 1.0;
     utterance.volume = 0.9;
     
-    // Try to use a female voice
+    // Try to get a good voice
     const voices = window.speechSynthesis.getVoices();
-    const femaleVoice = voices.find(v => 
-      v.name.toLowerCase().includes('female') || 
+    const preferredVoice = voices.find(v => 
       v.name.toLowerCase().includes('samantha') ||
-      v.name.toLowerCase().includes('victoria') ||
-      v.name.toLowerCase().includes('karen') ||
-      v.name.toLowerCase().includes('google us english')
+      v.name.toLowerCase().includes('google us english') ||
+      v.name.toLowerCase().includes('microsoft zira') ||
+      v.lang === 'en-US'
     );
-    if (femaleVoice) {
-      utterance.voice = femaleVoice;
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
     }
     
     setIsSpeaking(true);
@@ -174,26 +113,25 @@ export default function BookNow() {
         
         setMessages([{ role: "assistant", content: welcomeMsg }]);
         
-        // Try to play voice greeting - will show button if autoplay blocked
+        // Play voice greeting using Web Speech API (autoplays)
         if (!hasPlayedGreeting.current) {
           hasPlayedGreeting.current = true;
-          const messageId = res.data.is_sold_out ? "bitsy_greeting_sold_out" : "bitsy_greeting";
-          setGreetingMessageId(messageId);
-          
-          // Try autoplay after short delay
           setTimeout(() => {
-            playVoiceMessage(messageId, true);
-          }, 800);
+            const greeting = res.data.is_sold_out 
+              ? "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
+              : "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?";
+            speakText(greeting);
+          }, 500);
         }
       } catch (error) {
         const defaultMsg = "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?\n\nJust let me know when you'd like to stay!";
         setMessages([{ role: "assistant", content: defaultMsg }]);
         
-        // Play default greeting using backend TTS
+        // Play default greeting
         if (!hasPlayedGreeting.current) {
           hasPlayedGreeting.current = true;
           setTimeout(() => {
-            playVoiceMessage("bitsy_greeting", true); // true = autoplay attempt
+            speakText("Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. How may I help you today?");
           }, 500);
         }
       }
@@ -579,24 +517,6 @@ export default function BookNow() {
                       <span className="text-gray-400 text-sm">Typing...</span>
                     </div>
                   </div>
-                </motion.div>
-              )}
-
-              {/* Play Greeting Button - shown when autoplay is blocked */}
-              {showPlayButton && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex justify-center"
-                >
-                  <Button
-                    onClick={() => playVoiceMessage(greetingMessageId, false)}
-                    className="bg-amber-500 hover:bg-amber-400 text-black px-6 py-2 rounded-full flex items-center gap-2"
-                    data-testid="play-greeting-btn"
-                  >
-                    <Volume2 className="w-5 h-5" />
-                    Tap to hear Bitsy's greeting
-                  </Button>
                 </motion.div>
               )}
             </div>
