@@ -18,10 +18,15 @@ import {
   Calendar,
   Mail,
   Mic,
-  MicOff
+  MicOff,
+  Volume2,
+  VolumeX
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// Track current audio to prevent overlap
+let currentAudio = null;
 
 export default function BookNow() {
   const [messages, setMessages] = useState([]);
@@ -31,12 +36,66 @@ export default function BookNow() {
   const [bookingConfirmed, setBookingConfirmed] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [availability, setAvailability] = useState(null);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const hasPlayedGreeting = useRef(false);
 
-  // Fetch availability and pricing on load
+  // Text-to-Speech function using Web Speech API
+  const speakText = (text) => {
+    if (!voiceEnabled || !('speechSynthesis' in window)) return;
+    
+    // Stop any currently playing audio
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
+    window.speechSynthesis.cancel();
+    
+    // Clean text for speech (remove emojis and special chars)
+    const cleanText = text.replace(/[🏨⚠️•\n]/g, ' ').replace(/\$/g, ' dollars ').replace(/\s+/g, ' ').trim();
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.1;
+    utterance.volume = 0.9;
+    
+    // Try to use a female voice
+    const voices = window.speechSynthesis.getVoices();
+    const femaleVoice = voices.find(v => 
+      v.name.toLowerCase().includes('female') || 
+      v.name.toLowerCase().includes('samantha') ||
+      v.name.toLowerCase().includes('victoria') ||
+      v.name.toLowerCase().includes('karen') ||
+      v.name.toLowerCase().includes('google us english')
+    );
+    if (femaleVoice) {
+      utterance.voice = femaleVoice;
+    }
+    
+    setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Stop speaking
+  const stopSpeaking = () => {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+  };
+
+  // Fetch availability and play voice greeting on load
   useEffect(() => {
     const fetchAvailability = async () => {
       try {
@@ -58,14 +117,45 @@ export default function BookNow() {
         }
         
         setMessages([{ role: "assistant", content: welcomeMsg }]);
+        
+        // Play voice greeting after a short delay (only once)
+        if (!hasPlayedGreeting.current) {
+          hasPlayedGreeting.current = true;
+          setTimeout(() => {
+            const voiceGreeting = res.data.is_sold_out 
+              ? "Hi there! This is Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
+              : "Hi there! This is Bitsy, your hotel concierge at Hodler Inn. How may I help you today?";
+            speakText(voiceGreeting);
+          }, 500);
+        }
       } catch (error) {
-        setMessages([{
-          role: "assistant",
-          content: "Hi there! I'm Bitsy, your booking assistant at Hodler Inn! 🏨\n\nWhen would you like to stay with us?"
-        }]);
+        const defaultMsg = "Hi there! I'm Bitsy, your booking assistant at Hodler Inn! 🏨\n\nWhen would you like to stay with us?";
+        setMessages([{ role: "assistant", content: defaultMsg }]);
+        
+        // Play default greeting
+        if (!hasPlayedGreeting.current) {
+          hasPlayedGreeting.current = true;
+          setTimeout(() => {
+            speakText("Hi there! This is Bitsy, your hotel concierge at Hodler Inn. How may I help you today?");
+          }, 500);
+        }
       }
     };
+    
+    // Load voices first (they may not be available immediately)
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
+    
     fetchAvailability();
+    
+    // Cleanup on unmount
+    return () => {
+      stopSpeaking();
+    };
   }, []);
 
   // Auto scroll to bottom
@@ -99,6 +189,11 @@ export default function BookNow() {
         content: response.data.response 
       }]);
 
+      // Speak the response
+      if (voiceEnabled) {
+        speakText(response.data.response);
+      }
+
       // Check if booking was created
       if (response.data.booking_created && response.data.booking_details) {
         setBookingConfirmed(response.data.booking_details);
@@ -106,10 +201,14 @@ export default function BookNow() {
 
     } catch (error) {
       console.error("Chat error:", error);
+      const errorMsg = "I apologize, but I'm having trouble processing your request. Please try again or call us directly at (918) 653-7801.";
       setMessages(prev => [...prev, { 
         role: "assistant", 
-        content: "I apologize, but I'm having trouble processing your request. Please try again or call us directly at (918) 653-7801." 
+        content: errorMsg 
       }]);
+      if (voiceEnabled) {
+        speakText(errorMsg);
+      }
     }
 
     setIsLoading(false);
@@ -362,6 +461,27 @@ export default function BookNow() {
           {/* Input Area */}
           <div className="border-t border-amber-500/20 p-4 bg-black/20">
             <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  if (isSpeaking) {
+                    stopSpeaking();
+                  }
+                  setVoiceEnabled(!voiceEnabled);
+                }}
+                className={`px-3 transition-all ${
+                  voiceEnabled 
+                    ? "bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30" 
+                    : "bg-slate-800 hover:bg-slate-700 text-gray-500"
+                }`}
+                data-testid="voice-toggle-btn"
+                title={voiceEnabled ? "Voice on - click to mute" : "Voice off - click to enable"}
+              >
+                {voiceEnabled ? (
+                  isSpeaking ? <Volume2 className="w-4 h-4 animate-pulse" /> : <Volume2 className="w-4 h-4" />
+                ) : (
+                  <VolumeX className="w-4 h-4" />
+                )}
+              </Button>
               <Input
                 ref={inputRef}
                 value={inputValue}
