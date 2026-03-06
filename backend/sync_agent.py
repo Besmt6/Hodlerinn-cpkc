@@ -2577,24 +2577,84 @@ async def collect_employees_from_portal_v2(username: str, password: str) -> dict
                     except:
                         continue
                 
-                # Find and set date range inputs
-                date_inputs = page.locator("input[type='text'][size='10'], input.ui-inputfield, input[id*='date'], input.hasDatepicker")
-                input_count = await date_inputs.count()
-                logger.info(f"Found {input_count} date inputs")
+                # Find and set date range inputs - try multiple selector strategies
+                date_input_selectors = [
+                    "input[type='text'][size='10']",
+                    "input.ui-inputfield",
+                    "input[id*='date']",
+                    "input.hasDatepicker",
+                    "input[placeholder*='date']",
+                    "input[name*='date']",
+                    "input[id*='Calendar']",
+                    "input[id*='calendar']",
+                    "input.form-control[type='text']",
+                    "input[type='text']"  # Last resort - all text inputs
+                ]
+                
+                date_inputs = None
+                input_count = 0
+                
+                for selector in date_input_selectors:
+                    try:
+                        date_inputs = page.locator(selector)
+                        input_count = await date_inputs.count()
+                        if input_count >= 2:
+                            logger.info(f"Found {input_count} date inputs with selector: {selector}")
+                            break
+                    except:
+                        continue
+                
+                if input_count == 0:
+                    # Log page content to help debug
+                    try:
+                        all_inputs = page.locator("input")
+                        all_count = await all_inputs.count()
+                        logger.warning(f"No date inputs found! Total inputs on page: {all_count}")
+                        # Log first few input attributes
+                        for i in range(min(5, all_count)):
+                            inp = all_inputs.nth(i)
+                            inp_type = await inp.get_attribute("type") or "none"
+                            inp_id = await inp.get_attribute("id") or "none"
+                            inp_class = await inp.get_attribute("class") or "none"
+                            logger.info(f"  Input {i}: type={inp_type}, id={inp_id}, class={inp_class[:50]}")
+                    except Exception as debug_err:
+                        logger.warning(f"Debug error: {debug_err}")
                 
                 if input_count >= 2:
+                    # If there are 3+ inputs, first one might be a tenant/property dropdown
+                    # The date inputs are usually the last two
+                    start_idx = 0
+                    end_idx = 1
+                    
+                    if input_count >= 3:
+                        # Check if first input is a tenant/dropdown by checking its ID
+                        first_input = date_inputs.nth(0)
+                        first_id = await first_input.get_attribute("id") or ""
+                        first_name = await first_input.get_attribute("name") or ""
+                        
+                        if "tenant" in first_id.lower() or "tenant" in first_name.lower() or "combo" in first_id.lower():
+                            logger.info(f"Skipping first input (tenant dropdown): {first_id}")
+                            start_idx = 1
+                            end_idx = 2
+                    
                     # Set start date
-                    start_input = date_inputs.nth(0)
+                    start_input = date_inputs.nth(start_idx)
                     await start_input.click()
+                    await page.wait_for_timeout(300)
                     await start_input.fill("")
-                    await start_input.type(start_str)
+                    await start_input.type(start_str, delay=50)
+                    await page.wait_for_timeout(500)
+                    await page.keyboard.press("Escape")  # Close any datepicker
                     await page.wait_for_timeout(300)
                     
                     # Set end date  
-                    end_input = date_inputs.nth(1)
+                    end_input = date_inputs.nth(end_idx)
                     await end_input.click()
+                    await page.wait_for_timeout(300)
                     await end_input.fill("")
-                    await end_input.type(end_str)
+                    await end_input.type(end_str, delay=50)
+                    await page.wait_for_timeout(500)
+                    await page.keyboard.press("Escape")  # Close any datepicker
                     await page.wait_for_timeout(300)
                     
                     logger.info(f"✓ Set date range: {start_str} to {end_str}")
