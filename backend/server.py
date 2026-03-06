@@ -7636,17 +7636,23 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
                         if not row or len(row) < 6:
                             continue
                         
-                        # Skip header rows
-                        if row[0] == "EMP #1" or not row[0]:
+                        # Skip header rows - check for header keywords
+                        first_cell = str(row[0]).strip() if row[0] else ""
+                        second_cell = str(row[1]).strip() if row[1] else ""
+                        if first_cell == "" or second_cell == "EMP #1" or second_cell == "Stay Type":
                             continue
                         
                         try:
-                            emp_id_1 = str(row[0]).strip() if row[0] else None
-                            emp_name_1 = str(row[1]).strip() if row[1] else None
-                            emp_id_2 = str(row[2]).strip() if row[2] else None
-                            emp_name_2 = str(row[3]).strip() if row[3] else None
-                            check_in_str = str(row[4]).strip() if row[4] else None
-                            check_out_str = str(row[5]).strip() if row[5] else None
+                            # New format: ['row#', 'EMP#1', 'Employee1Name', 'EMP#2', 'Employee2Name', 'Check-In', 'Check-Out']
+                            # Indices:      0        1           2             3            4              5           6
+                            emp_id_1 = str(row[1]).strip() if len(row) > 1 and row[1] else None
+                            emp_name_1 = str(row[2]).strip() if len(row) > 2 and row[2] else None
+                            emp_id_2 = str(row[3]).strip() if len(row) > 3 and row[3] else None
+                            emp_name_2 = str(row[4]).strip() if len(row) > 4 and row[4] else None
+                            check_in_str = str(row[5]).strip() if len(row) > 5 and row[5] else None
+                            check_out_str = str(row[6]).strip() if len(row) > 6 and row[6] else None
+                            
+                            logging.info(f"Parsed row: emp1={emp_name_1}, emp2={emp_name_2}, check_in={check_in_str}")
                             
                             # Process first employee
                             if emp_name_1 and check_in_str:
