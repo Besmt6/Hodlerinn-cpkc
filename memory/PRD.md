@@ -37,6 +37,13 @@ Build a two-part application, "Hodler Inn," with a guest portal and an admin bac
 - **AWS Backup Server:** 3.149.0.151 (EC2 instance, for testing/backup only)
 - **Database:** Both Emergent and AWS connect to the same MongoDB Atlas cluster (shared data)
 
+## AWS Account Details
+- **Account ID:** 3051-3786-5409
+- **Account Name:** Hodlerinn
+- **Region:** US East (Ohio) - us-east-2
+- **Credits:** $100 USD (expires September 5, 2026)
+- **Instance IP:** 3.149.0.151
+
 ## Key Database Schema
 - `guests`: `{ employee_number, name, room_number, check_in, check_out }`
 - `employees`: `{ employee_number, name }`
