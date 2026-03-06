@@ -116,12 +116,21 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 - **Email Parsing**: pdfplumber, imaplib (Zoho IMAP)
 - **Deployment**: Docker, Docker Compose, AWS EC2
 
-## AWS Production Server
+## Production Environments
+
+### MAIN PRODUCTION (Handled by Emergent/AI)
+- **URL**: https://cpkc.hodlerinn.com
+- **Admin**: https://cpkc.hodlerinn.com/admin
+- **Managed by**: Emergent platform (AI deploys here)
+- **Note**: NOT using Emergent preview - this IS the main production site
+
+### AWS BACKUP (Handled by User)
 - **Server**: ubuntu@ip-172-31-9-167
 - **Public IP**: 3.149.0.151
-- **Production URL**: http://3.149.0.151:3000
-- **Admin Dashboard**: http://3.149.0.151:3000/admin/dashboard
+- **URL**: http://3.149.0.151:3000
+- **Admin**: http://3.149.0.151:3000/admin/dashboard
 - **Project Folder**: `~/Hodlerinn-cpkc`
+- **Managed by**: User manages AWS directly
 - **Docker Containers**:
   - `hodlerinn-frontend` (port 3000)
   - `hodlerinn-backend` (port 8001)
@@ -134,6 +143,11 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
   docker-compose up -d --build
   ```
 - **Check Logs**: `docker logs hodlerinn-backend --tail 100`
+
+### Shared Database
+- **MongoDB Atlas**: Both environments use the same Atlas database
+- **Connection**: `mongodb+srv://Hodlerinn:***@cluster0.hi5zsox.mongodb.net/`
+- **DB Name**: `hodler_inn`
 
 ## Changelog
 - **March 6, 2025 (Session 3)**: 
