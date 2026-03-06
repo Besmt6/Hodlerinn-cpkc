@@ -587,8 +587,18 @@ def update_auto_sync_schedule(enabled: bool, start_date: str = None):
             # Schedule for 3 PM Central Time (America/Chicago) every day
             from pytz import timezone
             central_tz = timezone('America/Chicago')
+            def run_auto_sync():
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        asyncio.ensure_future(auto_sync_task())
+                    else:
+                        asyncio.run(auto_sync_task())
+                except RuntimeError:
+                    asyncio.run(auto_sync_task())
+            
             scheduler.add_job(
-                lambda: asyncio.create_task(auto_sync_task()),
+                run_auto_sync,
                 CronTrigger(hour=15, minute=0, start_date=trigger_start, timezone=central_tz),
                 id=AUTO_SYNC_JOB_ID,
                 replace_existing=True
@@ -611,14 +621,34 @@ async def start_scheduler():
     scheduler.add_job(monthly_data_reset, CronTrigger(day=1, hour=0, minute=0))
     
     # Daily status alerts at 7 AM and 10 PM Central Time
+    def run_morning_alert():
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(send_daily_status_alert("morning"))
+            else:
+                asyncio.run(send_daily_status_alert("morning"))
+        except RuntimeError:
+            asyncio.run(send_daily_status_alert("morning"))
+    
+    def run_evening_alert():
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(send_daily_status_alert("evening"))
+            else:
+                asyncio.run(send_daily_status_alert("evening"))
+        except RuntimeError:
+            asyncio.run(send_daily_status_alert("evening"))
+    
     scheduler.add_job(
-        lambda: asyncio.create_task(send_daily_status_alert("morning")),
+        run_morning_alert,
         CronTrigger(hour=7, minute=0, timezone=central_tz),
         id="morning_status_alert",
         replace_existing=True
     )
     scheduler.add_job(
-        lambda: asyncio.create_task(send_daily_status_alert("evening")),
+        run_evening_alert,
         CronTrigger(hour=22, minute=0, timezone=central_tz),
         id="evening_status_alert",
         replace_existing=True
@@ -626,8 +656,19 @@ async def start_scheduler():
     logging.info("Daily status alerts scheduled for 7 AM and 10 PM Central Time")
     
     # Auto-dirty checker every 5 minutes
+    def run_check_dirty_rooms():
+        """Wrapper to run async check_and_mark_dirty_rooms in scheduler context."""
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(check_and_mark_dirty_rooms())
+            else:
+                asyncio.run(check_and_mark_dirty_rooms())
+        except RuntimeError:
+            asyncio.run(check_and_mark_dirty_rooms())
+    
     scheduler.add_job(
-        lambda: asyncio.create_task(check_and_mark_dirty_rooms()),
+        run_check_dirty_rooms,
         'interval',
         minutes=5,
         id="auto_dirty_checker",
@@ -7790,8 +7831,19 @@ async def get_revenue_losses(start_date: Optional[str] = None, end_date: Optiona
 app.include_router(cpkc_router, prefix="/api")
 
 # Schedule email check every 5 minutes
+def run_check_cpkc_emails():
+    """Wrapper to run async check_cpkc_emails in scheduler context."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(check_cpkc_emails())
+        else:
+            asyncio.run(check_cpkc_emails())
+    except RuntimeError:
+        asyncio.run(check_cpkc_emails())
+
 scheduler.add_job(
-    lambda: asyncio.create_task(check_cpkc_emails()),
+    run_check_cpkc_emails,
     'interval',
     minutes=5,
     id='cpkc_email_check',

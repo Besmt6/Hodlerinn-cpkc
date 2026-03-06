@@ -501,6 +501,51 @@ export default function BookNow() {
                 ))}
               </AnimatePresence>
 
+              {/* Rate Card - shown in chat after greeting */}
+              {messages.length > 0 && messages[0].role === "assistant" && availability && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-3"
+                >
+                  <div className="w-8 h-8 flex-shrink-0"></div>
+                  <div className="bg-gradient-to-br from-slate-800/90 to-slate-900/90 border border-amber-500/30 rounded-xl p-4 max-w-[90%]">
+                    <h4 className="text-amber-400 font-semibold text-center text-sm mb-3">Room Rates</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-black/40 rounded-lg p-2 text-center">
+                        <p className="text-gray-400 text-xs">Single Bed</p>
+                        <p className="text-white font-bold">${availability.single_rate || 79}</p>
+                        {(availability.tax_rate || 0) > 0 && (
+                          <>
+                            <p className="text-gray-500 text-xs">+ ${((availability.single_rate || 79) * (availability.tax_rate / 100)).toFixed(2)} tax</p>
+                            <p className="text-amber-400 font-semibold text-xs">
+                              Total: ${((availability.single_rate || 79) * (1 + availability.tax_rate / 100)).toFixed(2)}/night
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      <div className="bg-black/40 rounded-lg p-2 text-center">
+                        <p className="text-gray-400 text-xs">Double Bed</p>
+                        <p className="text-white font-bold">${availability.double_rate || 89}</p>
+                        {(availability.tax_rate || 0) > 0 && (
+                          <>
+                            <p className="text-gray-500 text-xs">+ ${((availability.double_rate || 89) * (availability.tax_rate / 100)).toFixed(2)} tax</p>
+                            <p className="text-amber-400 font-semibold text-xs">
+                              Total: ${((availability.double_rate || 89) * (1 + availability.tax_rate / 100)).toFixed(2)}/night
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-slate-700/50 flex justify-center gap-3 text-xs text-gray-500">
+                      <span>Check-in: 3 PM</span>
+                      <span>•</span>
+                      <span>Check-out: 11 AM</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Loading indicator */}
               {isLoading && (
                 <motion.div
