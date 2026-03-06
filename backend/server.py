@@ -6974,7 +6974,7 @@ async def check_chatbot_availability(date: Optional[str] = None):
 async def transcribe_audio(file: UploadFile = File(...)):
     """Transcribe audio to text using OpenAI Whisper."""
     try:
-        from emergentintegrations.llm.audio import AudioTranscriber
+        from emergentintegrations.llm.openai import OpenAISpeechToText
         
         llm_key = os.environ.get('EMERGENT_LLM_KEY')
         if not llm_key:
@@ -6986,13 +6986,17 @@ async def transcribe_audio(file: UploadFile = File(...)):
             content = await file.read()
             f.write(content)
         
-        # Transcribe using Whisper
-        transcriber = AudioTranscriber(api_key=llm_key)
-        transcript = await transcriber.transcribe(temp_path)
+        # Transcribe using OpenAI Whisper via emergentintegrations
+        stt = OpenAISpeechToText(api_key=llm_key)
+        result = await stt.transcribe(temp_path, model="whisper-1", response_format="text")
         
         # Clean up temp file
         os.remove(temp_path)
         
+        # Handle different response formats
+        transcript = result if isinstance(result, str) else result.text if hasattr(result, 'text') else str(result)
+        
+        logging.info(f"Transcription successful: {transcript[:100]}...")
         return {"transcript": transcript, "success": True}
         
     except Exception as e:
