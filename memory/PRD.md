@@ -145,9 +145,11 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 - **Check Logs**: `docker logs hodlerinn-backend --tail 100`
 
 ### Shared Database
-- **MongoDB Atlas**: Both environments use the same Atlas database
+- **MongoDB Atlas**: Both environments should use the same Atlas database
+- **Atlas Dashboard**: User has access to MongoDB Atlas dashboard
 - **Connection**: `mongodb+srv://Hodlerinn:***@cluster0.hi5zsox.mongodb.net/`
 - **DB Name**: `hodler_inn`
+- **Note**: If data doesn't match between environments, check Atlas dashboard for multiple databases
 
 ## Changelog
 - **March 6, 2025 (Session 3)**: 
