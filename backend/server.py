@@ -6790,6 +6790,21 @@ class ChatResponse(BaseModel):
     booking_created: bool = False
     booking_details: Optional[dict] = None
 
+class PhoneLookup(BaseModel):
+    phone: str
+
+@api_router.post("/chatbot/lookup-guest")
+async def lookup_guest_by_phone(lookup: PhoneLookup):
+    """Look up a guest by phone number to check if they've stayed before."""
+    try:
+        guest = await find_returning_guest(phone=lookup.phone)
+        if guest:
+            return {"found": True, "guest": guest}
+        return {"found": False, "guest": None}
+    except Exception as e:
+        logging.error(f"Guest lookup error: {e}")
+        return {"found": False, "guest": None}
+
 @api_router.post("/chatbot/message")
 async def chatbot_message(chat_input: ChatMessage):
     """Process a chatbot message and return AI response."""
