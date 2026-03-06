@@ -696,31 +696,32 @@ function CheckInForm({ setView, setSuccessMessage }) {
         // First check if already registered as a guest
         const response = await axios.get(`${API}/guests/${employeeNumber}`);
         const cleanedName = cleanEmployeeName(response.data.name);
-        setEmployeeName(cleanedName);
+        setEmployeeName(cleanedName);  // Display cleaned name
         setEmployeeStatus('found');
-        playWelcomeWithName(cleanedName, false);
+        playWelcomeWithName(cleanedName, false);  // Speak cleaned name
         setTimeout(() => roomInputRef.current?.focus(), 300);
       } catch (error) {
         // Check if employee ID is in admin's approved list
         try {
           const empResponse = await axios.get(`${API}/employees/verify/${employeeNumber}`);
-          const cleanedName = cleanEmployeeName(empResponse.data.name);
-          setEmployeeName(cleanedName);
+          const originalName = empResponse.data.name;  // Keep original for storage
+          const cleanedName = cleanEmployeeName(originalName);  // Clean for display/voice
+          setEmployeeName(cleanedName);  // Display cleaned name
           
-          // Auto-register the employee since they're in the admin list
+          // Auto-register the employee - STORE ORIGINAL NAME for portal sync
           try {
             await axios.post(`${API}/guests/register`, {
               employee_number: employeeNumber,
-              name: cleanedName
+              name: originalName  // Store ORIGINAL name to match portal
             });
             // Successfully registered - show full form
             setEmployeeStatus('found');
-            playWelcomeWithName(cleanedName, false);
+            playWelcomeWithName(cleanedName, false);  // Speak cleaned name
             setTimeout(() => roomInputRef.current?.focus(), 300);
           } catch (regError) {
             // Registration failed - maybe already registered, still show form
             setEmployeeStatus('found');
-            playWelcomeWithName(cleanedName, false);
+            playWelcomeWithName(cleanedName, false);  // Speak cleaned name
             setTimeout(() => roomInputRef.current?.focus(), 300);
           }
         } catch (empError) {
