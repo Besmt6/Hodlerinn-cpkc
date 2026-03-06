@@ -104,6 +104,7 @@ export default function AdminDashboard() {
   const [endDate, setEndDate] = useState("");
   const [isFiltered, setIsFiltered] = useState(false);
   const [showActiveOnly, setShowActiveOnly] = useState(true);  // Default to showing only active/in-house guests
+  const [roomSearch, setRoomSearch] = useState("");  // Room number search
   
   // Room management state
   const [showRoomDialog, setShowRoomDialog] = useState(false);
@@ -1475,10 +1476,35 @@ export default function AdminDashboard() {
               {/* Records Table */}
               <Card className="bg-vault-surface border-vault-border" data-testid="records-table-card">
                 <CardHeader className="border-b border-vault-border">
-                  <CardTitle className="font-outfit text-xl text-vault-text flex items-center gap-2">
-                    <FileSpreadsheet className="w-5 h-5 text-vault-gold" />
-                    Guest Records
-                  </CardTitle>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <CardTitle className="font-outfit text-xl text-vault-text flex items-center gap-2">
+                      <FileSpreadsheet className="w-5 h-5 text-vault-gold" />
+                      Guest Records
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                        <Input
+                          type="text"
+                          placeholder="Search room #..."
+                          value={roomSearch}
+                          onChange={(e) => setRoomSearch(e.target.value)}
+                          className="pl-8 w-32 sm:w-40 h-8 bg-black/50 border-vault-border text-vault-text text-sm"
+                          data-testid="room-search-input"
+                        />
+                      </div>
+                      {roomSearch && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setRoomSearch("")}
+                          className="h-8 px-2 text-vault-text-secondary hover:text-vault-text"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[400px]">
@@ -1497,14 +1523,20 @@ export default function AdminDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {records.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={9} className="text-center text-vault-text-secondary py-8">
-                              No records found
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          records.map((record) => (
+                        {(() => {
+                          const filteredRecords = records.filter(record => 
+                            !roomSearch || record.room_number?.toString().includes(roomSearch)
+                          );
+                          if (filteredRecords.length === 0) {
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={9} className="text-center text-vault-text-secondary py-8">
+                                  {roomSearch ? `No guests found in room ${roomSearch}` : "No records found"}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }
+                          return filteredRecords.map((record) => (
                             <TableRow key={record.id} className="table-row border-vault-border" data-testid={`record-row-${record.id}`}>
                               <TableCell className="font-mono text-vault-text">{record.employee_number}</TableCell>
                               <TableCell className="text-vault-text">{record.employee_name}</TableCell>
@@ -1572,8 +1604,8 @@ export default function AdminDashboard() {
                                 </Dialog>
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
+                          ));
+                        })()}
                       </TableBody>
                     </Table>
                   </ScrollArea>

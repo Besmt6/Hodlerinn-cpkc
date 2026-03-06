@@ -6383,6 +6383,346 @@ async def import_database(file_content: dict):
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
 
+# ==================== AI Booking Chatbot ====================
+
+from emergentintegrations.llm.chat import LlmChat, UserMessage
+
+# Store active chat sessions
+chat_sessions = {}
+
+CHATBOT_SYSTEM_PROMPT = """You are a friendly and professional reservation assistant for Hodler Inn, a comfortable hotel in Okmulgee, Oklahoma. Your job is to help guests make room reservations through natural conversation.
+
+IMPORTANT BOOKING RULES:
+1. You MUST collect ALL of these details before creating a reservation:
+   - Guest full name
+   - Email address
+   - Phone number
+   - Check-in date
+   - Check-out date
+   - Room preference (single bed $85/night or double bed $95/night)
+
+2. After collecting all information, summarize the booking and ask for confirmation.
+
+3. CRITICAL: When the guest confirms, respond with EXACTLY this JSON format on a new line (the system will parse this):
+BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone":"1234567890","check_in":"YYYY-MM-DD","check_out":"YYYY-MM-DD","room_type":"single or double","rate":85}}
+
+4. Important policies to communicate:
+   - Reservations MUST be confirmed by calling the hotel at (918) 653-7801
+   - Unconfirmed reservations will be automatically cancelled 48 hours before arrival
+   - No payment is collected online - payment is made at check-in
+
+5. Be conversational, warm, and helpful. Don't overwhelm guests with all questions at once - ask naturally in conversation.
+
+6. Hotel info if asked:
+   - Address: 800 N Wood Dr, Okmulgee, OK 74447
+   - Phone: (918) 653-7801
+   - Check-in time: 3:00 PM
+   - Check-out time: 11:00 AM
+
+7. If guest asks about availability, say rooms are generally available but you'll confirm their specific dates when creating the booking.
+
+Current date: {current_date}"""
+
+class ChatMessage(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+class ChatResponse(BaseModel):
+    response: str
+    session_id: str
+    booking_created: bool = False
+    booking_details: Optional[dict] = None
+
+@api_router.post("/chatbot/message")
+async def chatbot_message(chat_input: ChatMessage):
+    """Process a chatbot message and return AI response."""
+    try:
+        session_id = chat_input.session_id or str(uuid.uuid4())
+        
+        # Get or create chat session
+        if session_id not in chat_sessions:
+            llm_key = os.environ.get('EMERGENT_LLM_KEY')
+            if not llm_key:
+                raise HTTPException(status_code=500, detail="LLM key not configured")
+            
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            system_prompt = CHATBOT_SYSTEM_PROMPT.format(current_date=current_date)
+            
+            chat = LlmChat(
+                api_key=llm_key,
+                session_id=session_id,
+                system_message=system_prompt
+            ).with_model("openai", "gpt-5.2")
+            
+            chat_sessions[session_id] = {
+                "chat": chat,
+                "messages": [],
+                "created_at": datetime.now(timezone.utc)
+            }
+        
+        session = chat_sessions[session_id]
+        chat = session["chat"]
+        
+        # Store user message
+        session["messages"].append({
+            "role": "user",
+            "content": chat_input.message,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+        # Send message to LLM
+        user_message = UserMessage(text=chat_input.message)
+        response = await chat.send_message(user_message)
+        
+        # Store assistant response
+        session["messages"].append({
+            "role": "assistant", 
+            "content": response,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+        # Check if booking was confirmed
+        booking_created = False
+        booking_details = None
+        
+        if "BOOKING_CONFIRMED:" in response:
+            try:
+                json_str = response.split("BOOKING_CONFIRMED:")[1].strip()
+                # Handle case where there might be text after the JSON
+                if "\n" in json_str:
+                    json_str = json_str.split("\n")[0]
+                booking_data = json.loads(json_str)
+                
+                # Create the reservation in database
+                reservation = await create_chatbot_reservation(booking_data)
+                if reservation:
+                    booking_created = True
+                    booking_details = reservation
+                    
+                    # Clean up the response to remove the JSON
+                    clean_response = response.split("BOOKING_CONFIRMED:")[0].strip()
+                    if not clean_response:
+                        clean_response = f"Your reservation has been created! Confirmation details have been sent to {booking_data.get('email')}. Remember to confirm by calling (918) 653-7801."
+                    response = clean_response
+                    
+            except Exception as e:
+                logging.error(f"Failed to parse booking confirmation: {e}")
+        
+        return ChatResponse(
+            response=response,
+            session_id=session_id,
+            booking_created=booking_created,
+            booking_details=booking_details
+        )
+        
+    except Exception as e:
+        logging.error(f"Chatbot error: {e}")
+        raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}")
+
+async def create_chatbot_reservation(booking_data: dict):
+    """Create a reservation from chatbot booking data."""
+    try:
+        guest_name = booking_data.get("guest_name", "")
+        email = booking_data.get("email", "")
+        phone = booking_data.get("phone", "")
+        check_in = booking_data.get("check_in", "")
+        check_out = booking_data.get("check_out", "")
+        room_type = booking_data.get("room_type", "single")
+        rate = booking_data.get("rate", 85)
+        
+        # Find an available room
+        occupied_rooms = []
+        bookings = await db.bookings.find({"is_checked_out": False}, {"room_number": 1}).to_list(100)
+        occupied_rooms.extend([b["room_number"] for b in bookings if b.get("room_number")])
+        blocked = await db.blocked_rooms.find({"is_active": True}, {"room_number": 1}).to_list(100)
+        occupied_rooms.extend([b["room_number"] for b in blocked if b.get("room_number")])
+        
+        # Get all rooms and find available one
+        all_rooms = await db.rooms.find({}, {"room_number": 1, "room_type": 1}).to_list(100)
+        available_room = None
+        for room in all_rooms:
+            if room["room_number"] not in occupied_rooms:
+                available_room = room["room_number"]
+                break
+        
+        if not available_room:
+            logging.warning("No rooms available for chatbot booking")
+            available_room = "TBD"  # Will be assigned at check-in
+        
+        # Calculate nights
+        try:
+            check_in_date = datetime.strptime(check_in, "%Y-%m-%d")
+            check_out_date = datetime.strptime(check_out, "%Y-%m-%d")
+            nights = (check_out_date - check_in_date).days
+        except:
+            nights = 1
+        
+        total_amount = nights * rate
+        
+        # Create reservation record
+        reservation_id = str(uuid.uuid4())
+        reservation = {
+            "id": reservation_id,
+            "room_number": available_room,
+            "room_type": room_type,
+            "guest_name": guest_name,
+            "email": email,
+            "phone": phone,
+            "check_in_date": check_in,
+            "check_out_date": check_out,
+            "room_rate": rate,
+            "total_amount": total_amount,
+            "nights": nights,
+            "notes": "Booked via AI Chatbot - MUST confirm by calling (918) 653-7801",
+            "is_active": False,  # Not active until check-in
+            "is_reservation": True,
+            "source": "chatbot",
+            "requires_confirmation": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.blocked_rooms.insert_one(reservation)
+        
+        # Send confirmation email
+        await send_chatbot_booking_email(reservation)
+        
+        # Send Telegram notification
+        await send_telegram_notification(
+            f"🤖 <b>NEW CHATBOT BOOKING</b>\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"👤 {guest_name}\n"
+            f"📧 {email}\n"
+            f"📱 {phone}\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"📅 {check_in} → {check_out}\n"
+            f"🛏️ {room_type.title()} (${rate}/night)\n"
+            f"💰 Total: ${total_amount}\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"⚠️ REQUIRES PHONE CONFIRMATION"
+        )
+        
+        return {
+            "id": reservation_id,
+            "guest_name": guest_name,
+            "email": email,
+            "check_in": check_in,
+            "check_out": check_out,
+            "room_type": room_type,
+            "rate": rate,
+            "total": total_amount,
+            "nights": nights
+        }
+        
+    except Exception as e:
+        logging.error(f"Failed to create chatbot reservation: {e}")
+        return None
+
+async def send_chatbot_booking_email(reservation: dict):
+    """Send booking confirmation email from chatbot reservation."""
+    try:
+        settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+        if not settings or not settings.get("email_sender"):
+            logging.warning("Email not configured for chatbot booking confirmation")
+            return False
+        
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        smtp_host = settings.get("email_smtp_host", "smtp.zoho.com")
+        smtp_port = settings.get("email_smtp_port", 587)
+        sender = settings.get("email_sender")
+        password = decrypt_data(settings.get("email_password_encrypted"))
+        
+        guest_email = reservation.get("email")
+        guest_name = reservation.get("guest_name")
+        check_in = reservation.get("check_in_date")
+        check_out = reservation.get("check_out_date")
+        room_type = reservation.get("room_type", "standard")
+        rate = reservation.get("room_rate", 85)
+        total = reservation.get("total_amount", 0)
+        nights = reservation.get("nights", 1)
+        
+        subject = "Hodler Inn - Reservation Request Received"
+        
+        body = f"""Dear {guest_name},
+
+Thank you for your reservation request at Hodler Inn!
+
+RESERVATION DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Check-in: {check_in} (3:00 PM)
+Check-out: {check_out} (11:00 AM)
+Room Type: {room_type.title()}
+Rate: ${rate}/night
+Nights: {nights}
+Total: ${total}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ IMPORTANT - ACTION REQUIRED:
+Your reservation is NOT confirmed until you call us directly.
+
+Please call (918) 653-7801 to confirm your booking.
+
+Reservations not confirmed by phone will be automatically 
+cancelled 48 hours before the scheduled arrival date.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HOTEL INFORMATION:
+Hodler Inn
+800 N Wood Dr
+Okmulgee, OK 74447
+Phone: (918) 653-7801
+
+POLICIES:
+- Payment is collected at check-in
+- Valid ID required at check-in
+- No pets allowed
+- No smoking
+
+We look forward to hosting you!
+
+Best regards,
+Hodler Inn Team
+
+---
+This is an automated message from our online booking assistant.
+"""
+        
+        msg = MIMEMultipart()
+        msg['From'] = sender
+        msg['To'] = guest_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+        
+        server = smtplib.SMTP(smtp_host, smtp_port)
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, guest_email, msg.as_string())
+        server.quit()
+        
+        logging.info(f"Chatbot booking confirmation sent to: {guest_email}")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Failed to send chatbot booking email: {e}")
+        return False
+
+@api_router.get("/chatbot/history/{session_id}")
+async def get_chat_history(session_id: str):
+    """Get chat history for a session."""
+    if session_id in chat_sessions:
+        return {"messages": chat_sessions[session_id]["messages"]}
+    return {"messages": []}
+
+@api_router.delete("/chatbot/session/{session_id}")
+async def clear_chat_session(session_id: str):
+    """Clear a chat session."""
+    if session_id in chat_sessions:
+        del chat_sessions[session_id]
+    return {"message": "Session cleared"}
+
 
 # Include the router in the main app (MUST be after all route definitions)
 app.include_router(api_router)
