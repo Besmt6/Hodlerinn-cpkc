@@ -76,7 +76,8 @@ import {
   FileBarChart,
   Cloud,
   Upload,
-  UserX
+  UserX,
+  TrendingUp
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -137,7 +138,17 @@ export default function AdminDashboard() {
   // Blocked rooms state (other guests)
   const [blockedRooms, setBlockedRooms] = useState([]);
   const [showBlockRoomDialog, setShowBlockRoomDialog] = useState(false);
-  const [blockRoomForm, setBlockRoomForm] = useState({ room_number: "", guest_name: "", notes: "" });
+  const [blockRoomForm, setBlockRoomForm] = useState({ 
+    room_number: "", 
+    guest_name: "", 
+    phone: "",
+    address: "",
+    check_in_date: new Date().toISOString().split('T')[0],
+    check_out_date: "",
+    room_rate: "",
+    notes: "" 
+  });
+  const [blockedRoomStats, setBlockedRoomStats] = useState(null);
   
   // Guarantee report state
   const [guaranteeReport, setGuaranteeReport] = useState(null);
@@ -205,6 +216,7 @@ export default function AdminDashboard() {
     fetchEmployees();
     fetchRegisteredGuests();
     fetchBlockedRooms();
+    fetchBlockedRoomStats();
   }, [navigate]);
 
   const fetchRegisteredGuests = async () => {
@@ -266,22 +278,50 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchBlockedRoomStats = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/rooms/blocked/stats`);
+      setBlockedRoomStats(response.data);
+    } catch (error) {
+      console.error("Failed to load blocked room stats");
+    }
+  };
+
   const handleBlockRoom = async () => {
     if (!blockRoomForm.room_number) {
       toast.error("Please select a room");
       return;
     }
+    if (!blockRoomForm.guest_name) {
+      toast.error("Please enter guest name");
+      return;
+    }
     try {
       await axios.post(`${API}/admin/rooms/block`, {
         room_number: blockRoomForm.room_number,
-        guest_name: blockRoomForm.guest_name || "Other Guest",
+        guest_name: blockRoomForm.guest_name,
+        phone: blockRoomForm.phone,
+        address: blockRoomForm.address,
+        check_in_date: blockRoomForm.check_in_date,
+        check_out_date: blockRoomForm.check_out_date,
+        room_rate: parseFloat(blockRoomForm.room_rate) || 0,
         notes: blockRoomForm.notes
       });
-      toast.success(`Room ${blockRoomForm.room_number} blocked for other guest`);
+      toast.success(`Room ${blockRoomForm.room_number} blocked for ${blockRoomForm.guest_name}`);
       setShowBlockRoomDialog(false);
-      setBlockRoomForm({ room_number: "", guest_name: "", notes: "" });
+      setBlockRoomForm({ 
+        room_number: "", 
+        guest_name: "", 
+        phone: "",
+        address: "",
+        check_in_date: new Date().toISOString().split('T')[0],
+        check_out_date: "",
+        room_rate: "",
+        notes: "" 
+      });
       fetchRooms();
       fetchBlockedRooms();
+      fetchBlockedRoomStats();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to block room");
     }
@@ -1907,35 +1947,95 @@ export default function AdminDashboard() {
                 />
               </div>
 
+              {/* Occupancy & Revenue Stats */}
+              {blockedRoomStats && (
+                <Card className="bg-vault-surface border-vault-border mb-6">
+                  <CardHeader className="border-b border-vault-border pb-3">
+                    <CardTitle className="font-outfit text-lg text-vault-gold flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5" />
+                      Occupancy & Revenue (Other Guests)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-black/30 rounded-lg p-4 text-center">
+                        <p className="text-3xl font-bold text-vault-gold">{blockedRoomStats.occupancy_percent}%</p>
+                        <p className="text-vault-text-secondary text-sm">Total Occupancy</p>
+                        <p className="text-vault-text-secondary text-xs mt-1">
+                          {blockedRoomStats.total_occupied}/{blockedRoomStats.total_rooms} rooms
+                        </p>
+                      </div>
+                      <div className="bg-black/30 rounded-lg p-4 text-center">
+                        <p className="text-3xl font-bold text-amber-400">{blockedRoomStats.blocked_occupancy_percent}%</p>
+                        <p className="text-vault-text-secondary text-sm">Other Guests</p>
+                        <p className="text-vault-text-secondary text-xs mt-1">
+                          {blockedRoomStats.active_blocked_rooms} rooms blocked
+                        </p>
+                      </div>
+                      <div className="bg-black/30 rounded-lg p-4 text-center">
+                        <p className="text-3xl font-bold text-green-400">${blockedRoomStats.active_revenue.toLocaleString()}</p>
+                        <p className="text-vault-text-secondary text-sm">Active Revenue</p>
+                        <p className="text-vault-text-secondary text-xs mt-1">Currently checked in</p>
+                      </div>
+                      <div className="bg-black/30 rounded-lg p-4 text-center">
+                        <p className="text-3xl font-bold text-emerald-400">${blockedRoomStats.total_revenue_all_time.toLocaleString()}</p>
+                        <p className="text-vault-text-secondary text-sm">Total Revenue</p>
+                        <p className="text-vault-text-secondary text-xs mt-1">All time</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Blocked Rooms (Other Guests) Section */}
               {blockedRooms.length > 0 && (
                 <Card className="bg-amber-900/20 border-amber-600/50 mb-6">
                   <CardHeader className="border-b border-amber-600/30 pb-3">
                     <CardTitle className="font-outfit text-lg text-amber-400 flex items-center gap-2">
                       <Users className="w-5 h-5" />
-                      Blocked Rooms (Other Guests) - Not Billed to Railroad
+                      Other Guests - Currently Checked In
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                      {blockedRooms.map((block) => (
-                        <div key={block.id} className="bg-black/30 border border-amber-600/30 rounded-lg p-3 flex justify-between items-center">
-                          <div>
-                            <p className="text-amber-400 font-bold">Room {block.room_number}</p>
-                            <p className="text-vault-text-secondary text-sm">{block.guest_name}</p>
-                            {block.notes && <p className="text-vault-text-secondary text-xs">{block.notes}</p>}
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-red-400 hover:text-red-300 hover:bg-red-900/30"
-                            onClick={() => handleUnblockRoom(block.room_number)}
-                            data-testid={`unblock-room-${block.room_number}`}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-amber-600/30">
+                            <th className="text-left py-2 px-3 text-amber-400 text-sm">Room</th>
+                            <th className="text-left py-2 px-3 text-amber-400 text-sm">Guest Name</th>
+                            <th className="text-left py-2 px-3 text-amber-400 text-sm">Phone</th>
+                            <th className="text-left py-2 px-3 text-amber-400 text-sm">Check-In</th>
+                            <th className="text-left py-2 px-3 text-amber-400 text-sm">Check-Out</th>
+                            <th className="text-left py-2 px-3 text-amber-400 text-sm">Rate/Night</th>
+                            <th className="text-left py-2 px-3 text-amber-400 text-sm">Total</th>
+                            <th className="text-left py-2 px-3 text-amber-400 text-sm">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {blockedRooms.map((block) => (
+                            <tr key={block.id} className="border-b border-amber-600/20 hover:bg-amber-900/20">
+                              <td className="py-2 px-3 text-vault-text font-bold">{block.room_number}</td>
+                              <td className="py-2 px-3 text-vault-text">{block.guest_name}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">{block.phone || '-'}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">{block.check_in_date || '-'}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">{block.check_out_date || '-'}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">${block.room_rate || 0}</td>
+                              <td className="py-2 px-3 text-green-400 font-medium">${block.total_revenue || 0}</td>
+                              <td className="py-2 px-3">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-900/30"
+                                  onClick={() => handleUnblockRoom(block.room_number)}
+                                >
+                                  <XCircle className="w-4 h-4 mr-1" />
+                                  Check Out
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </CardContent>
                 </Card>
@@ -4272,7 +4372,7 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
       {/* Block Room Dialog (Other Guest) */}
       {showBlockRoomDialog && (
         <Dialog open={showBlockRoomDialog} onOpenChange={() => setShowBlockRoomDialog(false)}>
-          <DialogContent className="bg-vault-surface border-vault-border">
+          <DialogContent className="bg-vault-surface border-vault-border max-w-lg">
             <DialogHeader>
               <DialogTitle className="font-outfit text-vault-text flex items-center gap-2">
                 <Users className="w-5 h-5 text-amber-400" />
@@ -4280,45 +4380,114 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
               </DialogTitle>
             </DialogHeader>
             <p className="text-vault-text-secondary text-sm mb-4">
-              Block a room for a non-railroad guest. This room will count toward occupancy but will NOT be billed to the railroad.
+              Check in a non-railroad guest. This room will count toward occupancy but will NOT be billed to the railroad.
             </p>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Number *</label>
-                <Select 
-                  value={blockRoomForm.room_number} 
-                  onValueChange={(val) => setBlockRoomForm({...blockRoomForm, room_number: val})}
-                >
-                  <SelectTrigger className="bg-black/50 border-vault-border text-vault-text">
-                    <SelectValue placeholder="Select available room" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-vault-surface border-vault-border">
-                    {rooms
-                      .filter(r => r.status === 'available' && !blockedRooms.some(b => b.room_number === r.room_number))
-                      .map(room => (
-                        <SelectItem key={room.id} value={room.room_number} className="text-vault-text">
-                          Room {room.room_number} ({room.room_type})
-                        </SelectItem>
-                      ))
-                    }
-                  </SelectContent>
-                </Select>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Number *</label>
+                  <Select 
+                    value={blockRoomForm.room_number} 
+                    onValueChange={(val) => setBlockRoomForm({...blockRoomForm, room_number: val})}
+                  >
+                    <SelectTrigger className="bg-black/50 border-vault-border text-vault-text">
+                      <SelectValue placeholder="Select room" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-vault-surface border-vault-border">
+                      {rooms
+                        .filter(r => r.status === 'available' && !blockedRooms.some(b => b.room_number === r.room_number))
+                        .map(room => (
+                          <SelectItem key={room.id} value={room.room_number} className="text-vault-text">
+                            Room {room.room_number} ({room.room_type})
+                          </SelectItem>
+                        ))
+                      }
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Room Rate ($/night)</label>
+                  <Input
+                    type="number"
+                    value={blockRoomForm.room_rate}
+                    onChange={(e) => setBlockRoomForm({...blockRoomForm, room_rate: e.target.value})}
+                    placeholder="0.00"
+                    className="bg-black/50 border-vault-border text-vault-text"
+                  />
+                </div>
               </div>
+              
               <div>
-                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Guest Name (Optional)</label>
+                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Guest Name *</label>
                 <Input
                   value={blockRoomForm.guest_name}
                   onChange={(e) => setBlockRoomForm({...blockRoomForm, guest_name: e.target.value})}
-                  placeholder="e.g. Walk-in Guest, John Doe"
+                  placeholder="Full name"
                   className="bg-black/50 border-vault-border text-vault-text"
                 />
               </div>
+              
               <div>
-                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Notes (Optional)</label>
+                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Phone Number</label>
+                <Input
+                  value={blockRoomForm.phone}
+                  onChange={(e) => setBlockRoomForm({...blockRoomForm, phone: e.target.value})}
+                  placeholder="(xxx) xxx-xxxx"
+                  className="bg-black/50 border-vault-border text-vault-text"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Address</label>
+                <Input
+                  value={blockRoomForm.address}
+                  onChange={(e) => setBlockRoomForm({...blockRoomForm, address: e.target.value})}
+                  placeholder="Street, City, State, ZIP"
+                  className="bg-black/50 border-vault-border text-vault-text"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Check-In Date</label>
+                  <Input
+                    type="date"
+                    value={blockRoomForm.check_in_date}
+                    onChange={(e) => setBlockRoomForm({...blockRoomForm, check_in_date: e.target.value})}
+                    className="bg-black/50 border-vault-border text-vault-text"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Check-Out Date</label>
+                  <Input
+                    type="date"
+                    value={blockRoomForm.check_out_date}
+                    onChange={(e) => setBlockRoomForm({...blockRoomForm, check_out_date: e.target.value})}
+                    className="bg-black/50 border-vault-border text-vault-text"
+                  />
+                </div>
+              </div>
+              
+              {blockRoomForm.room_rate && blockRoomForm.check_in_date && blockRoomForm.check_out_date && (
+                <div className="bg-vault-gold/10 border border-vault-gold/30 rounded-lg p-3">
+                  <p className="text-vault-gold text-sm font-medium">
+                    Estimated Total: ${(
+                      Math.max(0, Math.ceil((new Date(blockRoomForm.check_out_date) - new Date(blockRoomForm.check_in_date)) / (1000 * 60 * 60 * 24))) * 
+                      parseFloat(blockRoomForm.room_rate || 0)
+                    ).toFixed(2)}
+                    <span className="text-vault-text-secondary font-normal ml-2">
+                      ({Math.max(0, Math.ceil((new Date(blockRoomForm.check_out_date) - new Date(blockRoomForm.check_in_date)) / (1000 * 60 * 60 * 24)))} nights × ${parseFloat(blockRoomForm.room_rate || 0).toFixed(2)})
+                    </span>
+                  </p>
+                </div>
+              )}
+              
+              <div>
+                <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Notes</label>
                 <Input
                   value={blockRoomForm.notes}
                   onChange={(e) => setBlockRoomForm({...blockRoomForm, notes: e.target.value})}
-                  placeholder="e.g. Paid cash, 2 nights"
+                  placeholder="Payment method, special requests, etc."
                   className="bg-black/50 border-vault-border text-vault-text"
                 />
               </div>
@@ -4332,7 +4501,7 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                 className="bg-amber-600 hover:bg-amber-700 text-white"
                 data-testid="confirm-block-room-btn"
               >
-                Block Room
+                Check In Guest
               </Button>
             </DialogFooter>
           </DialogContent>

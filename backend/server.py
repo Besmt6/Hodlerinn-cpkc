@@ -3037,12 +3037,17 @@ async def mark_room_clean(room_number: str):
 # Block room for non-railroad guest (Other Guest)
 class BlockRoomInput(BaseModel):
     room_number: str
-    guest_name: Optional[str] = "Other Guest"
+    guest_name: str
+    phone: Optional[str] = ""
+    address: Optional[str] = ""
+    check_in_date: Optional[str] = None  # YYYY-MM-DD format
+    check_out_date: Optional[str] = None  # YYYY-MM-DD format
+    room_rate: Optional[float] = 0.0  # Per night rate
     notes: Optional[str] = ""
 
 @api_router.post("/admin/rooms/block")
 async def block_room_other_guest(input: BlockRoomInput):
-    """Block a room for non-railroad guest. Counts toward occupancy but not billed to railroad."""
+    """Block a room for non-railroad guest with full details. Counts toward occupancy but not billed to railroad."""
     # Check if room exists
     room = await db.rooms.find_one({"room_number": input.room_number}, {"_id": 0})
     if not room:
@@ -3064,11 +3069,31 @@ async def block_room_other_guest(input: BlockRoomInput):
     if existing_block:
         raise HTTPException(status_code=400, detail="Room is already blocked")
     
-    # Create blocked room record
+    # Calculate total revenue if dates and rate provided
+    total_revenue = 0.0
+    nights = 0
+    if input.check_in_date and input.check_out_date and input.room_rate:
+        try:
+            check_in = datetime.strptime(input.check_in_date, "%Y-%m-%d")
+            check_out = datetime.strptime(input.check_out_date, "%Y-%m-%d")
+            nights = (check_out - check_in).days
+            if nights > 0:
+                total_revenue = nights * input.room_rate
+        except:
+            pass
+    
+    # Create blocked room record with full details
     block_doc = {
         "id": str(uuid.uuid4()),
         "room_number": input.room_number,
         "guest_name": input.guest_name,
+        "phone": input.phone,
+        "address": input.address,
+        "check_in_date": input.check_in_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "check_out_date": input.check_out_date,
+        "room_rate": input.room_rate,
+        "nights": nights,
+        "total_revenue": total_revenue,
         "notes": input.notes,
         "is_active": True,
         "blocked_at": datetime.now(timezone.utc).isoformat()
@@ -3081,7 +3106,7 @@ async def block_room_other_guest(input: BlockRoomInput):
     # Check if we're low on rooms (4 or fewer) and send heads-up notice
     await check_and_send_heads_up_notification()
     
-    return {"message": f"Room {input.room_number} blocked for other guest", "block": block_doc}
+    return {"message": f"Room {input.room_number} blocked for {input.guest_name}", "block": block_doc}
 
 @api_router.post("/admin/rooms/unblock/{room_number}")
 async def unblock_room(room_number: str):
@@ -3109,6 +3134,72 @@ async def get_blocked_rooms():
     """Get all currently blocked rooms (other guests)"""
     blocked = await db.blocked_rooms.find({"is_active": True}, {"_id": 0}).to_list(100)
     return blocked
+
+
+@api_router.get("/admin/rooms/blocked/stats")
+async def get_blocked_rooms_stats():
+    """Get statistics for blocked rooms - revenue and occupancy."""
+    # Get all blocked rooms (active and inactive for revenue calculation)
+    all_blocked = await db.blocked_rooms.find({}, {"_id": 0}).to_list(1000)
+    active_blocked = [b for b in all_blocked if b.get("is_active")]
+    
+    # Calculate total revenue from all blocked rooms
+    total_revenue = sum(b.get("total_revenue", 0) for b in all_blocked)
+    active_revenue = sum(b.get("total_revenue", 0) for b in active_blocked)
+    
+    # Get total room count
+    total_rooms = await db.rooms.count_documents({})
+    
+    # Get railroad occupied rooms
+    railroad_occupied = await db.bookings.count_documents({"is_checked_out": False})
+    
+    # Calculate occupancy
+    blocked_count = len(active_blocked)
+    total_occupied = railroad_occupied + blocked_count
+    occupancy_percent = (total_occupied / total_rooms * 100) if total_rooms > 0 else 0
+    
+    # Calculate blocked room occupancy percentage (just blocked rooms)
+    blocked_occupancy_percent = (blocked_count / total_rooms * 100) if total_rooms > 0 else 0
+    
+    return {
+        "active_blocked_rooms": blocked_count,
+        "railroad_occupied": railroad_occupied,
+        "total_occupied": total_occupied,
+        "total_rooms": total_rooms,
+        "occupancy_percent": round(occupancy_percent, 1),
+        "blocked_occupancy_percent": round(blocked_occupancy_percent, 1),
+        "total_revenue_all_time": round(total_revenue, 2),
+        "active_revenue": round(active_revenue, 2),
+        "blocked_rooms": active_blocked
+    }
+
+
+@api_router.get("/admin/rooms/blocked/history")
+async def get_blocked_rooms_history(start_date: str = None, end_date: str = None):
+    """Get history of all blocked rooms with optional date filter."""
+    query = {}
+    
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date
+        if date_filter:
+            query["check_in_date"] = date_filter
+    
+    history = await db.blocked_rooms.find(query, {"_id": 0}).sort("blocked_at", -1).to_list(500)
+    
+    # Calculate totals
+    total_revenue = sum(b.get("total_revenue", 0) for b in history)
+    total_nights = sum(b.get("nights", 0) for b in history)
+    
+    return {
+        "history": history,
+        "total_records": len(history),
+        "total_revenue": round(total_revenue, 2),
+        "total_nights": total_nights
+    }
 
 # ==================== Employee Management ====================
 
