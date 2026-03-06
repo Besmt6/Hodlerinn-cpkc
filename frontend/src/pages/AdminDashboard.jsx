@@ -190,6 +190,10 @@ export default function AdminDashboard() {
   });
   const [manualEntryLoading, setManualEntryLoading] = useState(false);
   
+  // Expected Arrivals state (CPKC)
+  const [expectedArrivals, setExpectedArrivals] = useState([]);
+  const [checkingCpkcEmails, setCheckingCpkcEmails] = useState(false);
+  
   // Turned Away Guests state
   const [turnedAwayGuests, setTurnedAwayGuests] = useState([]);
   const [showTurnedAwayForm, setShowTurnedAwayForm] = useState(false);
@@ -259,6 +263,7 @@ export default function AdminDashboard() {
     fetchBlockedRoomStats();
     fetchReservations();
     fetchEmailAlertSettings();
+    fetchExpectedArrivals();
   }, [navigate]);
 
   const fetchRegisteredGuests = async () => {
@@ -1036,6 +1041,38 @@ export default function AdminDashboard() {
       toast.success("Sign-In Sheet (Excel) exported!");
     } catch (error) {
       toast.error("Failed to export");
+    }
+  };
+
+  // Expected Arrivals functions
+  const fetchExpectedArrivals = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/expected-arrivals`);
+      setExpectedArrivals(response.data);
+    } catch (error) {
+      console.error("Failed to fetch expected arrivals");
+    }
+  };
+
+  const checkCpkcEmails = async () => {
+    setCheckingCpkcEmails(true);
+    try {
+      await axios.post(`${API}/admin/check-cpkc-emails`);
+      toast.success("Email check completed!");
+      fetchExpectedArrivals();
+    } catch (error) {
+      toast.error("Failed to check emails");
+    }
+    setCheckingCpkcEmails(false);
+  };
+
+  const deleteExpectedArrival = async (arrivalId) => {
+    try {
+      await axios.delete(`${API}/admin/expected-arrivals/${arrivalId}`);
+      toast.success("Arrival removed");
+      fetchExpectedArrivals();
+    } catch (error) {
+      toast.error("Failed to remove arrival");
     }
   };
 
@@ -2406,6 +2443,97 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Expected CPKC Arrivals Section */}
+              <Card className="bg-blue-900/20 border-blue-500/50 mb-6">
+                <CardHeader className="border-b border-blue-500/30 pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="font-outfit text-lg text-blue-400 flex items-center gap-2">
+                      <Mail className="w-5 h-5" />
+                      Expected CPKC Arrivals
+                      {expectedArrivals.length > 0 && (
+                        <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full ml-2">
+                          {expectedArrivals.length}
+                        </span>
+                      )}
+                    </CardTitle>
+                    <Button
+                      onClick={checkCpkcEmails}
+                      disabled={checkingCpkcEmails}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-500 text-white"
+                      data-testid="check-cpkc-emails-btn"
+                    >
+                      {checkingCpkcEmails ? (
+                        <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Check Emails
+                    </Button>
+                  </div>
+                  <p className="text-blue-300/70 text-xs mt-1">
+                    Auto-imported from CPKC email (aces_support@apiglobalsolutions.com) - Checked every 5 minutes
+                  </p>
+                </CardHeader>
+                <CardContent className="p-4">
+                  {expectedArrivals.length === 0 ? (
+                    <p className="text-vault-text-secondary text-center py-4">No expected arrivals</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-blue-500/30">
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Employee</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Name</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Check-In</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Check-Out</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Status</th>
+                            <th className="text-left py-2 px-3 text-blue-400 text-sm">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {expectedArrivals.map((arrival) => (
+                            <tr key={arrival.id} className="border-b border-blue-500/20 hover:bg-blue-900/20">
+                              <td className="py-2 px-3 text-vault-text font-mono text-sm">{arrival.employee_id || '-'}</td>
+                              <td className="py-2 px-3 text-vault-text">{arrival.first_name} {arrival.last_name}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">
+                                {arrival.check_in_date} {arrival.check_in_time || ''}
+                              </td>
+                              <td className="py-2 px-3 text-vault-text-secondary">{arrival.check_out_date || '-'}</td>
+                              <td className="py-2 px-3">
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                  arrival.status === 'checked_in' 
+                                    ? 'bg-emerald-500/20 text-emerald-400' 
+                                    : 'bg-amber-500/20 text-amber-400'
+                                }`}>
+                                  {arrival.status === 'checked_in' ? 'Checked In' : 'Expected'}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3">
+                                {arrival.status === 'expected' && (
+                                  <Button
+                                    onClick={() => deleteExpectedArrival(arrival.id)}
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-7 px-2"
+                                    title="Remove (cancelled)"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <p className="text-blue-300/50 text-xs mt-3">
+                    Chatbot will not sell rooms when CPKC arrivals are expected. Guests check in at kiosk.
+                  </p>
+                </CardContent>
+              </Card>
 
               {/* Blocked Rooms (Other Guests) Section */}
               {blockedRooms.length > 0 && (
