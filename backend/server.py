@@ -6791,6 +6791,14 @@ async def find_returning_guest(email: str = None, phone: str = None):
         else:
             return None
         
+        # First check if guest is blocked - don't reveal they are in system
+        blocked_check = await db.guests.find_one({
+            **query,
+            "is_blocked": True
+        })
+        if blocked_check:
+            return None  # Don't reveal blocked guest exists
+        
         # Check blocked_rooms (reservations) first
         reservation = await db.blocked_rooms.find_one(
             {**query, "source": "chatbot"},
@@ -6946,7 +6954,13 @@ async def chatbot_message(chat_input: ChatMessage):
                 
                 # Create the reservation in database
                 reservation = await create_chatbot_reservation(booking_data)
-                if reservation:
+                
+                # Check if guest was blocked
+                if reservation and reservation.get("error") == "blocked":
+                    response = reservation.get("message", "We're sorry, but we are unable to process this reservation. Please contact the front desk directly at (918) 653-7801.")
+                    booking_created = False
+                    booking_details = None
+                elif reservation and reservation.get("success") != False:
                     booking_created = True
                     booking_details = reservation
                     
@@ -6980,6 +6994,29 @@ async def create_chatbot_reservation(booking_data: dict):
         check_out = booking_data.get("check_out", "")
         room_type = booking_data.get("room_type", "single")
         rate = booking_data.get("rate", 85)
+        
+        # Check if guest is blocked by email or phone
+        blocked_guest = None
+        if email:
+            blocked_guest = await db.guests.find_one({
+                "email": {"$regex": email, "$options": "i"},
+                "is_blocked": True
+            })
+        if not blocked_guest and phone:
+            # Clean phone number for comparison
+            clean_phone = ''.join(filter(str.isdigit, phone))
+            blocked_guest = await db.guests.find_one({
+                "phone": {"$regex": clean_phone},
+                "is_blocked": True
+            })
+        
+        if blocked_guest:
+            logging.warning(f"Blocked guest attempted to book: {guest_name} ({email})")
+            return {
+                "success": False,
+                "error": "blocked",
+                "message": "We're sorry, but we are unable to process this reservation. Please contact the front desk directly at (918) 653-7801."
+            }
         
         # Find an available room
         occupied_rooms = []
