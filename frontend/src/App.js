@@ -5,6 +5,8 @@ import GuestPortal from "@/pages/GuestPortal";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import BookNow from "@/pages/BookNow";
+import DemoPortal from "@/pages/DemoPortal";
+import DemoAdmin from "@/pages/DemoAdmin";
 
 function App() {
   return (
@@ -15,6 +17,8 @@ function App() {
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/book" element={<BookNow />} />
+          <Route path="/demo" element={<DemoPortal />} />
+          <Route path="/demo/admin" element={<DemoAdmin />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />

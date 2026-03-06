@@ -39,6 +39,9 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Demo database (separate collections for demo mode)
+demo_db = client[os.environ['DB_NAME'] + "_demo"]
+
 # Telegram configuration
 # Telegram configuration
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
@@ -6886,6 +6889,204 @@ async def transcribe_audio(file: UploadFile = File(...)):
 
 # Include the router in the main app (MUST be after all route definitions)
 app.include_router(api_router)
+
+
+# ==================== DEMO MODE API ====================
+demo_router = APIRouter(prefix="/demo")
+
+@demo_router.post("/init")
+async def initialize_demo_data():
+    """Initialize demo database with sample data."""
+    try:
+        # Clear existing demo data
+        await demo_db.rooms.delete_many({})
+        await demo_db.bookings.delete_many({})
+        await demo_db.employees.delete_many({})
+        await demo_db.blocked_rooms.delete_many({})
+        await demo_db.settings.delete_many({})
+        
+        # Create sample rooms (28 rooms like production)
+        rooms = []
+        for i in range(1, 29):
+            room_num = 100 + i
+            rooms.append({
+                "room_number": room_num,
+                "room_type": "single" if i <= 14 else "double",
+                "floor": 1 if i <= 14 else 2,
+                "cleaning_status": "clean",
+                "is_blocked": False
+            })
+        await demo_db.rooms.insert_many(rooms)
+        
+        # Create sample employees
+        sample_employees = [
+            {"employee_id": "EMP001", "first_name": "John", "last_name": "Smith", "craft": "Engineer", "status": "active"},
+            {"employee_id": "EMP002", "first_name": "Jane", "last_name": "Doe", "craft": "Conductor", "status": "active"},
+            {"employee_id": "EMP003", "first_name": "Mike", "last_name": "Johnson", "craft": "Brakeman", "status": "active"},
+            {"employee_id": "EMP004", "first_name": "Sarah", "last_name": "Williams", "craft": "Engineer", "status": "active"},
+            {"employee_id": "EMP005", "first_name": "Tom", "last_name": "Brown", "craft": "Conductor", "status": "active"},
+        ]
+        await demo_db.employees.insert_many(sample_employees)
+        
+        # Create sample active bookings (guests currently checked in)
+        today = datetime.now().strftime("%Y-%m-%d")
+        sample_bookings = [
+            {
+                "id": str(uuid.uuid4()),
+                "employee_id": "EMP001",
+                "first_name": "John",
+                "last_name": "Smith",
+                "room_number": 101,
+                "check_in_time": f"{today}T14:30:00",
+                "is_checked_out": False,
+                "is_verified": True,
+                "source": "railroad"
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "employee_id": "EMP002",
+                "first_name": "Jane",
+                "last_name": "Doe",
+                "room_number": 102,
+                "check_in_time": f"{today}T15:00:00",
+                "is_checked_out": False,
+                "is_verified": True,
+                "source": "railroad"
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "employee_id": "EMP003",
+                "first_name": "Mike",
+                "last_name": "Johnson",
+                "room_number": 115,
+                "check_in_time": f"{today}T16:00:00",
+                "is_checked_out": False,
+                "is_verified": False,
+                "source": "railroad"
+            },
+        ]
+        await demo_db.bookings.insert_many(sample_bookings)
+        
+        # Create demo settings
+        demo_settings = {
+            "id": "portal_settings",
+            "voice_enabled": True,
+            "voice_volume": 1.0,
+            "voice_speed": 0.85,
+            "nightly_rate": 75.0,
+            "single_room_rate": 85.0,
+            "double_room_rate": 95.0,
+            "sales_tax_rate": 8.5,
+            "chatbot_max_rooms": 3,
+            "guaranteed_rooms": 25
+        }
+        await demo_db.settings.insert_one(demo_settings)
+        
+        return {"success": True, "message": "Demo data initialized successfully"}
+    except Exception as e:
+        logging.error(f"Demo init error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@demo_router.get("/rooms")
+async def get_demo_rooms():
+    """Get all demo rooms with occupancy status."""
+    rooms = await demo_db.rooms.find({}, {"_id": 0}).to_list(100)
+    bookings = await demo_db.bookings.find({"is_checked_out": False}, {"_id": 0, "room_number": 1}).to_list(100)
+    blocked = await demo_db.blocked_rooms.find({"is_active": True}, {"_id": 0, "room_number": 1}).to_list(100)
+    
+    occupied_rooms = [b["room_number"] for b in bookings] + [b["room_number"] for b in blocked]
+    
+    for room in rooms:
+        room["is_occupied"] = room["room_number"] in occupied_rooms
+    
+    return rooms
+
+@demo_router.get("/guests")
+async def get_demo_guests():
+    """Get all demo guests."""
+    guests = await demo_db.bookings.find({}, {"_id": 0}).to_list(500)
+    return guests
+
+@demo_router.get("/employees")
+async def get_demo_employees():
+    """Get demo employees."""
+    employees = await demo_db.employees.find({}, {"_id": 0}).to_list(500)
+    return employees
+
+@demo_router.get("/settings")
+async def get_demo_settings():
+    """Get demo portal settings."""
+    settings = await demo_db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    if not settings:
+        return {
+            "id": "portal_settings",
+            "voice_enabled": True,
+            "nightly_rate": 75.0,
+            "single_room_rate": 85.0,
+            "double_room_rate": 95.0,
+            "sales_tax_rate": 8.5,
+            "chatbot_max_rooms": 3,
+            "guaranteed_rooms": 25
+        }
+    return settings
+
+@demo_router.post("/checkin")
+async def demo_checkin(employee_id: str, room_number: int, first_name: str = "", last_name: str = ""):
+    """Demo check-in a guest."""
+    # Check if room is available
+    existing = await demo_db.bookings.find_one({"room_number": room_number, "is_checked_out": False})
+    if existing:
+        raise HTTPException(status_code=400, detail="Room is already occupied")
+    
+    # Find employee if exists
+    employee = await demo_db.employees.find_one({"employee_id": employee_id})
+    if employee:
+        first_name = employee.get("first_name", first_name)
+        last_name = employee.get("last_name", last_name)
+    
+    booking = {
+        "id": str(uuid.uuid4()),
+        "employee_id": employee_id,
+        "first_name": first_name,
+        "last_name": last_name,
+        "room_number": room_number,
+        "check_in_time": datetime.now(timezone.utc).isoformat(),
+        "is_checked_out": False,
+        "is_verified": employee is not None,
+        "source": "demo"
+    }
+    
+    await demo_db.bookings.insert_one(booking)
+    return {"success": True, "message": f"Checked in to room {room_number}", "booking": {k: v for k, v in booking.items() if k != "_id"}}
+
+@demo_router.post("/checkout")
+async def demo_checkout(room_number: int):
+    """Demo check-out a guest."""
+    result = await demo_db.bookings.update_one(
+        {"room_number": room_number, "is_checked_out": False},
+        {"$set": {"is_checked_out": True, "check_out_time": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="No active booking found for this room")
+    return {"success": True, "message": f"Checked out of room {room_number}"}
+
+@demo_router.get("/stats")
+async def get_demo_stats():
+    """Get demo dashboard stats."""
+    total_rooms = await demo_db.rooms.count_documents({})
+    occupied = await demo_db.bookings.count_documents({"is_checked_out": False})
+    blocked = await demo_db.blocked_rooms.count_documents({"is_active": True})
+    
+    return {
+        "total_rooms": total_rooms or 28,
+        "occupied": occupied,
+        "blocked": blocked,
+        "available": (total_rooms or 28) - occupied - blocked,
+        "occupancy_rate": round((occupied + blocked) / (total_rooms or 28) * 100, 1)
+    }
+
+# Include demo router
+app.include_router(demo_router, prefix="/api")
 
 
 @app.on_event("shutdown")
