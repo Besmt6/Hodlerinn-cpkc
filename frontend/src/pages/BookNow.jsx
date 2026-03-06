@@ -600,27 +600,76 @@ export default function BookNow() {
           </div>
         </div>
 
-        {/* Contact Info */}
+        {/* Rate Card */}
+        {availability && (
+          <div className="mt-6 bg-gradient-to-r from-slate-800/50 to-slate-900/50 border border-amber-500/20 rounded-xl p-4 max-w-md mx-auto">
+            <h3 className="text-amber-400 font-semibold text-center mb-3">Room Rates</h3>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="bg-black/30 rounded-lg p-3 text-center">
+                <p className="text-gray-400 text-xs mb-1">Single Bed</p>
+                <p className="text-white font-bold">${availability.single_rate || 85}</p>
+                {(availability.tax_rate || 0) > 0 && (
+                  <>
+                    <p className="text-gray-500 text-xs">+ ${((availability.single_rate || 85) * (availability.tax_rate / 100)).toFixed(2)} tax</p>
+                    <p className="text-amber-400 font-semibold text-xs mt-1">
+                      Total: ${((availability.single_rate || 85) * (1 + availability.tax_rate / 100)).toFixed(2)}/night
+                    </p>
+                  </>
+                )}
+                {!(availability.tax_rate > 0) && (
+                  <p className="text-amber-400 font-semibold text-xs mt-1">/night</p>
+                )}
+              </div>
+              <div className="bg-black/30 rounded-lg p-3 text-center">
+                <p className="text-gray-400 text-xs mb-1">Double Bed</p>
+                <p className="text-white font-bold">${availability.double_rate || 95}</p>
+                {(availability.tax_rate || 0) > 0 && (
+                  <>
+                    <p className="text-gray-500 text-xs">+ ${((availability.double_rate || 95) * (availability.tax_rate / 100)).toFixed(2)} tax</p>
+                    <p className="text-amber-400 font-semibold text-xs mt-1">
+                      Total: ${((availability.double_rate || 95) * (1 + availability.tax_rate / 100)).toFixed(2)}/night
+                    </p>
+                  </>
+                )}
+                {!(availability.tax_rate > 0) && (
+                  <p className="text-amber-400 font-semibold text-xs mt-1">/night</p>
+                )}
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-700/50 flex justify-center gap-4 text-xs text-gray-400">
+              <span>Check-in: 3 PM</span>
+              <span>•</span>
+              <span>Check-out: 11 AM</span>
+            </div>
+          </div>
+        )}
+
+        {/* Contact */}
         <div className="mt-6 text-center">
-          <p className="text-gray-500 text-sm">
-            Need immediate assistance? Call us at{" "}
-            <a href="tel:9186537801" className="text-amber-400 hover:underline">(918) 653-7801</a>
-          </p>
+          <a href="tel:9186537801" className="inline-flex items-center gap-2 text-amber-400 hover:text-amber-300 transition-colors">
+            <Phone className="w-4 h-4" />
+            <span>(918) 653-7801</span>
+          </a>
         </div>
       </div>
 
       {/* Footer */}
-      <footer className="mt-16 py-8 border-t border-slate-800">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-gray-500 text-sm">
-            © {new Date().getFullYear()} Hodler Inn. All rights reserved.
-          </p>
-          <p className="text-gray-600 text-xs mt-2">
-            820 US-59, Heavener, OK 74937
-          </p>
-          <p className="text-amber-500/80 text-xs mt-3 font-medium">
-            100% Non-Smoking Property • No Pets Allowed
-          </p>
+      <footer className="mt-8 py-6 bg-slate-900/50 border-t border-slate-800">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <MapPin className="w-4 h-4 text-amber-500/60" />
+              <span className="text-gray-500 text-sm">820 US-59, Heavener, OK 74937</span>
+            </div>
+            <div className="flex items-center gap-2 bg-amber-500/10 px-4 py-2 rounded-full">
+              <span className="text-amber-400 text-xs font-medium">100% Non-Smoking</span>
+              <span className="text-gray-600">•</span>
+              <span className="text-amber-400 text-xs font-medium">No Pets</span>
+            </div>
+            <p className="text-gray-600 text-xs">
+              © {new Date().getFullYear()} Hodler Inn
+            </p>
+          </div>
         </div>
       </footer>
     </div>
