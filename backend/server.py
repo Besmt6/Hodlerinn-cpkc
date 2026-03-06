@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Response, Query, BackgroundTasks
+from fastapi import FastAPI, APIRouter, HTTPException, Response, Query, BackgroundTasks, File, UploadFile
 from fastapi.responses import StreamingResponse, FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -854,7 +854,13 @@ class PortalSettingsUpdate(BaseModel):
     voice_speed: Optional[float] = None  # Voice speed 0.5 to 1.5
     telegram_chat_id: Optional[str] = None  # Telegram group/chat ID for notifications
     public_api_key: Optional[str] = None  # API key for public endpoints
-    nightly_rate: Optional[float] = None  # Nightly room rate for billing
+    nightly_rate: Optional[float] = None  # Nightly room rate for billing (railroad)
+    # Chatbot pricing settings
+    single_room_rate: Optional[float] = None  # Single bed rate for chatbot
+    double_room_rate: Optional[float] = None  # Double bed rate for chatbot
+    sales_tax_rate: Optional[float] = None  # Sales tax percentage (e.g., 8.5 for 8.5%)
+    chatbot_max_rooms: Optional[int] = None  # Max rooms chatbot can sell per day
+    guaranteed_rooms: Optional[int] = None  # Number of guaranteed railroad rooms
     # Email report settings
     email_reports_enabled: Optional[bool] = None
     email_smtp_host: Optional[str] = None
@@ -4485,6 +4491,11 @@ async def get_portal_settings():
             "public_api_key": "",
             "public_api_key_set": False,
             "nightly_rate": 75.0,
+            "single_room_rate": 85.0,
+            "double_room_rate": 95.0,
+            "sales_tax_rate": 0.0,
+            "chatbot_max_rooms": 3,
+            "guaranteed_rooms": 25,
             "email_reports_enabled": False,
             "email_smtp_host": "smtp.zoho.com",
             "email_smtp_port": 587,
@@ -4509,6 +4520,11 @@ async def get_portal_settings():
         "public_api_key": settings.get("public_api_key", ""),
         "public_api_key_set": bool(settings.get("public_api_key")),
         "nightly_rate": settings.get("nightly_rate", 75.0),
+        "single_room_rate": settings.get("single_room_rate", 85.0),
+        "double_room_rate": settings.get("double_room_rate", 95.0),
+        "sales_tax_rate": settings.get("sales_tax_rate", 0.0),
+        "chatbot_max_rooms": settings.get("chatbot_max_rooms", 3),
+        "guaranteed_rooms": settings.get("guaranteed_rooms", 25),
         "email_reports_enabled": settings.get("email_reports_enabled", False),
         "email_smtp_host": settings.get("email_smtp_host", "smtp.zoho.com"),
         "email_smtp_port": settings.get("email_smtp_port", 587),
@@ -4559,6 +4575,22 @@ async def update_portal_settings(input: PortalSettingsUpdate):
     
     if input.nightly_rate is not None:
         update_data["nightly_rate"] = max(0.0, input.nightly_rate)
+    
+    # Chatbot pricing settings
+    if input.single_room_rate is not None:
+        update_data["single_room_rate"] = max(0.0, input.single_room_rate)
+    
+    if input.double_room_rate is not None:
+        update_data["double_room_rate"] = max(0.0, input.double_room_rate)
+    
+    if input.sales_tax_rate is not None:
+        update_data["sales_tax_rate"] = max(0.0, min(100.0, input.sales_tax_rate))
+    
+    if input.chatbot_max_rooms is not None:
+        update_data["chatbot_max_rooms"] = max(0, input.chatbot_max_rooms)
+    
+    if input.guaranteed_rooms is not None:
+        update_data["guaranteed_rooms"] = max(0, input.guaranteed_rooms)
     
     # Email report settings
     if input.email_reports_enabled is not None:
@@ -6390,7 +6422,84 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 # Store active chat sessions
 chat_sessions = {}
 
-CHATBOT_SYSTEM_PROMPT = """You are a friendly and professional reservation assistant for Hodler Inn, a comfortable hotel in Okmulgee, Oklahoma. Your job is to help guests make room reservations through natural conversation.
+async def get_chatbot_availability(target_date: str = None):
+    """Check how many rooms the chatbot can sell for a given date."""
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    
+    total_rooms = await db.rooms.count_documents({})
+    if total_rooms == 0:
+        total_rooms = 28
+    
+    chatbot_max = settings.get("chatbot_max_rooms", 3) if settings else 3
+    guaranteed_rooms = settings.get("guaranteed_rooms", 25) if settings else 25
+    
+    # Get current date if not specified
+    if not target_date:
+        target_date = datetime.now().strftime("%Y-%m-%d")
+    
+    # Count railroad guests currently in-house
+    railroad_occupied = await db.bookings.count_documents({"is_checked_out": False})
+    
+    # Count chatbot reservations for this date
+    chatbot_reservations = await db.blocked_rooms.count_documents({
+        "source": "chatbot",
+        "is_reservation": True,
+        "check_in_date": {"$lte": target_date},
+        "check_out_date": {"$gt": target_date}
+    })
+    
+    # Count other blocked rooms (non-railroad guests)
+    other_blocked = await db.blocked_rooms.count_documents({
+        "is_active": True,
+        "source": {"$ne": "chatbot"}
+    })
+    
+    # Calculate availability
+    # Chatbot can only sell up to chatbot_max rooms, and only if there's actual availability
+    rooms_available_for_chatbot = min(
+        chatbot_max - chatbot_reservations,  # Remaining chatbot quota
+        total_rooms - railroad_occupied - other_blocked - chatbot_reservations  # Actual physical availability
+    )
+    
+    return {
+        "total_rooms": total_rooms,
+        "railroad_occupied": railroad_occupied,
+        "chatbot_reservations": chatbot_reservations,
+        "other_blocked": other_blocked,
+        "chatbot_max": chatbot_max,
+        "guaranteed_rooms": guaranteed_rooms,
+        "rooms_available_for_chatbot": max(0, rooms_available_for_chatbot),
+        "is_sold_out": rooms_available_for_chatbot <= 0
+    }
+
+async def get_chatbot_pricing():
+    """Get current pricing settings for chatbot."""
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    return {
+        "single_rate": settings.get("single_room_rate", 85.0) if settings else 85.0,
+        "double_rate": settings.get("double_room_rate", 95.0) if settings else 95.0,
+        "tax_rate": settings.get("sales_tax_rate", 0.0) if settings else 0.0
+    }
+
+def get_chatbot_system_prompt(current_date: str, pricing: dict, availability: dict):
+    """Generate dynamic system prompt with current pricing and availability."""
+    single_rate = pricing["single_rate"]
+    double_rate = pricing["double_rate"]
+    tax_rate = pricing["tax_rate"]
+    
+    tax_info = f" (plus {tax_rate}% tax)" if tax_rate > 0 else ""
+    
+    availability_note = ""
+    if availability["is_sold_out"]:
+        availability_note = """
+IMPORTANT: We are currently SOLD OUT. Apologize politely and suggest the guest call the hotel directly at (918) 653-7801 to check for cancellations or future availability. DO NOT attempt to make a reservation."""
+    else:
+        rooms_left = availability["rooms_available_for_chatbot"]
+        availability_note = f"""
+AVAILABILITY: We have {rooms_left} room(s) available for online booking today. If guest asks about availability, you can confirm we have rooms available."""
+
+    return f"""You are a friendly and professional reservation assistant for Hodler Inn, a comfortable hotel in Okmulgee, Oklahoma. Your job is to help guests make room reservations through natural conversation.
+{availability_note}
 
 IMPORTANT BOOKING RULES:
 1. You MUST collect ALL of these details before creating a reservation:
@@ -6399,12 +6508,12 @@ IMPORTANT BOOKING RULES:
    - Phone number
    - Check-in date
    - Check-out date
-   - Room preference (single bed $85/night or double bed $95/night)
+   - Room preference (single bed ${single_rate}/night or double bed ${double_rate}/night){tax_info}
 
-2. After collecting all information, summarize the booking and ask for confirmation.
+2. After collecting all information, summarize the booking including the total with tax if applicable, and ask for confirmation.
 
 3. CRITICAL: When the guest confirms, respond with EXACTLY this JSON format on a new line (the system will parse this):
-BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone":"1234567890","check_in":"YYYY-MM-DD","check_out":"YYYY-MM-DD","room_type":"single or double","rate":85}}
+BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone":"1234567890","check_in":"YYYY-MM-DD","check_out":"YYYY-MM-DD","room_type":"single","rate":{single_rate}}}
 
 4. Important policies to communicate:
    - Reservations MUST be confirmed by calling the hotel at (918) 653-7801
@@ -6418,8 +6527,6 @@ BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone"
    - Phone: (918) 653-7801
    - Check-in time: 3:00 PM
    - Check-out time: 11:00 AM
-
-7. If guest asks about availability, say rooms are generally available but you'll confirm their specific dates when creating the booking.
 
 Current date: {current_date}"""
 
@@ -6446,7 +6553,9 @@ async def chatbot_message(chat_input: ChatMessage):
                 raise HTTPException(status_code=500, detail="LLM key not configured")
             
             current_date = datetime.now().strftime("%Y-%m-%d")
-            system_prompt = CHATBOT_SYSTEM_PROMPT.format(current_date=current_date)
+            pricing = await get_chatbot_pricing()
+            availability = await get_chatbot_availability(current_date)
+            system_prompt = get_chatbot_system_prompt(current_date, pricing, availability)
             
             chat = LlmChat(
                 api_key=llm_key,
@@ -6457,7 +6566,8 @@ async def chatbot_message(chat_input: ChatMessage):
             chat_sessions[session_id] = {
                 "chat": chat,
                 "messages": [],
-                "created_at": datetime.now(timezone.utc)
+                "created_at": datetime.now(timezone.utc),
+                "pricing": pricing
             }
         
         session = chat_sessions[session_id]
@@ -6557,7 +6667,13 @@ async def create_chatbot_reservation(booking_data: dict):
         except:
             nights = 1
         
-        total_amount = nights * rate
+        # Get tax rate
+        settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+        tax_rate = settings.get("sales_tax_rate", 0.0) if settings else 0.0
+        
+        subtotal = nights * rate
+        tax_amount = subtotal * (tax_rate / 100)
+        total_amount = subtotal + tax_amount
         
         # Create reservation record
         reservation_id = str(uuid.uuid4())
@@ -6571,7 +6687,10 @@ async def create_chatbot_reservation(booking_data: dict):
             "check_in_date": check_in,
             "check_out_date": check_out,
             "room_rate": rate,
-            "total_amount": total_amount,
+            "subtotal": subtotal,
+            "tax_rate": tax_rate,
+            "tax_amount": round(tax_amount, 2),
+            "total_amount": round(total_amount, 2),
             "nights": nights,
             "notes": "Booked via AI Chatbot - MUST confirm by calling (918) 653-7801",
             "is_active": False,  # Not active until check-in
@@ -6722,6 +6841,47 @@ async def clear_chat_session(session_id: str):
     if session_id in chat_sessions:
         del chat_sessions[session_id]
     return {"message": "Session cleared"}
+
+@api_router.get("/chatbot/availability")
+async def check_chatbot_availability(date: Optional[str] = None):
+    """Check room availability for chatbot bookings."""
+    target_date = date or datetime.now().strftime("%Y-%m-%d")
+    availability = await get_chatbot_availability(target_date)
+    pricing = await get_chatbot_pricing()
+    return {
+        **availability,
+        **pricing,
+        "date": target_date
+    }
+
+@api_router.post("/chatbot/transcribe")
+async def transcribe_audio(file: UploadFile = File(...)):
+    """Transcribe audio to text using OpenAI Whisper."""
+    try:
+        from emergentintegrations.llm.audio import AudioTranscriber
+        
+        llm_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not llm_key:
+            raise HTTPException(status_code=500, detail="LLM key not configured")
+        
+        # Save uploaded file temporarily
+        temp_path = f"/tmp/audio_{uuid.uuid4()}.webm"
+        with open(temp_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+        
+        # Transcribe using Whisper
+        transcriber = AudioTranscriber(api_key=llm_key)
+        transcript = await transcriber.transcribe(temp_path)
+        
+        # Clean up temp file
+        os.remove(temp_path)
+        
+        return {"transcript": transcript, "success": True}
+        
+    except Exception as e:
+        logging.error(f"Transcription error: {e}")
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
 
 # Include the router in the main app (MUST be after all route definitions)

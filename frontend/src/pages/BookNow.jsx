@@ -16,7 +16,9 @@ import {
   Loader2,
   Home,
   Calendar,
-  Mail
+  Mail,
+  Mic,
+  MicOff
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -27,15 +29,43 @@ export default function BookNow() {
   const [sessionId, setSessionId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [bookingConfirmed, setBookingConfirmed] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [availability, setAvailability] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
-  // Initial welcome message
+  // Fetch availability and pricing on load
   useEffect(() => {
-    setMessages([{
-      role: "assistant",
-      content: "Welcome to Hodler Inn! 👋 I'm here to help you make a room reservation.\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $85/night\n• Double Bed - $95/night\n\nWhen would you like to stay with us?"
-    }]);
+    const fetchAvailability = async () => {
+      try {
+        const res = await axios.get(`${API}/chatbot/availability`);
+        setAvailability(res.data);
+        
+        // Set initial message with current pricing
+        const singleRate = res.data.single_rate || 85;
+        const doubleRate = res.data.double_rate || 95;
+        const taxRate = res.data.tax_rate || 0;
+        const taxInfo = taxRate > 0 ? ` (plus ${taxRate}% tax)` : "";
+        
+        let welcomeMsg = `Welcome to Hodler Inn! 👋 I'm here to help you make a room reservation.\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night${taxInfo}\n\n`;
+        
+        if (res.data.is_sold_out) {
+          welcomeMsg += "⚠️ Unfortunately, we're currently fully booked online. Please call us at (918) 653-7801 to check availability.";
+        } else {
+          welcomeMsg += "When would you like to stay with us?";
+        }
+        
+        setMessages([{ role: "assistant", content: welcomeMsg }]);
+      } catch (error) {
+        setMessages([{
+          role: "assistant",
+          content: "Welcome to Hodler Inn! 👋 I'm here to help you make a room reservation.\n\nWhen would you like to stay with us?"
+        }]);
+      }
+    };
+    fetchAvailability();
   }, []);
 
   // Auto scroll to bottom
@@ -91,6 +121,81 @@ export default function BookNow() {
       e.preventDefault();
       sendMessage();
     }
+  };
+
+  // Voice recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        await transcribeAudio(audioBlob);
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Microphone access denied:", error);
+      alert("Please allow microphone access to use voice input.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const transcribeAudio = async (audioBlob) => {
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.webm');
+      
+      const response = await axios.post(`${API}/chatbot/transcribe`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      if (response.data.transcript) {
+        setInputValue(response.data.transcript);
+        // Auto-send the transcribed message
+        const userMessage = response.data.transcript;
+        setInputValue("");
+        setMessages(prev => [...prev, { role: "user", content: userMessage }]);
+        
+        // Send to chatbot
+        const chatResponse = await axios.post(`${API}/chatbot/message`, {
+          message: userMessage,
+          session_id: sessionId
+        });
+        
+        setSessionId(chatResponse.data.session_id);
+        setMessages(prev => [...prev, { 
+          role: "assistant", 
+          content: chatResponse.data.response 
+        }]);
+        
+        if (chatResponse.data.booking_created && chatResponse.data.booking_details) {
+          setBookingConfirmed(chatResponse.data.booking_details);
+        }
+      }
+    } catch (error) {
+      console.error("Transcription error:", error);
+      setMessages(prev => [...prev, { 
+        role: "assistant", 
+        content: "I couldn't understand that. Please try again or type your message." 
+      }]);
+    }
+    setIsLoading(false);
   };
 
   return (
@@ -253,17 +358,30 @@ export default function BookNow() {
 
           {/* Input Area */}
           <div className="border-t border-amber-500/20 p-4 bg-black/20">
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <Input
                 ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
+                placeholder={isRecording ? "Listening..." : "Type or tap mic to speak..."}
                 className="flex-1 bg-slate-800/80 border-slate-700 text-white placeholder:text-gray-500 focus:border-amber-500/50 focus:ring-amber-500/20"
-                disabled={isLoading}
+                disabled={isLoading || isRecording}
                 data-testid="chat-input"
               />
+              <Button
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isLoading}
+                className={`px-4 transition-all ${
+                  isRecording 
+                    ? "bg-red-500 hover:bg-red-400 text-white animate-pulse" 
+                    : "bg-slate-700 hover:bg-slate-600 text-gray-300"
+                }`}
+                data-testid="voice-btn"
+                title={isRecording ? "Stop recording" : "Start voice input"}
+              >
+                {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </Button>
               <Button
                 onClick={sendMessage}
                 disabled={!inputValue.trim() || isLoading}

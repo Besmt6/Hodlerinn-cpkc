@@ -78,7 +78,8 @@ import {
   Upload,
   UserX,
   TrendingUp,
-  Bell
+  Bell,
+  MessageCircle
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -201,6 +202,11 @@ export default function AdminDashboard() {
     telegram_chat_id: "",
     public_api_key: "",
     nightly_rate: 75.0,
+    single_room_rate: 85.0,
+    double_room_rate: 95.0,
+    sales_tax_rate: 0.0,
+    chatbot_max_rooms: 3,
+    guaranteed_rooms: 25,
     email_reports_enabled: false,
     email_smtp_host: "smtp.zoho.com",
     email_smtp_port: 587,
@@ -822,6 +828,11 @@ export default function AdminDashboard() {
         telegram_chat_id: settingsRes.data.telegram_chat_id || "",
         public_api_key: settingsRes.data.public_api_key || "",
         nightly_rate: settingsRes.data.nightly_rate || 75.0,
+        single_room_rate: settingsRes.data.single_room_rate || 85.0,
+        double_room_rate: settingsRes.data.double_room_rate || 95.0,
+        sales_tax_rate: settingsRes.data.sales_tax_rate || 0.0,
+        chatbot_max_rooms: settingsRes.data.chatbot_max_rooms || 3,
+        guaranteed_rooms: settingsRes.data.guaranteed_rooms || 25,
         email_reports_enabled: settingsRes.data.email_reports_enabled || false,
         email_smtp_host: settingsRes.data.email_smtp_host || "smtp.zoho.com",
         email_smtp_port: settingsRes.data.email_smtp_port || 587,
@@ -847,7 +858,12 @@ export default function AdminDashboard() {
         auto_sync_enabled: portalSettings.auto_sync_enabled,
         telegram_chat_id: portalSettings.telegram_chat_id,
         public_api_key: portalSettings.public_api_key,
-        nightly_rate: portalSettings.nightly_rate
+        nightly_rate: portalSettings.nightly_rate,
+        single_room_rate: portalSettings.single_room_rate,
+        double_room_rate: portalSettings.double_room_rate,
+        sales_tax_rate: portalSettings.sales_tax_rate,
+        chatbot_max_rooms: portalSettings.chatbot_max_rooms,
+        guaranteed_rooms: portalSettings.guaranteed_rooms
       });
       toast.success("Settings saved successfully");
       fetchSettings();
@@ -3576,7 +3592,7 @@ export default function AdminDashboard() {
                     {/* Nightly Rate */}
                     <div className="mb-4">
                       <label className="text-xs text-vault-gold uppercase tracking-wider mb-2 block font-medium">
-                        Nightly Rate ($)
+                        Railroad Nightly Rate ($)
                       </label>
                       <Input
                         type="number"
@@ -3587,8 +3603,118 @@ export default function AdminDashboard() {
                         data-testid="nightly-rate-input"
                       />
                       <p className="text-vault-text-secondary text-xs mt-1">
-                        Rate per night used in billing calculations.
+                        Rate per night used for railroad crew billing.
                       </p>
+                    </div>
+
+                    {/* Chatbot & Pricing Settings */}
+                    <div className="mt-6 p-4 bg-gradient-to-r from-amber-500/10 to-amber-600/5 rounded-xl border border-amber-500/20">
+                      <h4 className="text-vault-gold font-semibold text-sm mb-4 flex items-center gap-2">
+                        <MessageCircle className="w-4 h-4" />
+                        Chatbot & Online Booking Settings
+                      </h4>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                        {/* Single Room Rate */}
+                        <div>
+                          <label className="text-xs text-vault-text-secondary uppercase tracking-wider mb-1 block">
+                            Single Bed Rate ($)
+                          </label>
+                          <Input
+                            type="number"
+                            value={portalSettings.single_room_rate}
+                            onChange={(e) => setPortalSettings({...portalSettings, single_room_rate: parseFloat(e.target.value) || 0})}
+                            placeholder="85.00"
+                            className="bg-black/50 border-vault-border text-vault-text"
+                            data-testid="single-room-rate-input"
+                          />
+                        </div>
+                        
+                        {/* Double Room Rate */}
+                        <div>
+                          <label className="text-xs text-vault-text-secondary uppercase tracking-wider mb-1 block">
+                            Double Bed Rate ($)
+                          </label>
+                          <Input
+                            type="number"
+                            value={portalSettings.double_room_rate}
+                            onChange={(e) => setPortalSettings({...portalSettings, double_room_rate: parseFloat(e.target.value) || 0})}
+                            placeholder="95.00"
+                            className="bg-black/50 border-vault-border text-vault-text"
+                            data-testid="double-room-rate-input"
+                          />
+                        </div>
+                        
+                        {/* Sales Tax */}
+                        <div>
+                          <label className="text-xs text-vault-text-secondary uppercase tracking-wider mb-1 block">
+                            Sales Tax (%)
+                          </label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            value={portalSettings.sales_tax_rate}
+                            onChange={(e) => setPortalSettings({...portalSettings, sales_tax_rate: parseFloat(e.target.value) || 0})}
+                            placeholder="8.5"
+                            className="bg-black/50 border-vault-border text-vault-text"
+                            data-testid="sales-tax-rate-input"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Max Chatbot Rooms */}
+                        <div>
+                          <label className="text-xs text-vault-text-secondary uppercase tracking-wider mb-1 block">
+                            Max Chatbot Rooms/Day
+                          </label>
+                          <Input
+                            type="number"
+                            value={portalSettings.chatbot_max_rooms}
+                            onChange={(e) => setPortalSettings({...portalSettings, chatbot_max_rooms: parseInt(e.target.value) || 0})}
+                            placeholder="3"
+                            className="bg-black/50 border-vault-border text-vault-text"
+                            data-testid="chatbot-max-rooms-input"
+                          />
+                          <p className="text-vault-text-secondary text-xs mt-1">
+                            Limit online bookings to protect railroad guarantee
+                          </p>
+                        </div>
+                        
+                        {/* Guaranteed Rooms */}
+                        <div>
+                          <label className="text-xs text-vault-text-secondary uppercase tracking-wider mb-1 block">
+                            Guaranteed Railroad Rooms
+                          </label>
+                          <Input
+                            type="number"
+                            value={portalSettings.guaranteed_rooms}
+                            onChange={(e) => setPortalSettings({...portalSettings, guaranteed_rooms: parseInt(e.target.value) || 0})}
+                            placeholder="25"
+                            className="bg-black/50 border-vault-border text-vault-text"
+                            data-testid="guaranteed-rooms-input"
+                          />
+                          <p className="text-vault-text-secondary text-xs mt-1">
+                            Rooms reserved for CPKC crew
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 p-3 bg-black/30 rounded-lg">
+                        <p className="text-vault-text-secondary text-xs">
+                          <span className="text-vault-gold font-medium">Chatbot URL:</span>{" "}
+                          <a 
+                            href="/book" 
+                            target="_blank" 
+                            className="text-blue-400 hover:underline"
+                          >
+                            {window.location.origin}/book
+                          </a>
+                        </p>
+                        <p className="text-vault-text-secondary text-xs mt-1">
+                          The AI chatbot checks real-time availability and won't oversell beyond the limit above.
+                        </p>
+                      </div>
                     </div>
 
                     {/* API Documentation Panel */}
