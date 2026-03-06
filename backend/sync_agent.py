@@ -2539,131 +2539,137 @@ async def collect_employees_from_portal_v2(username: str, password: str) -> dict
             except:
                 continue
         
-        # Step 3: Process months from current month back to Sep 2025
-        logger.info("\n--- Step 3: Processing months ---")
+        # Step 3: Select Billing Period from dropdown and process
+        logger.info("\n--- Step 3: Select Billing Period and Process ---")
         
-        from datetime import datetime, timedelta
-        from calendar import monthrange
+        # The page has a "Billing Period" dropdown, not date inputs
+        # We need to click the dropdown and select each billing period
         
-        # Start from current month and go back to Sep 2025
-        current_date = datetime.now()
-        end_date = datetime(2025, 9, 1)  # Sep 2025 is the oldest
+        billing_period_dropdown = page.locator("select[id*='billingPeriod'], .ui-selectonemenu:has-text('Select'), div[id*='billingPeriod']").first
+        
+        # Try to find and click the billing period dropdown
+        dropdown_selectors = [
+            "label:has-text('Billing Period') + div select",
+            "label:has-text('Billing Period') ~ div .ui-selectonemenu",
+            "div:has-text('Billing Period') select",
+            "[id*='billingPeriod']",
+            ".ui-selectonemenu-label:has-text('Select')"
+        ]
+        
+        dropdown_clicked = False
+        for selector in dropdown_selectors:
+            try:
+                dropdown = page.locator(selector).first
+                if await dropdown.count() > 0:
+                    await dropdown.click()
+                    await page.wait_for_timeout(1000)
+                    logger.info(f"✓ Clicked Billing Period dropdown with: {selector}")
+                    dropdown_clicked = True
+                    break
+            except Exception as e:
+                continue
+        
+        if not dropdown_clicked:
+            # Try clicking on the "-Select-" text directly
+            try:
+                select_label = page.locator("text=-Select-").first
+                if await select_label.count() > 0:
+                    await select_label.click()
+                    await page.wait_for_timeout(1000)
+                    logger.info("✓ Clicked -Select- label")
+                    dropdown_clicked = True
+            except:
+                pass
+        
+        # Get all billing period options
+        billing_periods = []
+        try:
+            # Look for dropdown options
+            options = page.locator(".ui-selectonemenu-item, .ui-selectonemenu-list li, select option")
+            option_count = await options.count()
+            logger.info(f"Found {option_count} billing period options")
+            
+            for i in range(option_count):
+                opt = options.nth(i)
+                text = await opt.inner_text()
+                if text and text.strip() != "-Select-" and text.strip() != "":
+                    billing_periods.append(text.strip())
+            
+            logger.info(f"Billing periods to process: {billing_periods[:5]}...")  # Show first 5
+        except Exception as e:
+            logger.error(f"Error getting billing periods: {e}")
+        
+        # Close dropdown if open
+        await page.keyboard.press("Escape")
+        await page.wait_for_timeout(500)
         
         months_processed = 0
-        max_months = 18  # Limit to avoid very long runs
+        max_months = 12  # Limit to last 12 billing periods
         
-        while current_date >= end_date and months_processed < max_months:
-            # Calculate month start and end dates
-            month_start = current_date.replace(day=1)
-            _, last_day = monthrange(current_date.year, current_date.month)
-            month_end = current_date.replace(day=last_day)
-            
-            month_str = month_start.strftime("%B %Y")
-            start_str = month_start.strftime("%m/%d/%Y")
-            end_str = month_end.strftime("%m/%d/%Y")
-            
-            logger.info(f"\n>>> Processing {month_str} ({start_str} - {end_str})")
+        for billing_period in billing_periods[:max_months]:
+            logger.info(f"\n>>> Processing Billing Period: {billing_period}")
             
             try:
-                # Navigate to Sign-in Report page (fresh start for each month)
-                for selector in report_selectors:
-                    try:
-                        report = page.locator(selector).first
-                        if await report.count() > 0:
-                            await report.click()
-                            await page.wait_for_load_state("networkidle", timeout=30000)
-                            await page.wait_for_timeout(1500)
-                            break
-                    except:
-                        continue
-                
-                # Find and set date range inputs - try multiple selector strategies
-                date_input_selectors = [
-                    "input[type='text'][size='10']",
-                    "input.ui-inputfield",
-                    "input[id*='date']",
-                    "input.hasDatepicker",
-                    "input[placeholder*='date']",
-                    "input[name*='date']",
-                    "input[id*='Calendar']",
-                    "input[id*='calendar']",
-                    "input.form-control[type='text']",
-                    "input[type='text']"  # Last resort - all text inputs
+                # Click on the Billing Period dropdown to open it
+                billing_dropdown_selectors = [
+                    "label:has-text('Billing Period') + div",
+                    "label:has-text('Billing Period') ~ div .ui-selectonemenu",
+                    "[id*='billingPeriod']",
+                    ".ui-selectonemenu:has-text('-Select-')",
+                    "div.ui-selectonemenu"
                 ]
                 
-                date_inputs = None
-                input_count = 0
-                
-                for selector in date_input_selectors:
+                dropdown_opened = False
+                for selector in billing_dropdown_selectors:
                     try:
-                        date_inputs = page.locator(selector)
-                        input_count = await date_inputs.count()
-                        if input_count >= 2:
-                            logger.info(f"Found {input_count} date inputs with selector: {selector}")
+                        dropdown = page.locator(selector).first
+                        if await dropdown.count() > 0:
+                            await dropdown.click()
+                            await page.wait_for_timeout(1000)
+                            dropdown_opened = True
                             break
                     except:
                         continue
                 
-                if input_count == 0:
-                    # Log page content to help debug
+                if not dropdown_opened:
+                    # Try clicking on visible "-Select-" text
                     try:
-                        all_inputs = page.locator("input")
-                        all_count = await all_inputs.count()
-                        logger.warning(f"No date inputs found! Total inputs on page: {all_count}")
-                        # Log first few input attributes
-                        for i in range(min(5, all_count)):
-                            inp = all_inputs.nth(i)
-                            inp_type = await inp.get_attribute("type") or "none"
-                            inp_id = await inp.get_attribute("id") or "none"
-                            inp_class = await inp.get_attribute("class") or "none"
-                            logger.info(f"  Input {i}: type={inp_type}, id={inp_id}, class={inp_class[:50]}")
-                    except Exception as debug_err:
-                        logger.warning(f"Debug error: {debug_err}")
+                        select_text = page.locator("span:has-text('-Select-'), label:has-text('-Select-')").first
+                        await select_text.click()
+                        await page.wait_for_timeout(1000)
+                        dropdown_opened = True
+                    except:
+                        pass
                 
-                if input_count >= 2:
-                    # If there are 3+ inputs, first one might be a tenant/property dropdown
-                    # The date inputs are usually the last two
-                    start_idx = 0
-                    end_idx = 1
-                    
-                    if input_count >= 3:
-                        # Check if first input is a tenant/dropdown by checking its ID
-                        first_input = date_inputs.nth(0)
-                        first_id = await first_input.get_attribute("id") or ""
-                        first_name = await first_input.get_attribute("name") or ""
-                        
-                        if "tenant" in first_id.lower() or "tenant" in first_name.lower() or "combo" in first_id.lower():
-                            logger.info(f"Skipping first input (tenant dropdown): {first_id}")
-                            start_idx = 1
-                            end_idx = 2
-                    
-                    # Set start date
-                    start_input = date_inputs.nth(start_idx)
-                    await start_input.click()
-                    await page.wait_for_timeout(300)
-                    await start_input.fill("")
-                    await start_input.type(start_str, delay=50)
-                    await page.wait_for_timeout(500)
-                    await page.keyboard.press("Escape")  # Close any datepicker
-                    await page.wait_for_timeout(300)
-                    
-                    # Set end date  
-                    end_input = date_inputs.nth(end_idx)
-                    await end_input.click()
-                    await page.wait_for_timeout(300)
-                    await end_input.fill("")
-                    await end_input.type(end_str, delay=50)
-                    await page.wait_for_timeout(500)
-                    await page.keyboard.press("Escape")  # Close any datepicker
-                    await page.wait_for_timeout(300)
-                    
-                    logger.info(f"✓ Set date range: {start_str} to {end_str}")
-                elif input_count == 1:
-                    date_input = date_inputs.first
-                    await date_input.click()
-                    await date_input.fill("")
-                    await date_input.type(start_str)
-                    await page.wait_for_timeout(300)
+                if not dropdown_opened:
+                    logger.warning(f"Could not open Billing Period dropdown")
+                    continue
+                
+                # Select the billing period from dropdown options
+                option_selectors = [
+                    f".ui-selectonemenu-item:has-text('{billing_period}')",
+                    f"li:has-text('{billing_period}')",
+                    f"option:has-text('{billing_period}')"
+                ]
+                
+                option_selected = False
+                for selector in option_selectors:
+                    try:
+                        option = page.locator(selector).first
+                        if await option.count() > 0:
+                            await option.click()
+                            await page.wait_for_timeout(1000)
+                            logger.info(f"✓ Selected billing period: {billing_period}")
+                            option_selected = True
+                            break
+                    except:
+                        continue
+                
+                if not option_selected:
+                    # Close dropdown and skip this period
+                    await page.keyboard.press("Escape")
+                    logger.warning(f"Could not select billing period: {billing_period}")
+                    continue
                 
                 # Click Create button
                 create_selectors = [
@@ -2671,7 +2677,8 @@ async def collect_employees_from_portal_v2(username: str, password: str) -> dict
                     "button:has-text('Create')",
                     "input[type='submit'][value='Create']",
                     ".ui-button:has-text('Create')",
-                    "button.btn-primary"
+                    "button.btn-primary",
+                    "input.ui-button[value='Create']"
                 ]
                 
                 create_clicked = False
@@ -2689,25 +2696,22 @@ async def collect_employees_from_portal_v2(username: str, password: str) -> dict
                         continue
                 
                 if not create_clicked:
-                    logger.warning(f"Could not click Create button for {month_str}")
-                    current_date = (month_start - timedelta(days=1))
+                    logger.warning(f"Could not click Create button for {billing_period}")
                     months_processed += 1
                     continue
                 
-                # Process all "View Detail" links for this month
+                # Process all "View Detail" links for this billing period
                 month_employees = await process_view_detail_links_v2(page, seen_ids)
                 employees.extend(month_employees)
-                logger.info(f"✓ Found {len(month_employees)} new employees in {month_str}")
+                logger.info(f"✓ Found {len(month_employees)} new employees in {billing_period}")
                 
             except Exception as month_err:
-                logger.error(f"Error processing {month_str}: {month_err}")
+                logger.error(f"Error processing {billing_period}: {month_err}")
             
-            # Move to previous month
-            current_date = (month_start - timedelta(days=1))
             months_processed += 1
         
         logger.info("\n" + "="*60)
-        logger.info(f"COLLECTION COMPLETE: {len(employees)} unique employees from {months_processed} months")
+        logger.info(f"COLLECTION COMPLETE: {len(employees)} unique employees from {months_processed} billing periods")
         logger.info("="*60)
         
         return {
