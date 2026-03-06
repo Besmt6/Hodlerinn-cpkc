@@ -1978,134 +1978,167 @@ async def collect_employees_from_portal(username: str, password: str) -> dict:
 
 
 async def extract_employees_from_report_table(page, seen_ids: set) -> list:
-    """Extract employee data from the Sign-in Report table or by clicking View Details links."""
+    """Extract employee data from the Sign-in Report by clicking View Details for each date."""
     employees = []
     
     try:
-        # First, try to find direct employee data in summary table
-        tables = await page.locator("table").all()
+        # Based on user video: after generating report, page shows dates on left
+        # Each date has "View Detail" link - click it to see employee ID and name
         
-        for table in tables:
-            header_row = table.locator("tr").first
-            header_text = await header_row.inner_text()
-            header_lower = header_text.lower()
-            
-            if "crewid" not in header_lower and "crew id" not in header_lower:
+        # First log what we see on the page
+        page_text = await page.inner_text("body")
+        logger.info(f"Page content preview: {page_text[:500]}...")
+        
+        # Look for "View Detail" links (try multiple patterns)
+        view_detail_selectors = [
+            "a:has-text('View Detail')",
+            "a:has-text('View Details')",
+            "a:has-text('view detail')",
+            "a:has-text('Details')",
+            "[onclick*='detail']",
+            "a[href*='detail']",
+        ]
+        
+        view_links = None
+        link_count = 0
+        
+        for selector in view_detail_selectors:
+            try:
+                view_links = page.locator(selector)
+                link_count = await view_links.count()
+                if link_count > 0:
+                    logger.info(f"Found {link_count} View Detail links with selector: {selector}")
+                    break
+            except:
                 continue
-            
-            logger.info(f"Found employee data table with header: {header_text[:80]}...")
-            
-            rows = await table.locator("tr").all()
-            header_cells = await header_row.locator("th, td").all()
-            
-            # Find column positions
-            crew_id_col = -1
-            crew_name_col = -1
-            
-            for idx, cell in enumerate(header_cells):
-                cell_text = (await cell.inner_text()).strip().lower()
-                if "crewid" in cell_text or "crew id" in cell_text:
-                    crew_id_col = idx
-                elif "crew name" in cell_text or "crewname" in cell_text or ("name" in cell_text and crew_name_col == -1):
-                    crew_name_col = idx
-            
-            if crew_id_col >= 0:
-                logger.info(f"CrewId column: {crew_id_col}, Crew Name column: {crew_name_col}")
-                
-                for row_idx, row in enumerate(rows[1:], start=1):
-                    try:
-                        cells = await row.locator("td").all()
-                        if len(cells) <= crew_id_col:
-                            continue
-                        
-                        crew_id = (await cells[crew_id_col].inner_text()).strip()
-                        
-                        # Skip if ID is empty or invalid
-                        if not crew_id or crew_id == "" or crew_id == "NO ID":
-                            continue
-                        if crew_id in seen_ids:
-                            continue
-                        if ":" in crew_id or len(crew_id) > 15:
-                            continue
-                        if not crew_id.replace('-', '').replace(' ', '').replace('.', '').isalnum():
-                            continue
-                        
-                        # Get crew name
-                        crew_name = ""
-                        if crew_name_col >= 0 and len(cells) > crew_name_col:
-                            crew_name = (await cells[crew_name_col].inner_text()).strip()
-                        elif len(cells) > 1:
-                            crew_name = (await cells[1].inner_text()).strip()
-                        
-                        # Skip if name is empty or too short
-                        if not crew_name or crew_name == "" or len(crew_name) < 2:
-                            logger.info(f"  Skipping row {row_idx}: ID={crew_id} has no valid name")
-                            continue
-                        
-                        # Valid employee found
-                        seen_ids.add(crew_id)
-                        formatted_name = format_crew_name(crew_name)
-                        employees.append({
-                            "employee_number": crew_id,
-                            "name": formatted_name,
-                            "original_name": crew_name
-                        })
-                        logger.info(f"  Employee: ID={crew_id}, Name={formatted_name}")
-                            
-                    except Exception as row_err:
-                        continue
-            break
         
-        # If no employees found in summary table, try View Details links
-        if len(employees) == 0:
-            logger.info("No employees in summary table - looking for View Details links...")
+        if link_count == 0:
+            # Try to find any links that might be detail links
+            all_links = page.locator("a")
+            all_link_count = await all_links.count()
+            logger.info(f"No View Detail links found. Total links on page: {all_link_count}")
             
-            view_links = page.locator("a:has-text('View Details'), a:has-text('View'), [class*='view']")
-            link_count = await view_links.count()
-            logger.info(f"Found {link_count} View Details links")
+            # Log first 10 links for debugging
+            for i in range(min(10, all_link_count)):
+                try:
+                    link = all_links.nth(i)
+                    link_text = await link.inner_text()
+                    link_href = await link.get_attribute("href") or ""
+                    logger.info(f"  Link {i}: text='{link_text[:30]}', href='{link_href[:50]}'")
+                except:
+                    continue
             
-            if link_count > 0:
-                # Process each View Details link
-                max_links = min(link_count, 15)  # Limit to avoid timeout
+            # Fallback: try to extract from any visible table
+            return await extract_from_any_visible_table(page, seen_ids)
+        
+        # Process each View Detail link (process ALL dates, not just 15)
+        max_links = min(link_count, 31)  # Up to 31 days in a month
+        logger.info(f"Processing {max_links} View Detail links...")
+        
+        for i in range(max_links):
+            try:
+                # Re-find links each time (DOM may change after navigation)
+                view_links = page.locator(view_detail_selectors[0])  # Use the selector that worked
+                current_count = await view_links.count()
                 
-                for i in range(max_links):
-                    try:
-                        # Re-find links (DOM may have changed)
-                        view_links = page.locator("a:has-text('View Details'), a:has-text('View')")
-                        current_count = await view_links.count()
-                        
-                        if i >= current_count:
-                            break
-                        
-                        link = view_links.nth(i)
-                        link_text = await link.inner_text()
-                        logger.info(f"Clicking View Details link {i+1}/{max_links}: {link_text[:30]}...")
-                        
-                        await link.click()
-                        await page.wait_for_load_state("networkidle", timeout=30000)
-                        await page.wait_for_timeout(1500)
-                        
-                        # Extract from detail page
-                        detail_employees = await extract_from_detail_page(page, seen_ids)
-                        employees.extend(detail_employees)
-                        logger.info(f"  Found {len(detail_employees)} employees from View Details")
-                        
-                        # Go back - this may put us on a different page after multiple periods
-                        await page.go_back()
-                        await page.wait_for_load_state("networkidle", timeout=30000)
-                        await page.wait_for_timeout(1000)
-                        
-                    except Exception as link_err:
-                        logger.warning(f"Error processing View Details link {i}: {link_err}")
-                        try:
-                            await page.go_back()
-                            await page.wait_for_timeout(1000)
-                        except:
-                            pass
-                        continue
-            
+                if i >= current_count:
+                    logger.info(f"Only {current_count} links remaining, stopping at {i}")
+                    break
+                
+                link = view_links.nth(i)
+                link_text = await link.inner_text()
+                logger.info(f"Clicking View Detail {i+1}/{max_links}: '{link_text}'...")
+                
+                # Click the link
+                await link.click()
+                await page.wait_for_load_state("networkidle", timeout=30000)
+                await page.wait_for_timeout(1000)
+                
+                # Extract employees from the detail page
+                # Look for table with first two columns being ID and Name
+                detail_employees = await extract_from_detail_page(page, seen_ids)
+                employees.extend(detail_employees)
+                logger.info(f"  Extracted {len(detail_employees)} employees from this date")
+                
+                # Go back to the main report page
+                await page.go_back()
+                await page.wait_for_load_state("networkidle", timeout=30000)
+                await page.wait_for_timeout(800)
+                
+            except Exception as link_err:
+                logger.warning(f"Error processing View Detail link {i}: {link_err}")
+                try:
+                    await page.go_back()
+                    await page.wait_for_timeout(500)
+                except:
+                    pass
+                continue
+        
+        logger.info(f"Total employees collected from View Details: {len(employees)}")
+        
     except Exception as e:
         logger.error(f"Error extracting from report table: {e}")
+    
+    return employees
+
+
+async def extract_from_any_visible_table(page, seen_ids: set) -> list:
+    """Fallback: Try to extract employee data from any visible table."""
+    employees = []
+    
+    try:
+        tables = await page.locator("table").all()
+        logger.info(f"Fallback: Found {len(tables)} tables on page")
+        
+        for table_idx, table in enumerate(tables):
+            try:
+                rows = await table.locator("tr").all()
+                if len(rows) < 2:
+                    continue
+                
+                # Get header to understand column structure
+                header_row = rows[0]
+                header_text = await header_row.inner_text()
+                logger.info(f"Table {table_idx} header: {header_text[:100]}...")
+                
+                # Process data rows
+                for row in rows[1:]:
+                    try:
+                        cells = await row.locator("td").all()
+                        if len(cells) < 2:
+                            continue
+                        
+                        # Get first two columns (ID and Name per user description)
+                        col1 = (await cells[0].inner_text()).strip()
+                        col2 = (await cells[1].inner_text()).strip()
+                        
+                        # Skip invalid entries
+                        if not col1 or col1 == "NO ID" or col1 == "":
+                            continue
+                        if not col2 or len(col2) < 2:
+                            continue
+                        
+                        # Validate ID format
+                        if len(col1) > 15 or ":" in col1:
+                            continue
+                        if not col1.replace('-', '').replace('.', '').replace(' ', '').isalnum():
+                            continue
+                        
+                        if col1 not in seen_ids:
+                            seen_ids.add(col1)
+                            employees.append({
+                                "employee_number": col1,
+                                "name": format_crew_name(col2),
+                                "original_name": col2
+                            })
+                            logger.info(f"  Found employee: ID={col1}, Name={col2}")
+                    except:
+                        continue
+            except:
+                continue
+                
+    except Exception as e:
+        logger.error(f"Error in fallback extraction: {e}")
     
     return employees
 
