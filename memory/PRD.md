@@ -114,7 +114,23 @@ A comprehensive railroad crew accommodation management platform for Hodler Inn i
 - **AI/LLM**: emergentintegrations (GPT-5.2, Whisper)
 - **Voice**: Web Speech API (TTS), OpenAI Whisper (STT)
 - **Email Parsing**: pdfplumber, imaplib (Zoho IMAP)
-- **Deployment**: Docker, AWS EC2
+- **Deployment**: Docker, Docker Compose, AWS EC2
+
+## AWS Production Server
+- **Server**: ubuntu@ip-172-31-9-167
+- **Project Folder**: `~/Hodlerinn-cpkc`
+- **Docker Containers**:
+  - `hodlerinn-frontend` (port 3000)
+  - `hodlerinn-backend` (port 8001)
+  - `hodlerinn-mongodb` (port 27017)
+- **Deploy Commands**:
+  ```bash
+  cd ~/Hodlerinn-cpkc
+  git pull origin main
+  docker-compose down
+  docker-compose up -d --build
+  ```
+- **Check Logs**: `docker logs hodlerinn-backend --tail 100`
 
 ## Changelog
 - **March 6, 2025 (Session 3)**: 
