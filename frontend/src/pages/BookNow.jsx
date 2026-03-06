@@ -49,7 +49,7 @@ export default function BookNow() {
         const taxRate = res.data.tax_rate || 0;
         const taxInfo = taxRate > 0 ? ` (plus ${taxRate}% tax)` : "";
         
-        let welcomeMsg = `Welcome to Hodler Inn! 👋 I'm here to help you make a room reservation.\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night${taxInfo}\n\n`;
+        let welcomeMsg = `Hi there! I'm Bitsy, your booking assistant at Hodler Inn! 🏨\n\nWe offer comfortable rooms at great rates:\n• Single Bed - $${singleRate}/night\n• Double Bed - $${doubleRate}/night${taxInfo}\n\n`;
         
         if (res.data.is_sold_out) {
           welcomeMsg += "⚠️ Unfortunately, we're currently fully booked online. Please call us at (918) 653-7801 to check availability.";
@@ -61,7 +61,7 @@ export default function BookNow() {
       } catch (error) {
         setMessages([{
           role: "assistant",
-          content: "Welcome to Hodler Inn! 👋 I'm here to help you make a room reservation.\n\nWhen would you like to stay with us?"
+          content: "Hi there! I'm Bitsy, your booking assistant at Hodler Inn! 🏨\n\nWhen would you like to stay with us?"
         }]);
       }
     };
@@ -266,8 +266,8 @@ export default function BookNow() {
                 <MessageCircle className="w-6 h-6 text-black" />
               </div>
               <div>
-                <h2 className="text-white font-bold text-lg">Book Your Stay</h2>
-                <p className="text-amber-400/80 text-sm">Chat with our AI assistant to make a reservation</p>
+                <h2 className="text-white font-bold text-lg">Chat with Bitsy</h2>
+                <p className="text-amber-400/80 text-sm">Your AI booking assistant</p>
               </div>
             </div>
           </div>
