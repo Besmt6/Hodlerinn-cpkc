@@ -4,37 +4,37 @@
 
 ## HEADLINE
 ```
-Founder, Hodler Inn | Built AI-Powered Hotel Management System | Hospitality + Technology | Heavener, Oklahoma
+28 Years in Hospitality | Founder, Hodler Inn | Built AI-Powered Hotel Management System | Heavener, Oklahoma
 ```
 
 ---
 
 ## ABOUT SECTION
 
-I run a hotel. I also built the software to run it.
+28 years in hospitality taught me one thing: this industry runs on manual work that doesn't need to be manual.
 
-As the founder of Hodler Inn in Heavener, Oklahoma, I serve railroad crews who need reliable lodging. What I discovered was that the hospitality industry is drowning in manual processes—paper sign-ins, spreadsheet tracking, and hours of data entry into railroad portals.
+I've been in hotels since 1998. I've seen it all—paper logbooks, spreadsheet nightmares, hours spent copying data into portals. Every hotel owner knows this pain.
 
-So I fixed it.
+As the founder of Hodler Inn in Heavener, Oklahoma, serving railroad crews, I finally decided: enough is enough.
 
 Working with AI development tools (Emergent), I designed and deployed a complete hotel management system that:
 
 → Automates 95% of billing verification with railroad portals  
 → Saves 2+ hours of daily administrative work  
 → Provides voice-guided kiosk check-in for guests  
-→ Runs on dual-site cloud infrastructure (AWS + Kubernetes)  
+→ Runs on dual-site cloud infrastructure (AWS + MongoDB Atlas)  
 → Sends real-time notifications via Telegram
 
-I'm not a programmer. I'm a problem solver who learned to leverage AI tools to build real solutions.
+I didn't go back to school. I didn't hire developers. I used AI tools to turn 28 years of industry knowledge into working software.
 
-The future belongs to people who can identify problems AND use technology to solve them—without needing to write code themselves.
+The future of hospitality isn't just about service—it's about smart automation that lets us focus on guests, not paperwork.
 
 **Looking to connect with:**
-- Hospitality professionals exploring automation
-- Startups building for small business owners
-- Anyone who believes in solving real problems
+- Hospitality professionals tired of manual processes
+- Hotel owners exploring automation
+- Anyone who believes experience + technology = transformation
 
-Let's talk: Building something that matters? I'd love to hear about it.
+Let's talk: If you're in hospitality and drowning in admin work, I've been there. Happy to share what I learned.
 
 ---
 
@@ -42,7 +42,8 @@ Let's talk: Building something that matters? I'd love to hear about it.
 
 ### Founder & CEO
 **Hodler Inn**  
-*Heavener, Oklahoma*
+*Heavener, Oklahoma*  
+*[Current]*
 
 Owner and operator of hotel accommodations serving railroad crews. Built and deployed proprietary AI-powered management system to automate operations.
 
@@ -52,7 +53,7 @@ Owner and operator of hotel accommodations serving railroad crews. Built and dep
 - Handle billing, verification, and compliance with railroad contracts
 
 **Technology Innovation:**
-- Designed and deployed custom hotel management system
+- Designed and deployed custom hotel management system using AI tools (Emergent)
 - Built AI sync agent for automated billing verification
 - Created voice-guided guest kiosk for self-service check-in
 - Implemented dual-site cloud infrastructure for reliability
@@ -64,7 +65,21 @@ Owner and operator of hotel accommodations serving railroad crews. Built and dep
 - Eliminated paper sign-in sheets entirely
 - Created scalable system handling 200+ employees
 
-**Technologies Used:** React, Python, MongoDB Atlas, AWS, Docker, Playwright, OpenAI, Emergent AI
+---
+
+### Hospitality Professional
+**Hotel Industry Experience**  
+*1998 - Present (28 Years)*
+
+Nearly three decades of hands-on experience in hotel operations, from front desk to ownership. Deep understanding of:
+
+- Guest services and satisfaction
+- Revenue management and billing
+- Staff training and operations
+- Vendor and partner relationships
+- Industry challenges and pain points
+
+This experience became the foundation for building Hodler Inn's automated management system—solving problems I lived with for decades.
 
 ---
 
