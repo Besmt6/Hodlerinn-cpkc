@@ -154,6 +154,17 @@ export default function AdminDashboard() {
   const [blockedRoomStats, setBlockedRoomStats] = useState(null);
   const [reservations, setReservations] = useState([]);
   
+  // Email Alert Settings state
+  const [emailAlertSettings, setEmailAlertSettings] = useState({
+    recipients: [],
+    sold_out_enabled: true,
+    rooms_available_enabled: true,
+    heads_up_enabled: true,
+    heads_up_threshold: 4,
+    custom_subject_prefix: "Hodler Inn"
+  });
+  const [newRecipientEmail, setNewRecipientEmail] = useState("");
+  
   // Guarantee report state
   const [guaranteeReport, setGuaranteeReport] = useState(null);
   const [guaranteeLoading, setGuaranteeLoading] = useState(false);
@@ -222,6 +233,7 @@ export default function AdminDashboard() {
     fetchBlockedRooms();
     fetchBlockedRoomStats();
     fetchReservations();
+    fetchEmailAlertSettings();
   }, [navigate]);
 
   const fetchRegisteredGuests = async () => {
@@ -405,6 +417,60 @@ export default function AdminDashboard() {
       fetchReservations();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to send email");
+    }
+  };
+
+  // Email Alert Settings functions
+  const fetchEmailAlertSettings = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/email-alerts/settings`);
+      setEmailAlertSettings(response.data);
+    } catch (error) {
+      console.error("Failed to fetch email alert settings");
+    }
+  };
+
+  const updateEmailAlertSettings = async (newSettings) => {
+    try {
+      await axios.post(`${API}/admin/email-alerts/settings`, newSettings);
+      toast.success("Email alert settings updated");
+      fetchEmailAlertSettings();
+    } catch (error) {
+      toast.error("Failed to update settings");
+    }
+  };
+
+  const addEmailRecipient = async () => {
+    if (!newRecipientEmail || !newRecipientEmail.includes("@")) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/email-alerts/recipients/add?email=${encodeURIComponent(newRecipientEmail)}`);
+      toast.success(`Added ${newRecipientEmail}`);
+      setNewRecipientEmail("");
+      fetchEmailAlertSettings();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to add recipient");
+    }
+  };
+
+  const removeEmailRecipient = async (email) => {
+    try {
+      await axios.delete(`${API}/admin/email-alerts/recipients?email=${encodeURIComponent(email)}`);
+      toast.success(`Removed ${email}`);
+      fetchEmailAlertSettings();
+    } catch (error) {
+      toast.error("Failed to remove recipient");
+    }
+  };
+
+  const sendTestAlert = async () => {
+    try {
+      const res = await axios.post(`${API}/admin/email-alerts/test`);
+      toast.success(res.data.message);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to send test email");
     }
   };
 
@@ -4171,9 +4237,109 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                   
                   {/* CPKC Email Notification Test Buttons */}
                   <div className="border-t border-vault-border pt-4 mt-4">
-                    <h4 className="text-sm font-semibold text-vault-gold mb-3">Test CPKC Notifications</h4>
+                    <h4 className="text-sm font-semibold text-vault-gold mb-3">Email Alert Recipients</h4>
                     <p className="text-vault-text-secondary text-xs mb-3">
-                      Test the automated email notifications sent to CPKC (crewtravel@cpkcr.com, crewmanagers@cpkcr.com)
+                      Manage email recipients for automated alerts (sold out, rooms available, low availability)
+                    </p>
+                    
+                    {/* Current Recipients */}
+                    <div className="bg-black/30 rounded-lg p-3 mb-3">
+                      <p className="text-vault-text-secondary text-xs mb-2">Current Recipients:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {emailAlertSettings.recipients?.length > 0 ? (
+                          emailAlertSettings.recipients.map((email, idx) => (
+                            <div key={idx} className="bg-vault-surface border border-vault-border rounded-lg px-3 py-1 flex items-center gap-2">
+                              <span className="text-vault-text text-sm">{email}</span>
+                              <button 
+                                onClick={() => removeEmailRecipient(email)}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-vault-text-secondary text-sm">No recipients configured</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Add New Recipient */}
+                    <div className="flex gap-2 mb-4">
+                      <Input
+                        type="email"
+                        value={newRecipientEmail}
+                        onChange={(e) => setNewRecipientEmail(e.target.value)}
+                        placeholder="email@company.com"
+                        className="bg-black/50 border-vault-border text-vault-text flex-1"
+                      />
+                      <Button
+                        onClick={addEmailRecipient}
+                        className="bg-vault-gold hover:bg-vault-gold/80 text-black"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                    
+                    {/* Alert Toggles */}
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={emailAlertSettings.sold_out_enabled}
+                          onChange={(e) => {
+                            const newSettings = {...emailAlertSettings, sold_out_enabled: e.target.checked};
+                            setEmailAlertSettings(newSettings);
+                            updateEmailAlertSettings(newSettings);
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-vault-text text-sm">Sold Out</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={emailAlertSettings.rooms_available_enabled}
+                          onChange={(e) => {
+                            const newSettings = {...emailAlertSettings, rooms_available_enabled: e.target.checked};
+                            setEmailAlertSettings(newSettings);
+                            updateEmailAlertSettings(newSettings);
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-vault-text text-sm">Rooms Available</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={emailAlertSettings.heads_up_enabled}
+                          onChange={(e) => {
+                            const newSettings = {...emailAlertSettings, heads_up_enabled: e.target.checked};
+                            setEmailAlertSettings(newSettings);
+                            updateEmailAlertSettings(newSettings);
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-vault-text text-sm">Low Availability</span>
+                      </div>
+                    </div>
+                    
+                    {/* Test Button */}
+                    <Button
+                      onClick={sendTestAlert}
+                      disabled={emailAlertSettings.recipients?.length === 0}
+                      className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                    >
+                      <Mail className="w-4 h-4" />
+                      Send Test Alert to All Recipients
+                    </Button>
+                  </div>
+                  
+                  {/* Legacy Test Buttons */}
+                  <div className="border-t border-vault-border pt-4 mt-4">
+                    <h4 className="text-sm font-semibold text-vault-gold mb-3">Test Individual Alerts</h4>
+                    <p className="text-vault-text-secondary text-xs mb-3">
+                      Test specific notification types
                     </p>
                     <div className="flex flex-wrap gap-3">
                       <Button

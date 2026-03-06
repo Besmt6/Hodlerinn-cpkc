@@ -770,8 +770,31 @@ sold_out_notification_sent_date = None
 # Track if heads-up notice was already sent today
 heads_up_notification_sent_date = None
 
-# CPKC Email Recipients
-CPKC_EMAIL_RECIPIENTS = ["crewtravel@cpkcr.com", "crewmanagers@cpkcr.com"]
+# Default CPKC Email Recipients (fallback if not configured in DB)
+DEFAULT_CPKC_EMAIL_RECIPIENTS = ["crewtravel@cpkcr.com", "crewmanagers@cpkcr.com"]
+
+
+async def get_email_alert_settings():
+    """Get email alert settings from database."""
+    settings = await db.email_alert_settings.find_one({"id": "email_alerts"}, {"_id": 0})
+    if not settings:
+        # Return defaults
+        return {
+            "id": "email_alerts",
+            "recipients": DEFAULT_CPKC_EMAIL_RECIPIENTS,
+            "sold_out_enabled": True,
+            "rooms_available_enabled": True,
+            "heads_up_enabled": True,
+            "heads_up_threshold": 4,  # Alert when 4 or fewer rooms available
+            "custom_subject_prefix": "Hodler Inn"
+        }
+    return settings
+
+
+async def get_email_recipients():
+    """Get configured email recipients from database."""
+    settings = await get_email_alert_settings()
+    return settings.get("recipients", DEFAULT_CPKC_EMAIL_RECIPIENTS)
 
 
 async def get_notification_state():
@@ -848,11 +871,17 @@ async def get_room_availability_details():
 
 
 async def send_email_notification(subject: str, body: str):
-    """Send email notification to CPKC using configured SMTP settings."""
+    """Send email notification to configured recipients using SMTP settings."""
     settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
     
     if not settings or not settings.get("email_sender") or not settings.get("email_password_encrypted"):
         logging.warning("Email settings not configured - cannot send notification")
+        return False
+    
+    # Get recipients from database
+    recipients = await get_email_recipients()
+    if not recipients:
+        logging.warning("No email recipients configured")
         return False
     
     try:
@@ -868,7 +897,7 @@ async def send_email_notification(subject: str, body: str):
         # Create email
         msg = MIMEMultipart()
         msg['From'] = sender
-        msg['To'] = ", ".join(CPKC_EMAIL_RECIPIENTS)
+        msg['To'] = ", ".join(recipients)
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
         
@@ -876,10 +905,10 @@ async def send_email_notification(subject: str, body: str):
         server = smtplib.SMTP(smtp_host, smtp_port)
         server.starttls()
         server.login(sender, password)
-        server.sendmail(sender, CPKC_EMAIL_RECIPIENTS, msg.as_string())
+        server.sendmail(sender, recipients, msg.as_string())
         server.quit()
         
-        logging.info(f"Email notification sent: {subject}")
+        logging.info(f"Email notification sent to {recipients}: {subject}")
         return True
         
     except Exception as e:
@@ -1021,6 +1050,11 @@ async def check_and_send_sold_out_notification():
     """Check if all rooms are occupied and send notification to railroad company"""
     today = datetime.now().strftime("%Y-%m-%d")
     
+    # Check if sold out alerts are enabled
+    alert_settings = await get_email_alert_settings()
+    if not alert_settings.get("sold_out_enabled", True):
+        return
+    
     # Get total rooms count
     total_rooms = await db.rooms.count_documents({})
     if total_rooms == 0:
@@ -1029,8 +1063,8 @@ async def check_and_send_sold_out_notification():
     # Get occupied rooms count (railroad guests)
     occupied_by_railroad = await db.bookings.count_documents({"is_checked_out": False})
     
-    # Get blocked rooms count (other guests)
-    blocked_rooms = await db.blocked_rooms.count_documents({"is_active": True})
+    # Get blocked rooms count (other guests, not reservations)
+    blocked_rooms = await db.blocked_rooms.count_documents({"is_active": True, "is_reservation": {"$ne": True}})
     
     # Total occupied = railroad guests + other guests
     total_occupied = occupied_by_railroad + blocked_rooms
@@ -1042,10 +1076,12 @@ async def check_and_send_sold_out_notification():
         if state.get("sold_out_date") == today:
             return  # Already sent today
         
-        # Get email settings
+        # Get email settings and recipients from database
         settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+        recipients = await get_email_recipients()
+        subject_prefix = alert_settings.get("custom_subject_prefix", "Hodler Inn")
         
-        if settings and settings.get("email_sender") and settings.get("email_password_encrypted"):
+        if settings and settings.get("email_sender") and settings.get("email_password_encrypted") and recipients:
             try:
                 import smtplib
                 from email.mime.text import MIMEText
@@ -1056,25 +1092,22 @@ async def check_and_send_sold_out_notification():
                 sender = settings.get("email_sender")
                 password = decrypt_data(settings.get("email_password_encrypted"))
                 
-                # Railroad company emails
-                recipients = ["crewtravel@cpkcr.com", "crewmanagers@cpkcr.com"]
-                
                 # Create email
                 msg = MIMEMultipart()
                 msg['From'] = sender
                 msg['To'] = ", ".join(recipients)
-                msg['Subject'] = f"Hodler Inn - 100% Occupied ({today})"
+                msg['Subject'] = f"{subject_prefix} - 100% Occupied ({today})"
                 
                 body = f"""Hello,
 
-This is an automated notification from Hodler Inn.
+This is an automated notification from {subject_prefix}.
 
 We are currently 100% occupied with {total_occupied} rooms in house.
 
 More rooms will become available as crew gets called out from the hotel.
 
 Thank you,
-Hodler Inn
+{subject_prefix}
 
 ---
 This is an automated message. Please do not reply to this email.
@@ -1090,15 +1123,15 @@ This is an automated message. Please do not reply to this email.
                 
                 # Set sold-out state in database (persists across restarts)
                 await set_sold_out_state(today, True)
-                logging.info(f"Sold-out notification sent to railroad company: {recipients}")
+                logging.info(f"Sold-out notification sent to: {recipients}")
                 
                 # Also send Telegram notification
+                recipient_list = '\n• '.join(recipients)
                 await send_telegram_notification(
                     f"📧 <b>SOLD OUT NOTIFICATION SENT</b>\n"
                     f"━━━━━━━━━━━━━━━\n"
                     f"✅ Email sent to:\n"
-                    f"• crewtravel@cpkcr.com\n"
-                    f"• crewmanagers@cpkcr.com\n"
+                    f"• {recipient_list}\n"
                     f"━━━━━━━━━━━━━━━\n"
                     f"🏨 {total_occupied}/{total_rooms} rooms occupied\n"
                     f"🚂 Railroad: {occupied_by_railroad}\n"
@@ -3432,6 +3465,141 @@ async def get_blocked_rooms_history(start_date: str = None, end_date: str = None
         "total_revenue": round(total_revenue, 2),
         "total_nights": total_nights
     }
+
+
+# ==================== Email Alert Settings ====================
+
+class EmailAlertSettingsInput(BaseModel):
+    recipients: List[str]
+    sold_out_enabled: Optional[bool] = True
+    rooms_available_enabled: Optional[bool] = True
+    heads_up_enabled: Optional[bool] = True
+    heads_up_threshold: Optional[int] = 4
+    custom_subject_prefix: Optional[str] = "Hodler Inn"
+
+@api_router.get("/admin/email-alerts/settings")
+async def get_email_alert_settings_endpoint():
+    """Get email alert settings including recipients."""
+    settings = await get_email_alert_settings()
+    return settings
+
+@api_router.post("/admin/email-alerts/settings")
+async def update_email_alert_settings(input: EmailAlertSettingsInput):
+    """Update email alert settings."""
+    await db.email_alert_settings.update_one(
+        {"id": "email_alerts"},
+        {"$set": {
+            "id": "email_alerts",
+            "recipients": input.recipients,
+            "sold_out_enabled": input.sold_out_enabled,
+            "rooms_available_enabled": input.rooms_available_enabled,
+            "heads_up_enabled": input.heads_up_enabled,
+            "heads_up_threshold": input.heads_up_threshold,
+            "custom_subject_prefix": input.custom_subject_prefix,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    return {"message": "Email alert settings updated"}
+
+@api_router.post("/admin/email-alerts/recipients/add")
+async def add_email_recipient(email: str):
+    """Add a new email recipient."""
+    settings = await get_email_alert_settings()
+    recipients = settings.get("recipients", [])
+    
+    if email in recipients:
+        raise HTTPException(status_code=400, detail="Email already in recipient list")
+    
+    recipients.append(email)
+    
+    await db.email_alert_settings.update_one(
+        {"id": "email_alerts"},
+        {"$set": {"recipients": recipients, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    return {"message": f"Added {email} to recipients", "recipients": recipients}
+
+@api_router.delete("/admin/email-alerts/recipients")
+async def remove_email_recipient(email: str):
+    """Remove an email recipient."""
+    settings = await get_email_alert_settings()
+    recipients = settings.get("recipients", [])
+    
+    if email not in recipients:
+        raise HTTPException(status_code=404, detail="Email not in recipient list")
+    
+    recipients.remove(email)
+    
+    await db.email_alert_settings.update_one(
+        {"id": "email_alerts"},
+        {"$set": {"recipients": recipients, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    return {"message": f"Removed {email} from recipients", "recipients": recipients}
+
+@api_router.post("/admin/email-alerts/test")
+async def send_test_email_alert():
+    """Send a test email to all configured recipients."""
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    recipients = await get_email_recipients()
+    
+    if not settings or not settings.get("email_sender"):
+        raise HTTPException(status_code=400, detail="Email SMTP not configured in settings")
+    
+    if not recipients:
+        raise HTTPException(status_code=400, detail="No recipients configured")
+    
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        alert_settings = await get_email_alert_settings()
+        subject_prefix = alert_settings.get("custom_subject_prefix", "Hodler Inn")
+        
+        smtp_host = settings.get("email_smtp_host", "smtp.zoho.com")
+        smtp_port = settings.get("email_smtp_port", 587)
+        sender = settings.get("email_sender")
+        password = decrypt_data(settings.get("email_password_encrypted"))
+        
+        msg = MIMEMultipart()
+        msg['From'] = sender
+        msg['To'] = ", ".join(recipients)
+        msg['Subject'] = f"{subject_prefix} - Test Email Alert"
+        
+        body = f"""Hello,
+
+This is a TEST email from {subject_prefix} alert system.
+
+If you received this email, your alert configuration is working correctly.
+
+Current Alert Settings:
+- Sold Out Alerts: {'Enabled' if alert_settings.get('sold_out_enabled') else 'Disabled'}
+- Rooms Available Alerts: {'Enabled' if alert_settings.get('rooms_available_enabled') else 'Disabled'}
+- Low Availability (Heads Up) Alerts: {'Enabled' if alert_settings.get('heads_up_enabled') else 'Disabled'}
+- Heads Up Threshold: {alert_settings.get('heads_up_threshold', 4)} rooms
+
+Thank you,
+{subject_prefix}
+
+---
+This is a test message. No action required.
+"""
+        msg.attach(MIMEText(body, 'plain'))
+        
+        server = smtplib.SMTP(smtp_host, smtp_port)
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, recipients, msg.as_string())
+        server.quit()
+        
+        return {"message": f"Test email sent to: {', '.join(recipients)}"}
+        
+    except Exception as e:
+        logging.error(f"Failed to send test email: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send test email: {str(e)}")
+
 
 # ==================== Employee Management ====================
 
