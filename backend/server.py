@@ -7586,14 +7586,23 @@ async def check_cpkc_emails():
                 booking_id = booking_id_match.group(0) if booking_id_match else None
                 
                 # Process attachments
+                found_pdf = False
                 for part in msg.walk():
                     if part.get_content_maintype() == "multipart":
                         continue
                     
                     filename = part.get_filename()
-                    if filename and filename.endswith(".pdf"):
+                    content_type = part.get_content_type()
+                    logging.info(f"Email attachment: filename={filename}, content_type={content_type}")
+                    
+                    if filename and filename.lower().endswith(".pdf"):
+                        found_pdf = True
                         pdf_data = part.get_payload(decode=True)
+                        logging.info(f"Found PDF: {filename}, size: {len(pdf_data) if pdf_data else 0} bytes")
                         await process_cpkc_pdf(pdf_data, booking_id, subject)
+                
+                if not found_pdf:
+                    logging.warning(f"No PDF attachment found in email: {subject}")
                 
                 # Mark as read
                 imap.store(email_id, '+FLAGS', '\\Seen')
@@ -7610,12 +7619,16 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
     """Parse CPKC PDF and import expected arrivals."""
     try:
         guests_imported = []
+        logging.info(f"Processing PDF for booking: {booking_id}, size: {len(pdf_data)} bytes")
         
         with pdfplumber.open(io.BytesIO(pdf_data)) as pdf:
-            for page in pdf.pages:
+            logging.info(f"PDF has {len(pdf.pages)} pages")
+            for page_num, page in enumerate(pdf.pages):
                 tables = page.extract_tables()
+                logging.info(f"Page {page_num + 1}: Found {len(tables)} tables")
                 
-                for table in tables:
+                for table_num, table in enumerate(tables):
+                    logging.info(f"Table {table_num + 1} has {len(table)} rows")
                     for row in table:
                         if not row or len(row) < 6:
                             continue
