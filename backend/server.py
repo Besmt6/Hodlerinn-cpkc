@@ -7629,6 +7629,9 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
                 
                 for table_num, table in enumerate(tables):
                     logging.info(f"Table {table_num + 1} has {len(table)} rows")
+                    # Log first few rows for debugging
+                    for row_idx, row in enumerate(table[:3]):
+                        logging.info(f"  Row {row_idx}: {row}")
                     for row in table:
                         if not row or len(row) < 6:
                             continue
