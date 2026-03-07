@@ -360,8 +360,13 @@ export default function AdminDashboard() {
       toast.error("Please enter guest name");
       return;
     }
+    
+    // Prevent double submission
+    const submitBtn = document.querySelector('[data-testid="non-railroad-checkin-btn"]');
+    if (submitBtn) submitBtn.disabled = true;
+    
     try {
-      await axios.post(`${API}/admin/rooms/block`, {
+      const response = await axios.post(`${API}/admin/rooms/block`, {
         room_number: blockRoomForm.room_number || null,
         room_type: blockRoomForm.room_type,
         guest_name: blockRoomForm.guest_name,
@@ -377,6 +382,8 @@ export default function AdminDashboard() {
       const action = isReservation ? "Reservation created" : "Guest checked in";
       toast.success(`${action}: ${blockRoomForm.guest_name}`);
       setShowBlockRoomDialog(false);
+      
+      // Reset form IMMEDIATELY after success
       setBlockRoomForm({ 
         room_number: "", 
         room_type: "",
@@ -390,12 +397,18 @@ export default function AdminDashboard() {
         notes: "",
         is_reservation: false
       });
+      
+      // Refresh data
       fetchRooms();
       fetchBlockedRooms();
       fetchBlockedRoomStats();
       fetchReservations();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to process booking");
+      const errorMsg = error.response?.data?.detail || "Failed to process booking";
+      toast.error(errorMsg);
+    } finally {
+      // Re-enable button
+      if (submitBtn) submitBtn.disabled = false;
     }
   };
 
@@ -2364,7 +2377,23 @@ export default function AdminDashboard() {
                     Add Room
                   </Button>
                   <Button 
-                    onClick={() => setShowBlockRoomDialog(true)}
+                    onClick={() => {
+                      // Reset form when opening dialog
+                      setBlockRoomForm({ 
+                        room_number: "", 
+                        room_type: "",
+                        guest_name: "", 
+                        email: "",
+                        phone: "",
+                        address: "",
+                        check_in_date: new Date().toISOString().split('T')[0],
+                        check_out_date: "",
+                        room_rate: "",
+                        notes: "",
+                        is_reservation: false
+                      });
+                      setShowBlockRoomDialog(true);
+                    }}
                     className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2"
                     data-testid="block-room-btn"
                   >
@@ -5496,11 +5525,11 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                     disabled={!!blockRoomForm.room_number}
                   >
                     <SelectTrigger className="bg-black/50 border-vault-border text-vault-text">
-                      <SelectValue placeholder="Any type" />
+                      <SelectValue placeholder="Select room type" />
                     </SelectTrigger>
                     <SelectContent className="bg-vault-surface border-vault-border">
-                      <SelectItem value="Single" className="text-vault-text">Single</SelectItem>
-                      <SelectItem value="Double" className="text-vault-text">Double</SelectItem>
+                      <SelectItem value="Single Bed" className="text-vault-text">Single Bed</SelectItem>
+                      <SelectItem value="Two Bed" className="text-vault-text">Two Bed</SelectItem>
                       <SelectItem value="Suite" className="text-vault-text">Suite</SelectItem>
                     </SelectContent>
                   </Select>
@@ -5621,7 +5650,7 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
               <Button 
                 onClick={handleBlockRoom}
                 className="bg-amber-600 hover:bg-amber-700 text-white"
-                data-testid="confirm-block-room-btn"
+                data-testid="non-railroad-checkin-btn"
               >
                 {blockRoomForm.check_in_date > new Date().toISOString().split('T')[0] ? 'Create Reservation' : 'Check In Guest'}
               </Button>
