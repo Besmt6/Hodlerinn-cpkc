@@ -1515,6 +1515,9 @@ class APIGlobalSyncAgent:
                     (not e.get("current_emp_id") or e.get("has_red_status"))
                 ]
                 
+                # Track verified employee IDs to detect duplicates
+                verified_employee_ids = set()
+                
                 # FIRST: Match blue (already verified) entries against Hodler records
                 # This ensures we count them as verified even if no portal work is needed
                 # BUT if they're missing Employee ID or Room, we should still fill it in
@@ -1533,10 +1536,19 @@ class APIGlobalSyncAgent:
                     has_employee_id = entry.get("current_emp_id") and entry.get("current_emp_id") != "NO ID"
                     
                     if already_verified_on_portal:
+                        # Track this employee ID as already verified
+                        if has_employee_id:
+                            verified_employee_ids.add(entry.get("current_emp_id"))
+                        
                         # Check if this already-verified entry matches a Hodler Inn record
                         for record in hodler_records:
                             hodler_name = record.get("employee_name", "")
                             if match_names(api_name, hodler_name):
+                                # Track this employee ID
+                                emp_id = record.get("employee_number", "")
+                                if emp_id:
+                                    verified_employee_ids.add(emp_id)
+                                
                                 # Check if we already counted this one
                                 already_counted = any(
                                     v.get("api_name") == api_name or v.get("hodler_name") == hodler_name
@@ -1615,14 +1627,40 @@ class APIGlobalSyncAgent:
                     for record in hodler_records:
                         hodler_name = record.get("employee_name", "")
                         if match_names(api_name, hodler_name):
+                            emp_id = record.get("employee_number", "")
+                            
+                            # Check if this employee was already verified (DUPLICATE ENTRY)
+                            if emp_id and emp_id in verified_employee_ids:
+                                logger.info(f"*** DUPLICATE DETECTED: {api_name} (Employee {emp_id} already verified) - Marking as No Bill ***")
+                                try:
+                                    # Click "No Bill" on the duplicate entry
+                                    if await self.mark_no_bill(entry):
+                                        self.results["no_bill"].append({
+                                            "name": api_name,
+                                            "reason": f"Duplicate entry - Employee {emp_id} already verified",
+                                            "employee_id": emp_id
+                                        })
+                                        logger.info(f"Successfully marked duplicate {api_name} as No Bill")
+                                    else:
+                                        logger.warning(f"Failed to mark duplicate {api_name} as No Bill")
+                                except Exception as e:
+                                    logger.error(f"Error marking duplicate as No Bill: {e}")
+                                matched = True
+                                break
+                            
                             # Found a match - fill in the details
                             logger.info(f"*** MATCH FOUND: {api_name} <-> {hodler_name} ***")
+                            
+                            # Track this employee ID as verified
+                            if emp_id:
+                                verified_employee_ids.add(emp_id)
+                            
                             try:
                                 # Add timeout for verify_entry to prevent hanging
                                 success = await asyncio.wait_for(
                                     self.verify_entry(
                                         entry,
-                                        record.get("employee_number", ""),
+                                        emp_id,
                                         record.get("room_number", "")
                                     ),
                                     timeout=60  # 60 second timeout per entry
