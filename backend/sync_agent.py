@@ -1538,7 +1538,26 @@ class APIGlobalSyncAgent:
                     if already_verified_on_portal:
                         # Track this employee ID as already verified
                         if has_employee_id:
-                            verified_employee_ids.add(entry.get("current_emp_id"))
+                            current_emp_id = entry.get("current_emp_id")
+                            # Check if this employee ID was already verified (DUPLICATE on portal)
+                            if current_emp_id in verified_employee_ids:
+                                logger.info(f"*** DUPLICATE DETECTED (blue entry): {api_name} - Employee {current_emp_id} already processed ***")
+                                # This is a duplicate - mark as No Bill
+                                try:
+                                    if await self.mark_no_bill(entry):
+                                        self.results["no_bill"].append({
+                                            "name": api_name,
+                                            "reason": f"Duplicate entry - Employee {current_emp_id} already verified on portal",
+                                            "employee_id": current_emp_id
+                                        })
+                                        logger.info(f"Successfully marked duplicate blue entry {api_name} as No Bill")
+                                    else:
+                                        logger.warning(f"Failed to mark duplicate blue entry {api_name} as No Bill")
+                                except Exception as e:
+                                    logger.error(f"Error marking duplicate blue entry as No Bill: {e}")
+                                continue  # Skip to next entry
+                            else:
+                                verified_employee_ids.add(current_emp_id)
                         
                         # Check if this already-verified entry matches a Hodler Inn record
                         for record in hodler_records:
