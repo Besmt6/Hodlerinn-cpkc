@@ -1,167 +1,100 @@
-# Hodler Inn - Product Requirements Document
+# Hodler Inn - Hotel Management System PRD
 
 ## Original Problem Statement
-A comprehensive railroad crew accommodation management platform for Hodler Inn in Heavener, OK. The system handles guest check-ins, room management, billing, automated sync with railroad portals, and includes an AI-powered booking chatbot.
+Build a comprehensive hotel management system for Hodler Inn that handles:
+- Guest check-in/check-out via kiosk
+- Employee management and verification
+- CPKC railroad crew bookings via email scraping
+- API Global Solutions portal sync for billing verification
+- Admin dashboard for hotel operations
 
-## Business Information
-- **Address**: 820 US-59, Heavener, OK 74937
-- **Property Type**: Railroad Crew Accommodation
-- **Total Rooms**: 28
-- **Railroad Partner**: CPKC (Canadian Pacific Kansas City)
-- **Admin Password**: hodlerinn2024
+## User Personas
+1. **Hotel Staff** - Check in/out guests, manage rooms
+2. **Railroad Crew (CPKC)** - Self-service check-in via kiosk
+3. **Hotel Admin** - Manage settings, verify billing, run reports
 
-## Core Features Implemented
+## Core Requirements
+1. Guest Portal (Kiosk) - Self-service check-in/out
+2. Admin Dashboard - Full hotel management
+3. Email Scraper - Parse CPKC booking PDFs
+4. Sync Agent - Verify guests against API Global portal
+5. Reporting - PDF exports, billing reports
 
-### Guest Management
-- [x] Guest Portal - Self-service kiosk for railroad crew
-- [x] Employee ID verification
-- [x] Digital signature capture
-- [x] Check-in/Check-out flow
-- [x] Voice guidance (OpenAI TTS)
+## Current Architecture
+```
+/app/
+├── backend/
+│   ├── server.py        # Main FastAPI app (8100+ lines - NEEDS REFACTORING)
+│   ├── sync_agent.py    # Portal sync automation
+│   └── requirements.txt
+└── frontend/
+    └── src/
+        ├── pages/
+        │   ├── AdminDashboard.jsx
+        │   ├── GuestPortal.jsx
+        │   └── BookNow.jsx
+        └── components/
+```
 
-### Admin Dashboard
-- [x] Dashboard overview with stats
-- [x] Sign-In Sheet view
-- [x] Billing Report view
-- [x] Room Management
-- [x] Employee List management
-- [x] Guest Verification
-- [x] Guarantee Report
-- [x] Portal Settings
-- [x] Documentation page
+## What's Been Implemented
 
-### Room Management
-- [x] Room status tracking (clean/dirty)
-- [x] Occupancy management
-- [x] Other guests (non-railroad) booking
-- [x] Reservations system with confirm/cancel
-- [x] Auto-dirty marking (20 min after checkout)
+### March 7, 2026
+- ✅ Fixed sync agent hanging on last entry (added timeouts)
+- ✅ Fixed "No Bill" auto-click (now only verifies matched entries)
+- ✅ Fixed results accumulation bug (reset each sync run)
+- ✅ Added late arrival support (queries prev_day, target, next_day)
+- ✅ Added PDF report export for sync results
+- ✅ Verified Telegram notifications working
 
-### Billing & Reports
-- [x] Automated billing calculation (24-hour periods)
-- [x] Excel export
-- [x] PDF export
-- [x] PNG export
-- [x] Guarantee report
-- [x] Turned-away guests tracking
+### Previous Sessions
+- ✅ CPKC Email Scraper (PDF parsing, duplicate handling)
+- ✅ Employee Portal Import (530+ employees)
+- ✅ Chatbot UI cleanup on /book page
+- ✅ Mobile voice fixes (tap-to-start)
+- ✅ Auto-removal from Expected Arrivals on check-in
+- ✅ Guest verification system
+- ✅ Room assignment and billing
 
-### AI Chatbot (Bitsy) - UPDATED March 6, 2025
-- [x] Conversational booking flow
-- [x] Voice greeting on page load ("I'm Bitsy, your hotel concierge...")
-- [x] Voice responses (Bitsy speaks all replies)
-- [x] Voice input with auto-stop (silence detection)
-- [x] Voice on/off toggle button
-- [x] Real-time availability checking
-- [x] Dynamic pricing (single/double bed)
-- [x] **Returning guest recognition** - skips name/email/phone for repeat guests
-- [x] Email confirmations
-- [x] Telegram notifications to admin
+## Prioritized Backlog
 
-### Reservation Management - UPDATED March 6, 2025
-- [x] Pending/Confirmed status tracking
-- [x] **Confirm button** - Mark as phone confirmed
-- [x] **Manual cancel** - Cancel confirmed reservations
-- [x] Auto-cancel only applies to unconfirmed reservations
-- [x] Telegram notifications for confirm/cancel
+### P0 - Critical
+- [ ] Verify email alerts working (scheduled for tomorrow)
 
-### Integrations
-- [x] API Global railroad portal sync
-- [x] Auto-sync at 3 PM Central
-- [x] Telegram notifications
-- [x] Email alerts (sold-out, available, heads-up, daily)
-- [x] Per-recipient email alert preferences
-- [x] Zoho WorkDrive backup
-- [x] CPKC Email Scraper (expected arrivals)
+### P1 - High Priority  
+- [ ] Refactor server.py into smaller modules (8100+ lines)
+- [ ] Production DB sync for cpkc.hodlerinn.com
 
-### Demo Mode
-- [x] Sandboxed demo environment
-- [x] Separate demo database
-- [x] Demo Guest Portal (/demo)
-- [x] Demo Admin Panel (/demo/admin)
-- [x] Sample data (EMP001, EMP002, EMP003)
+### P2 - Medium Priority
+- [ ] Voice message echo fix on Guest Portal
+- [ ] AI Phone Agent (blocked on PBX details)
+- [ ] Smart Lock Integration (blocked on vendor API)
 
-## API Endpoints
+### P3 - Future
+- [ ] HODL Rewards Token system
+- [ ] White-Label SaaS version
+- [ ] Code refactoring for AdminDashboard.jsx
 
-### Chatbot
-- `POST /api/chatbot/message` - Send message to chatbot
-- `GET /api/chatbot/availability` - Check room availability
-- `POST /api/chatbot/transcribe` - Voice to text (OpenAI Whisper)
+## Technical Stack
+- **Backend:** FastAPI, Python 3.11
+- **Frontend:** React, Tailwind CSS, Shadcn UI
+- **Database:** MongoDB Atlas
+- **Automation:** Playwright (portal sync)
+- **Notifications:** Telegram Bot API
+- **PDF:** ReportLab
 
-### Reservations (NEW)
-- `GET /api/admin/rooms/reservations` - Get all reservations
-- `POST /api/admin/rooms/reservations/{id}/confirm` - Mark as confirmed
-- `POST /api/admin/rooms/reservations/{id}/cancel` - Manual cancel
-- `DELETE /api/admin/rooms/reservations/{id}` - Delete reservation
+## Key API Endpoints
+- `/api/admin/sync/run` - Run sync agent
+- `/api/admin/sync/export-pdf` - Download sync report
+- `/api/admin/check-cpkc-emails` - Manual email check
+- `/api/admin/collect-employees` - Import from portal
+- `/api/book-room` - Guest check-in
 
-## Pending Verifications (P1)
-1. Auto-Sync v11 Logic - User verification pending
-2. Voice Message Echo - User verification pending
+## Environment Variables
+- `MONGO_URL` - MongoDB connection string
+- `TELEGRAM_BOT_TOKEN` - Telegram notifications
+- `TELEGRAM_CHAT_ID` - Notification target
 
-## Upcoming Tasks (P1)
-1. Deploy all features to production
-2. AI Phone Agent (blocked on phone company response)
-3. Smart Lock Integration (blocked on vendor API)
-
-## Future/Backlog (P2-P3)
-1. HODL Rewards Token system
-2. Code refactoring (server.py ~7900 lines, AdminDashboard.jsx ~5600 lines)
-3. White-Label SaaS Version
-
-## Tech Stack
-- **Frontend**: React, Tailwind CSS, Shadcn UI
-- **Backend**: FastAPI, Motor (async MongoDB)
-- **Database**: MongoDB Atlas
-- **AI/LLM**: emergentintegrations (GPT-5.2, Whisper)
-- **Voice**: Web Speech API (TTS), OpenAI Whisper (STT)
-- **Email Parsing**: pdfplumber, imaplib (Zoho IMAP)
-- **Deployment**: Docker, Docker Compose, AWS EC2
-
-## Production Environments
-
-### MAIN PRODUCTION (Handled by Emergent/AI)
-- **URL**: https://cpkc.hodlerinn.com
-- **Admin**: https://cpkc.hodlerinn.com/admin
-- **Managed by**: Emergent platform (AI deploys here)
-- **Note**: NOT using Emergent preview - this IS the main production site
-
-### AWS BACKUP (Handled by User)
-- **Server**: ubuntu@ip-172-31-9-167
-- **Public IP**: 3.149.0.151
-- **URL**: http://3.149.0.151:3000
-- **Admin**: http://3.149.0.151:3000/admin/dashboard
-- **Project Folder**: `~/Hodlerinn-cpkc`
-- **Managed by**: User manages AWS directly
-- **Docker Containers**:
-  - `hodlerinn-frontend` (port 3000)
-  - `hodlerinn-backend` (port 8001)
-  - `hodlerinn-mongodb` (port 27017)
-- **Deploy Commands**:
-  ```bash
-  cd ~/Hodlerinn-cpkc
-  git pull origin main
-  docker-compose down
-  docker-compose up -d --build
-  ```
-- **Check Logs**: `docker logs hodlerinn-backend --tail 100`
-
-### Shared Database
-- **MongoDB Atlas**: Both environments should use the same Atlas database
-- **Atlas Dashboard**: User has access to MongoDB Atlas dashboard
-- **Connection**: `mongodb+srv://Hodlerinn:***@cluster0.hi5zsox.mongodb.net/`
-- **DB Name**: `hodler_inn`
-- **Note**: If data doesn't match between environments, check Atlas dashboard for multiple databases
-
-## Changelog
-- **March 6, 2025 (Session 3)**: 
-  - **FIXED**: CPKC Email Scraper - scheduler async issue, IMAP enabled, PDF column mapping
-  - **FIXED**: Import from Portal - rewrote to use Billing Period dropdown, 530 employees imported
-  - **IMPROVED**: BookNow UI - removed duplicate rates, header shows "$79 + tax"
-  - **IMPROVED**: Mobile voice - added "Tap to hear Bitsy" button, fixed response speech
-  - **ADDED**: Policy notice with icons (Non-Smoking, No Pets) below chat input
-- **March 6, 2025 (Session 2)**: 
-  - Fixed Bitsy greeting ("I'm Bitsy" for both voice and text)
-  - Added automatic silence detection for voice input
-  - Added returning guest recognition
-  - Added reservation confirm/cancel system with Status column
-- **March 6, 2025 (Session 1)**: Added Documentation page with 5 tabs
-- **March 5, 2025**: Added Bitsy chatbot, Demo mode, CPKC email scraper
+## Known Issues
+1. server.py is 8100+ lines (needs decomposition)
+2. Different MongoDB instances across environments
+3. Late arrivals (after midnight) need special handling
