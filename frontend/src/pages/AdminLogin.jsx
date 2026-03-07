@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, ArrowLeft } from "lucide-react";
+import { setAdminToken, clearAdminToken } from "@/lib/adminAuth";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -14,6 +15,10 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    clearAdminToken();
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -24,7 +29,13 @@ export default function AdminLogin() {
 
     setLoading(true);
     try {
-      await axios.post(`${API}/admin/login`, { password });
+      const response = await axios.post(`${API}/admin/login`, { password });
+      const token = response?.data?.token;
+      if (!token) {
+        throw new Error("Login response missing token");
+      }
+
+      setAdminToken(token);
       sessionStorage.setItem("adminAuth", "true");
       toast.success("Login successful");
       navigate("/admin/dashboard");
