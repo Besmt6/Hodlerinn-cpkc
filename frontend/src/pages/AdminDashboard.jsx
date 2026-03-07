@@ -193,6 +193,7 @@ export default function AdminDashboard() {
   
   // Expected Arrivals state (CPKC)
   const [expectedArrivals, setExpectedArrivals] = useState([]);
+  const [expectedCheckouts, setExpectedCheckouts] = useState([]);
   const [checkingCpkcEmails, setCheckingCpkcEmails] = useState(false);
   
   // Turned Away Guests state
@@ -280,6 +281,7 @@ export default function AdminDashboard() {
     fetchReservations();
     fetchEmailAlertSettings();
     fetchExpectedArrivals();
+    fetchExpectedCheckouts();
   }, [navigate]);
 
   const fetchRegisteredGuests = async () => {
@@ -1093,12 +1095,22 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchExpectedCheckouts = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/expected-checkouts`);
+      setExpectedCheckouts(response.data);
+    } catch (error) {
+      console.error("Failed to fetch expected checkouts");
+    }
+  };
+
   const checkCpkcEmails = async () => {
     setCheckingCpkcEmails(true);
     try {
       await axios.post(`${API}/admin/check-cpkc-emails`);
       toast.success("Email check completed!");
       fetchExpectedArrivals();
+      fetchExpectedCheckouts();
     } catch (error) {
       toast.error("Failed to check emails");
     }
@@ -1112,6 +1124,26 @@ export default function AdminDashboard() {
       fetchExpectedArrivals();
     } catch (error) {
       toast.error("Failed to remove arrival");
+    }
+  };
+
+  const deleteExpectedCheckout = async (checkoutId) => {
+    try {
+      await axios.delete(`${API}/admin/expected-checkouts/${checkoutId}`);
+      toast.success("Check-out removed");
+      fetchExpectedCheckouts();
+    } catch (error) {
+      toast.error("Failed to remove check-out");
+    }
+  };
+
+  const markCheckoutCompleted = async (checkoutId) => {
+    try {
+      await axios.post(`${API}/admin/expected-checkouts/${checkoutId}/completed`);
+      toast.success("Check-out marked as completed");
+      fetchExpectedCheckouts();
+    } catch (error) {
+      toast.error("Failed to mark check-out as completed");
     }
   };
 
@@ -2637,6 +2669,94 @@ export default function AdminDashboard() {
                   )}
                   <p className="text-blue-300/50 text-xs mt-3">
                     Chatbot will not sell rooms when CPKC arrivals are expected. Guests check in at kiosk.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Expected CPKC Check-Outs Section */}
+              <Card className="bg-orange-900/20 border-orange-500/50 mb-6">
+                <CardHeader className="border-b border-orange-500/30 pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="font-outfit text-lg text-orange-400 flex items-center gap-2">
+                      <LogOut className="w-5 h-5" />
+                      Expected CPKC Check-Outs
+                      {expectedCheckouts.length > 0 && (
+                        <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full ml-2">
+                          {expectedCheckouts.length}
+                        </span>
+                      )}
+                    </CardTitle>
+                  </div>
+                  <p className="text-orange-300/70 text-xs mt-1">
+                    Employees expected to check out - rooms will need cleaning
+                  </p>
+                </CardHeader>
+                <CardContent className="p-4">
+                  {expectedCheckouts.length === 0 ? (
+                    <p className="text-vault-text-secondary text-center py-4">No expected check-outs</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-orange-500/30">
+                            <th className="text-left py-2 px-3 text-orange-400 text-sm">Employee</th>
+                            <th className="text-left py-2 px-3 text-orange-400 text-sm">Name</th>
+                            <th className="text-left py-2 px-3 text-orange-400 text-sm">Check-Out Date</th>
+                            <th className="text-left py-2 px-3 text-orange-400 text-sm">Check-Out Time</th>
+                            <th className="text-left py-2 px-3 text-orange-400 text-sm">Room</th>
+                            <th className="text-left py-2 px-3 text-orange-400 text-sm">Status</th>
+                            <th className="text-left py-2 px-3 text-orange-400 text-sm">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {expectedCheckouts.map((checkout) => (
+                            <tr key={checkout.id} className="border-b border-orange-500/20 hover:bg-orange-900/20">
+                              <td className="py-2 px-3 text-vault-text font-mono text-sm">{checkout.employee_id || '-'}</td>
+                              <td className="py-2 px-3 text-vault-text">{checkout.first_name} {checkout.last_name}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">{checkout.check_out_date || '-'}</td>
+                              <td className="py-2 px-3 text-vault-text-secondary">{checkout.check_out_time || '-'}</td>
+                              <td className="py-2 px-3 text-vault-text">{checkout.room_number || '-'}</td>
+                              <td className="py-2 px-3">
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                  checkout.status === 'completed' 
+                                    ? 'bg-emerald-500/20 text-emerald-400' 
+                                    : 'bg-orange-500/20 text-orange-400'
+                                }`}>
+                                  {checkout.status === 'completed' ? 'Completed' : 'Expected'}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 flex gap-1">
+                                {checkout.status === 'expected' && (
+                                  <>
+                                    <Button
+                                      onClick={() => markCheckoutCompleted(checkout.id)}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 h-7 px-2"
+                                      title="Mark as completed"
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      onClick={() => deleteExpectedCheckout(checkout.id)}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-7 px-2"
+                                      title="Remove"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <p className="text-orange-300/50 text-xs mt-3">
+                    Check-outs are auto-removed after the check-out date passes.
                   </p>
                 </CardContent>
               </Card>

@@ -50,15 +50,25 @@ Build a comprehensive hotel management system for Hodler Inn, serving railroad c
 ## Pending Issues (P0-P2)
 
 ### P0 - Critical
-1. **MongoDB Migration** - Production site using wrong database. Need to migrate to user's Atlas instance.
+1. ~~**MongoDB Migration**~~ ✅ COMPLETE - Production using user's Atlas instance
 2. **SALTER Duplicate Handling** - Logic deployed, needs verification on March 4th sync
 
 ### P1 - Important  
 3. **Occupancy Tracking** - UI and endpoints deployed, needs user testing
-4. **Email/Telegram Alerts** - User needs to verify if working
+4. **Email/Telegram Alerts** - User needs to verify if working (duplicate alert fix deployed)
+5. **Duplicate Telegram Alerts** - Flag-based fix deployed, awaiting verification
 
 ### P2 - Low Priority
-5. **Voice Echo on Guest Portal** - Reported but not reproduced
+6. **Voice Echo on Guest Portal** - Reported but not reproduced
+
+## Recently Completed (March 2026)
+- ✅ **CPKC Check-Out Detection** - Green highlighting detection using PyMuPDF
+- ✅ **Expected Check-Outs List** - New collection + API + UI for tracking check-outs
+- ✅ **MongoDB Migration** - All data in user's Atlas instance
+- ✅ **Frontend Routing Fix** - Hash-based routing for page refresh
+- ✅ **Automated Zoho Upload** - Sign-in sheets uploaded at 11:59 PM daily
+- ✅ **Embeddable Chatbot** - `/bitsy` route for iFrame embedding
+- ✅ **Phone Agent Webhook** - `GET /api/webhook/guests` endpoint
 
 ## Upcoming Features (Blocked)
 - AI Phone Agent - Blocked on SIP/Webhook details from Virtual PBX provider

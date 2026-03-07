@@ -8367,21 +8367,14 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
     - CHECK-OUT: Only check-out date is highlighted green -> Skip (not an arrival)
     """
     try:
-        # First, detect if this is a check-out notification using green highlighting
+        # Detect if this is a check-out notification using green highlighting
         color_analysis = detect_green_highlighted_fields(pdf_data)
-        
-        if color_analysis["is_checkout"]:
-            logging.info(f"SKIPPING PDF - detected as CHECK-OUT notification (only check-out date is green)")
-            await send_telegram_notification(
-                f"📧 <b>CPKC CHECK-OUT NOTIFICATION</b>\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"ℹ️ Skipped - Employee checking out\n"
-                f"📋 Booking: {booking_id or 'Unknown'}"
-            )
-            return
+        is_checkout_pdf = color_analysis["is_checkout"]
         
         guests_imported = []
-        logging.info(f"Processing PDF for booking: {booking_id}, size: {len(pdf_data)} bytes (CHECK-IN detected)")
+        checkouts_imported = []
+        
+        logging.info(f"Processing PDF for booking: {booking_id}, size: {len(pdf_data)} bytes, type={'CHECK-OUT' if is_checkout_pdf else 'CHECK-IN'}")
         
         with pdfplumber.open(io.BytesIO(pdf_data)) as pdf:
             # Only process Page 1, Table 1 (main guest list) to avoid duplicates from other tables
@@ -8420,21 +8413,31 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
                             
                             # Process first employee
                             if emp_name_1 and check_in_str:
-                                guest = await import_cpkc_guest(emp_id_1, emp_name_1, check_in_str, check_out_str, booking_id)
-                                if guest:
-                                    guests_imported.append(guest)
+                                if is_checkout_pdf:
+                                    checkout = await import_cpkc_checkout(emp_id_1, emp_name_1, check_in_str, check_out_str, booking_id)
+                                    if checkout:
+                                        checkouts_imported.append(checkout)
+                                else:
+                                    guest = await import_cpkc_guest(emp_id_1, emp_name_1, check_in_str, check_out_str, booking_id)
+                                    if guest:
+                                        guests_imported.append(guest)
                             
                             # Process second employee if exists
                             if emp_name_2 and check_in_str:
-                                guest = await import_cpkc_guest(emp_id_2, emp_name_2, check_in_str, check_out_str, booking_id)
-                                if guest:
-                                    guests_imported.append(guest)
+                                if is_checkout_pdf:
+                                    checkout = await import_cpkc_checkout(emp_id_2, emp_name_2, check_in_str, check_out_str, booking_id)
+                                    if checkout:
+                                        checkouts_imported.append(checkout)
+                                else:
+                                    guest = await import_cpkc_guest(emp_id_2, emp_name_2, check_in_str, check_out_str, booking_id)
+                                    if guest:
+                                        guests_imported.append(guest)
                                     
                         except Exception as e:
                             logging.error(f"Error parsing row: {e}")
         
         if guests_imported:
-            # Send Telegram notification
+            # Send Telegram notification for arrivals
             guest_list = "\n".join([f"• {g['name']} ({g['check_in']})" for g in guests_imported[:10]])
             if len(guests_imported) > 10:
                 guest_list += f"\n... and {len(guests_imported) - 10} more"
@@ -8450,6 +8453,24 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
             )
             
             logging.info(f"Imported {len(guests_imported)} guests from CPKC email")
+        
+        if checkouts_imported:
+            # Send Telegram notification for check-outs
+            checkout_list = "\n".join([f"• {c['name']} ({c['check_out']})" for c in checkouts_imported[:10]])
+            if len(checkouts_imported) > 10:
+                checkout_list += f"\n... and {len(checkouts_imported) - 10} more"
+            
+            await send_telegram_notification(
+                f"📧 <b>CPKC CHECK-OUT NOTIFICATION</b>\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"🚪 {len(checkouts_imported)} Expected Check-Out(s)\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"{checkout_list}\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"🧹 Rooms will need cleaning"
+            )
+            
+            logging.info(f"Imported {len(checkouts_imported)} check-outs from CPKC email")
         
     except Exception as e:
         logging.error(f"PDF processing error: {e}")
@@ -8568,6 +8589,100 @@ async def import_cpkc_guest(emp_id: str, emp_name: str, check_in_str: str, check
         logging.error(f"Error importing guest {emp_name}: {e}")
         return None
 
+async def import_cpkc_checkout(emp_id: str, emp_name: str, check_in_str: str, check_out_str: str, booking_id: str):
+    """Import a single CPKC guest as expected check-out.
+    
+    This function handles check-out notifications detected via green highlighting.
+    """
+    try:
+        # Parse name format: LASTNAME,(FIRSTNAME)*CODE
+        name_match = re.match(r'([^,]+),?\(?([^)]*)\)?(?:\*\w+)?', emp_name)
+        if name_match:
+            last_name = name_match.group(1).strip()
+            first_name = name_match.group(2).strip() if name_match.group(2) else ""
+        else:
+            last_name = emp_name
+            first_name = ""
+        
+        # Parse check-in date: "06-Mar-2026 10:23"
+        check_in_date = None
+        check_in_time = None
+        if check_in_str:
+            try:
+                dt = datetime.strptime(check_in_str, "%d-%b-%Y %H:%M")
+                check_in_date = dt.strftime("%Y-%m-%d")
+                check_in_time = dt.strftime("%H:%M")
+            except:
+                check_in_date = check_in_str
+        
+        # Parse check-out date/time
+        check_out_date = None
+        check_out_time = None
+        if check_out_str:
+            try:
+                dt = datetime.strptime(check_out_str, "%d-%b-%Y %H:%M")
+                check_out_date = dt.strftime("%Y-%m-%d")
+                check_out_time = dt.strftime("%H:%M")
+            except:
+                check_out_date = check_out_str
+        
+        # Clean employee name for matching
+        clean_emp_name = emp_name.replace('\n', ' ').strip()
+        
+        # Check if already imported (avoid duplicates)
+        existing = await db.expected_checkouts.find_one({
+            "check_out_date": check_out_date,
+            "$or": [
+                {"employee_name": emp_name},
+                {"employee_name": clean_emp_name},
+                {"last_name": last_name, "first_name": first_name}
+            ]
+        })
+        
+        if existing:
+            logging.info(f"Skipping duplicate checkout: {emp_name} already expected to check out on {check_out_date}")
+            return None
+        
+        # Try to find matching booking to get room number
+        room_number = None
+        booking = await db.bookings.find_one({
+            "last_name": {"$regex": f"^{last_name}", "$options": "i"},
+            "status": "checked_in"
+        })
+        if booking:
+            room_number = booking.get("room_number")
+        
+        # Create expected checkout record
+        checkout = {
+            "id": str(uuid.uuid4()),
+            "booking_id": booking_id,
+            "employee_id": emp_id,
+            "employee_name": emp_name,
+            "first_name": first_name,
+            "last_name": last_name,
+            "check_in_date": check_in_date,
+            "check_in_time": check_in_time,
+            "check_out_date": check_out_date,
+            "check_out_time": check_out_time,
+            "room_number": room_number,
+            "status": "expected",
+            "source": "cpkc_email",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.expected_checkouts.insert_one(checkout)
+        
+        logging.info(f"Imported expected checkout: {first_name} {last_name} on {check_out_date}")
+        
+        return {
+            "name": f"{first_name} {last_name}".strip(),
+            "check_out": check_out_date
+        }
+        
+    except Exception as e:
+        logging.error(f"Error importing checkout {emp_name}: {e}")
+        return None
+
 async def get_expected_arrivals_for_date(target_date: str):
     """Get expected CPKC arrivals for a specific date."""
     arrivals = await db.expected_arrivals.find({
@@ -8638,6 +8753,61 @@ async def mark_arrival_checked_in(arrival_id: str, room_number: str):
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Arrival not found")
     return {"message": "Marked as checked in"}
+
+# ========== EXPECTED CHECK-OUTS ENDPOINTS ==========
+
+@cpkc_router.get("/expected-checkouts")
+async def get_expected_checkouts(date: Optional[str] = None):
+    """Get expected CPKC check-outs."""
+    query = {"status": "expected"}
+    if date:
+        query["check_out_date"] = date
+    
+    checkouts = await db.expected_checkouts.find(query, {"_id": 0}).sort("check_out_date", 1).to_list(500)
+    return checkouts
+
+@cpkc_router.delete("/expected-checkouts/{checkout_id}")
+async def delete_expected_checkout(checkout_id: str):
+    """Delete an expected check-out."""
+    result = await db.expected_checkouts.delete_one({"id": checkout_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Check-out not found")
+    return {"message": "Expected check-out deleted"}
+
+@cpkc_router.post("/expected-checkouts/{checkout_id}/completed")
+async def mark_checkout_completed(checkout_id: str):
+    """Mark expected check-out as completed."""
+    result = await db.expected_checkouts.update_one(
+        {"id": checkout_id},
+        {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Check-out not found")
+    return {"message": "Marked as completed"}
+
+@cpkc_router.post("/expected-checkouts/cleanup-old")
+async def cleanup_old_checkouts():
+    """Remove check-outs older than yesterday (auto-cleanup)."""
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    result = await db.expected_checkouts.delete_many({
+        "check_out_date": {"$lt": yesterday}
+    })
+    return {"message": f"Removed {result.deleted_count} old check-out entries"}
+
+async def get_expected_checkouts_for_date(target_date: str):
+    """Get expected CPKC check-outs for a specific date."""
+    checkouts = await db.expected_checkouts.find({
+        "check_out_date": target_date,
+        "status": "expected"
+    }, {"_id": 0}).to_list(100)
+    return checkouts
+
+async def count_expected_checkouts_for_date(target_date: str):
+    """Count expected CPKC check-outs for a specific date."""
+    return await db.expected_checkouts.count_documents({
+        "check_out_date": target_date,
+        "status": "expected"
+    })
 
 # Track revenue loss for guarantee report
 @cpkc_router.post("/revenue-loss")
