@@ -38,6 +38,7 @@ export default function BookNow() {
   const [availability, setAvailability] = useState(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [autoListenEnabled, setAutoListenEnabled] = useState(true); // Auto-listen after Bitsy speaks
   const [pendingGreeting, setPendingGreeting] = useState(null); // For mobile - needs tap to play
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
@@ -86,7 +87,17 @@ export default function BookNow() {
     }
     
     setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      // Auto-start listening after Bitsy finishes speaking (if enabled and not already recording)
+      if (autoListenEnabled && voiceEnabled && !isRecordingRef.current && !bookingConfirmed) {
+        setTimeout(() => {
+          if (!isRecordingRef.current && !isSpeaking) {
+            startRecording();
+          }
+        }, 500); // Small delay before auto-listen
+      }
+    };
     utterance.onerror = (e) => {
       console.log('Speech error:', e);
       setIsSpeaking(false);
@@ -654,6 +665,19 @@ export default function BookNow() {
                 ) : (
                   <VolumeX className="w-4 h-4" />
                 )}
+              </Button>
+              {/* Auto-listen toggle */}
+              <Button
+                onClick={() => setAutoListenEnabled(!autoListenEnabled)}
+                className={`px-3 transition-all ${
+                  autoListenEnabled 
+                    ? "bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30" 
+                    : "bg-slate-800 hover:bg-slate-700 text-gray-500"
+                }`}
+                data-testid="auto-listen-toggle-btn"
+                title={autoListenEnabled ? "Auto-listen ON - mic activates after Bitsy speaks" : "Auto-listen OFF - click mic manually"}
+              >
+                <span className="text-xs font-medium">{autoListenEnabled ? "AUTO" : "MAN"}</span>
               </Button>
               <Input
                 ref={inputRef}
