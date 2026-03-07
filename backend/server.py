@@ -2140,26 +2140,38 @@ async def check_in(input: CheckInCreate):
     await db.bookings.insert_one(doc)
     
     # Remove from expected arrivals list if they're there (auto-cleanup)
-    # Match by employee name (last name) or employee number
+    # Match by employee name (last name), employee number, or employee_name field
     try:
         # Parse the guest name to get last name
         last_name = None
         if guest_name and "," in guest_name:
+            # Format: "COLLINS,(RON) E" -> last_name = "COLLINS"
             last_name = guest_name.split(",")[0].strip().upper()
         elif guest_name and " " in guest_name:
             last_name = guest_name.split()[-1].strip().upper()
         
-        # Try to remove by last name or employee_id
+        # Build removal query with multiple matching strategies
         removal_query = {"$or": []}
+        
+        # Match by last_name field
         if last_name:
-            removal_query["$or"].append({"last_name": {"$regex": f"^{last_name}", "$options": "i"}})
+            removal_query["$or"].append({"last_name": {"$regex": f"^{last_name}$", "$options": "i"}})
+        
+        # Match by employee_id if provided
         if input.employee_number:
             removal_query["$or"].append({"employee_id": input.employee_number})
+            removal_query["$or"].append({"employee_id": str(input.employee_number)})
+        
+        # Match by employee_name containing the last name
+        if last_name:
+            removal_query["$or"].append({"employee_name": {"$regex": f"^{last_name},", "$options": "i"}})
         
         if removal_query["$or"]:
             result = await db.expected_arrivals.delete_many(removal_query)
             if result.deleted_count > 0:
-                logging.info(f"Auto-removed {result.deleted_count} expected arrival(s) for {guest_name} after check-in")
+                logging.info(f"Auto-removed {result.deleted_count} expected arrival(s) for {guest_name} (last_name: {last_name}) after check-in")
+            else:
+                logging.info(f"No expected arrivals found to remove for {guest_name} (last_name: {last_name})")
     except Exception as e:
         logging.warning(f"Could not auto-remove from expected arrivals: {e}")
     
