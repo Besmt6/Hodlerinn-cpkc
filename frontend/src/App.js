@@ -8,6 +8,7 @@ import BookNow from "@/pages/BookNow";
 import DemoPortal from "@/pages/DemoPortal";
 import DemoAdmin from "@/pages/DemoAdmin";
 import Documentation from "@/pages/Documentation";
+import BitsyEmbed from "@/pages/BitsyEmbed";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="/book" element={<BookNow />} />
           <Route path="/demo" element={<DemoPortal />} />
           <Route path="/demo/admin" element={<DemoAdmin />} />
+          <Route path="/bitsy" element={<BitsyEmbed />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
