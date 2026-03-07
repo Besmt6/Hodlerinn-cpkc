@@ -5506,6 +5506,177 @@ async def run_sync(
     }
 
 
+
+@api_router.get("/admin/sync/export-pdf")
+async def export_sync_report_pdf():
+    """Generate a PDF report of the last sync results for human verification."""
+    global sync_status
+    
+    if not sync_status.get("last_results"):
+        raise HTTPException(status_code=404, detail="No sync results available. Please run a sync first.")
+    
+    results = sync_status["last_results"]
+    last_run = sync_status.get("last_run", "Unknown")
+    
+    # Create PDF in memory
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=TA_CENTER, spaceAfter=20)
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=12, alignment=TA_CENTER, spaceAfter=10, textColor=colors.grey)
+    section_style = ParagraphStyle('Section', parent=styles['Heading2'], fontSize=14, spaceBefore=15, spaceAfter=10, textColor=colors.darkblue)
+    
+    elements = []
+    
+    # Title
+    elements.append(Paragraph("Hodler Inn - Sync Agent Report", title_style))
+    elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", subtitle_style))
+    elements.append(Paragraph(f"Last Sync Run: {last_run}", subtitle_style))
+    elements.append(Paragraph(f"Agent Version: {results.get('agent_version', 'Unknown')}", subtitle_style))
+    elements.append(Spacer(1, 20))
+    
+    # Summary Table
+    verified_count = len(results.get("verified", []))
+    no_bill_count = len(results.get("no_bill", []))
+    missing_count = len(results.get("missing_in_hodler", []))
+    error_count = len(results.get("errors", []))
+    
+    summary_data = [
+        ["Category", "Count"],
+        ["Verified (Matched)", str(verified_count)],
+        ["No Bill", str(no_bill_count)],
+        ["Missing (Not Found)", str(missing_count)],
+        ["Errors", str(error_count)]
+    ]
+    
+    summary_table = Table(summary_data, colWidths=[3*inch, 1.5*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.lightgreen),
+        ('BACKGROUND', (0, 3), (-1, 3), colors.lightyellow),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 30))
+    
+    # VERIFIED Section
+    if results.get("verified"):
+        elements.append(Paragraph("VERIFIED ENTRIES (Matched)", section_style))
+        verified_data = [["#", "Portal Name", "Hodler Inn Name", "Employee ID", "Room"]]
+        for idx, v in enumerate(results["verified"], 1):
+            verified_data.append([
+                str(idx),
+                v.get("api_name", v.get("portal_name", "N/A"))[:30],
+                v.get("hodler_name", "N/A")[:30],
+                str(v.get("employee_id", "N/A")),
+                str(v.get("room", "N/A"))
+            ])
+        
+        verified_table = Table(verified_data, colWidths=[0.4*inch, 2*inch, 2*inch, 1.2*inch, 0.8*inch])
+        verified_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.green),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.Color(0.95, 1, 0.95)])
+        ]))
+        elements.append(verified_table)
+        elements.append(Spacer(1, 20))
+    
+    # MISSING Section
+    if results.get("missing_in_hodler"):
+        elements.append(Paragraph("MISSING ENTRIES (Not Found in Hodler Inn)", section_style))
+        missing_data = [["#", "Portal Name", "Reason", "Best Match Suggestion"]]
+        for idx, m in enumerate(results["missing_in_hodler"], 1):
+            best_match = ""
+            if m.get("best_matches") and len(m["best_matches"]) > 0:
+                bm = m["best_matches"][0]
+                best_match = f"{bm.get('name', 'N/A')[:20]} (Score: {bm.get('combined_score', 0):.2f})"
+            
+            missing_data.append([
+                str(idx),
+                m.get("name", "N/A")[:35],
+                (m.get("reason", "Not found")[:30] if m.get("reason") else "Not found"),
+                best_match[:35]
+            ])
+        
+        missing_table = Table(missing_data, colWidths=[0.4*inch, 2.2*inch, 1.8*inch, 2*inch])
+        missing_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.orange),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.Color(1, 0.98, 0.9)])
+        ]))
+        elements.append(missing_table)
+        elements.append(Spacer(1, 20))
+    
+    # NO BILL Section
+    if results.get("no_bill"):
+        elements.append(Paragraph("NO BILL ENTRIES", section_style))
+        no_bill_data = [["#", "Name", "Best Match Suggestion"]]
+        for idx, nb in enumerate(results["no_bill"], 1):
+            best_match = ""
+            if nb.get("best_matches") and len(nb["best_matches"]) > 0:
+                bm = nb["best_matches"][0]
+                best_match = f"{bm.get('name', 'N/A')[:25]} (Score: {bm.get('combined_score', 0):.2f})"
+            
+            no_bill_data.append([
+                str(idx),
+                nb.get("name", "N/A")[:40],
+                best_match[:40]
+            ])
+        
+        no_bill_table = Table(no_bill_data, colWidths=[0.4*inch, 3*inch, 3*inch])
+        no_bill_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+        ]))
+        elements.append(no_bill_table)
+        elements.append(Spacer(1, 20))
+    
+    # ERRORS Section
+    if results.get("errors"):
+        elements.append(Paragraph("ERRORS", section_style))
+        for idx, err in enumerate(results["errors"], 1):
+            elements.append(Paragraph(f"{idx}. {err}", styles['Normal']))
+        elements.append(Spacer(1, 20))
+    
+    # Footer
+    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=colors.grey)
+    elements.append(Spacer(1, 30))
+    elements.append(Paragraph("This report is generated by Hodler Inn Sync Agent for human verification.", footer_style))
+    elements.append(Paragraph("Please review all entries and update records as needed.", footer_style))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    # Generate filename with timestamp
+    filename = f"sync_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+
 @api_router.get("/admin/sync/debug-records")
 async def debug_sync_records(target_date: str = None):
     """Debug: Show what records the sync agent will use for matching."""

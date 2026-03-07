@@ -4455,6 +4455,18 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                           Last run: {new Date(syncStatus.last_run).toLocaleString()}
                         </p>
                       )}
+                      <button
+                        onClick={() => {
+                          window.open(`${API}/admin/sync/export-pdf`, '_blank');
+                        }}
+                        className="mt-3 w-full px-4 py-2 bg-vault-gold/20 hover:bg-vault-gold/30 text-vault-gold border border-vault-gold/50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        data-testid="download-sync-report-btn"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Download PDF Report
+                      </button>
                     </div>
                   )}
                 </CardContent>
