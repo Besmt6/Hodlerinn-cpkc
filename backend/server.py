@@ -8220,6 +8220,10 @@ async def check_cpkc_emails():
                 if "CPKC Sign-In Sheet" not in subject and "Revise" not in subject:
                     continue
                 
+                # Check if this is a CHECK-OUT notification (skip these - not arrivals)
+                # Check-out emails typically have check-out dates that are today or in the past
+                is_checkout_email = False
+                
                 logging.info(f"Processing CPKC email: {subject}")
                 
                 # Extract booking ID from subject
@@ -8334,8 +8338,32 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
         logging.error(f"PDF processing error: {e}")
 
 async def import_cpkc_guest(emp_id: str, emp_name: str, check_in_str: str, check_out_str: str, booking_id: str):
-    """Import a single CPKC guest as expected arrival."""
+    """Import a single CPKC guest as expected arrival.
+    
+    Only imports if check-in date is today or in the future.
+    Skips check-out notifications (where check-in is in the past).
+    """
     try:
+        # Parse the check-in date
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        # Parse check-in date from string (format: "2026-03-07 14:00" or "Mar 7, 2026")
+        check_in_date = None
+        if check_in_str:
+            # Try different date formats
+            for fmt in ["%Y-%m-%d %H:%M", "%Y-%m-%d", "%b %d, %Y %H:%M", "%b %d, %Y"]:
+                try:
+                    parsed = datetime.strptime(check_in_str.strip(), fmt)
+                    check_in_date = parsed.strftime("%Y-%m-%d")
+                    break
+                except:
+                    continue
+        
+        # If check-in date is in the past, this is a check-out notification - skip it
+        if check_in_date and check_in_date < today:
+            logging.info(f"Skipping {emp_name} - check-in date {check_in_date} is in the past (check-out notification)")
+            return None
+        
         # Parse name format: LASTNAME,(FIRSTNAME)*CODE
         name_match = re.match(r'([^,]+),?\(?([^)]*)\)?(?:\*\w+)?', emp_name)
         if name_match:
