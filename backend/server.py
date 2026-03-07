@@ -4179,32 +4179,45 @@ async def get_blocked_rooms_history(start_date: str = None, end_date: str = None
 
 @api_router.get("/admin/occupancy/daily")
 async def get_daily_occupancy(date: str = None):
-    """Get occupancy breakdown for a specific date or today."""
+    """Get occupancy breakdown for a specific date or today.
+    
+    Counts ALL guests who checked in on this date, including same-day check-in/check-out.
+    This gives accurate historical occupancy based on check-in records.
+    """
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")
     
     # Get total rooms
     total_rooms = await db.rooms.count_documents({})
     
-    # Get railroad bookings for this date
-    railroad_bookings = await db.bookings.find({
-        "check_in_date": date,
-        "is_checked_out": False
-    }, {"_id": 0}).to_list(1000)
+    # Count ALL railroad bookings that checked in on this date
+    # (regardless of whether they checked out same day or not)
+    railroad_checkins = await db.bookings.count_documents({
+        "check_in_date": date
+    })
     
-    # Also get bookings that span this date (checked in before, not checked out)
-    all_railroad = await db.bookings.find({
-        "is_checked_out": False
-    }, {"_id": 0}).to_list(1000)
+    # For current day, also count guests still in house from previous days
+    today = datetime.now().strftime("%Y-%m-%d")
+    carryover_guests = 0
+    if date == today:
+        # Count guests who checked in before today and haven't checked out
+        carryover_guests = await db.bookings.count_documents({
+            "check_in_date": {"$lt": date},
+            "is_checked_out": False
+        })
     
-    railroad_count = len(all_railroad)
+    railroad_count = railroad_checkins + carryover_guests
     
     # Get non-railroad (blocked rooms) for this date
-    blocked_rooms = await db.blocked_rooms.find({
-        "is_active": True
-    }, {"_id": 0}).to_list(1000)
+    # Count rooms blocked on or before this date that are still active or were active on this date
+    blocked_rooms = await db.blocked_rooms.count_documents({
+        "$or": [
+            {"is_active": True},  # Currently active
+            {"check_in_date": date}  # Checked in on this date
+        ]
+    })
     
-    non_railroad_count = len(blocked_rooms)
+    non_railroad_count = blocked_rooms
     
     # Calculate totals
     total_occupied = railroad_count + non_railroad_count
@@ -4215,6 +4228,8 @@ async def get_daily_occupancy(date: str = None):
         "date": date,
         "total_rooms": total_rooms,
         "railroad_guests": railroad_count,
+        "railroad_checkins_today": railroad_checkins,
+        "carryover_from_previous": carryover_guests,
         "non_railroad_guests": non_railroad_count,
         "total_occupied": total_occupied,
         "vacant_rooms": vacant_rooms,
@@ -4226,7 +4241,11 @@ async def get_daily_occupancy(date: str = None):
 
 @api_router.post("/admin/occupancy/record")
 async def record_daily_occupancy():
-    """Record today's occupancy snapshot for historical tracking."""
+    """Record today's occupancy snapshot for historical tracking.
+    
+    Based on CHECK-IN records, not check-out.
+    Same-day check-in/check-out counts for the day of check-in.
+    """
     today = datetime.now().strftime("%Y-%m-%d")
     
     # Get current occupancy
@@ -4235,31 +4254,28 @@ async def record_daily_occupancy():
     # Check if already recorded today
     existing = await db.occupancy_history.find_one({"date": today})
     
+    record_data = {
+        "railroad_guests": occupancy["railroad_guests"],
+        "railroad_checkins_today": occupancy.get("railroad_checkins_today", 0),
+        "carryover_from_previous": occupancy.get("carryover_from_previous", 0),
+        "non_railroad_guests": occupancy["non_railroad_guests"],
+        "total_occupied": occupancy["total_occupied"],
+        "occupancy_percent": occupancy["occupancy_percent"],
+        "total_rooms": occupancy["total_rooms"],
+        "recorded_at": datetime.now(timezone.utc).isoformat()
+    }
+    
     if existing:
         # Update existing record
         await db.occupancy_history.update_one(
             {"date": today},
-            {"$set": {
-                "railroad_guests": occupancy["railroad_guests"],
-                "non_railroad_guests": occupancy["non_railroad_guests"],
-                "total_occupied": occupancy["total_occupied"],
-                "occupancy_percent": occupancy["occupancy_percent"],
-                "total_rooms": occupancy["total_rooms"],
-                "recorded_at": datetime.now(timezone.utc).isoformat()
-            }}
+            {"$set": record_data}
         )
         return {"message": "Occupancy record updated for today", "data": occupancy}
     else:
         # Create new record
-        await db.occupancy_history.insert_one({
-            "date": today,
-            "railroad_guests": occupancy["railroad_guests"],
-            "non_railroad_guests": occupancy["non_railroad_guests"],
-            "total_occupied": occupancy["total_occupied"],
-            "occupancy_percent": occupancy["occupancy_percent"],
-            "total_rooms": occupancy["total_rooms"],
-            "recorded_at": datetime.now(timezone.utc).isoformat()
-        })
+        record_data["date"] = today
+        await db.occupancy_history.insert_one(record_data)
         return {"message": "Occupancy record created for today", "data": occupancy}
 
 
