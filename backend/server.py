@@ -4181,8 +4181,11 @@ async def get_blocked_rooms_history(start_date: str = None, end_date: str = None
 async def get_daily_occupancy(date: str = None):
     """Get occupancy breakdown for a specific date or today.
     
-    Counts ALL guests who checked in on this date, including same-day check-in/check-out.
-    This gives accurate historical occupancy based on check-in records.
+    Counts guests based on CHECK-IN DATE only.
+    - Check in March 7th at 23:00 → Counts for March 7th
+    - Check out March 8th at 11:00 → Does NOT count for March 8th
+    
+    Same-day check-in/check-out also counts for that day.
     """
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")
@@ -4191,33 +4194,16 @@ async def get_daily_occupancy(date: str = None):
     total_rooms = await db.rooms.count_documents({})
     
     # Count ALL railroad bookings that checked in on this date
-    # (regardless of whether they checked out same day or not)
-    railroad_checkins = await db.bookings.count_documents({
+    # This includes same-day check-in/check-out
+    # Does NOT include guests who checked in on previous days
+    railroad_count = await db.bookings.count_documents({
         "check_in_date": date
     })
     
-    # For current day, also count guests still in house from previous days
-    today = datetime.now().strftime("%Y-%m-%d")
-    carryover_guests = 0
-    if date == today:
-        # Count guests who checked in before today and haven't checked out
-        carryover_guests = await db.bookings.count_documents({
-            "check_in_date": {"$lt": date},
-            "is_checked_out": False
-        })
-    
-    railroad_count = railroad_checkins + carryover_guests
-    
-    # Get non-railroad (blocked rooms) for this date
-    # Count rooms blocked on or before this date that are still active or were active on this date
-    blocked_rooms = await db.blocked_rooms.count_documents({
-        "$or": [
-            {"is_active": True},  # Currently active
-            {"check_in_date": date}  # Checked in on this date
-        ]
+    # Get non-railroad guests who checked in on this date
+    non_railroad_count = await db.blocked_rooms.count_documents({
+        "check_in_date": date
     })
-    
-    non_railroad_count = blocked_rooms
     
     # Calculate totals
     total_occupied = railroad_count + non_railroad_count
@@ -4228,8 +4214,6 @@ async def get_daily_occupancy(date: str = None):
         "date": date,
         "total_rooms": total_rooms,
         "railroad_guests": railroad_count,
-        "railroad_checkins_today": railroad_checkins,
-        "carryover_from_previous": carryover_guests,
         "non_railroad_guests": non_railroad_count,
         "total_occupied": total_occupied,
         "vacant_rooms": vacant_rooms,
@@ -4243,8 +4227,9 @@ async def get_daily_occupancy(date: str = None):
 async def record_daily_occupancy():
     """Record today's occupancy snapshot for historical tracking.
     
-    Based on CHECK-IN records, not check-out.
-    Same-day check-in/check-out counts for the day of check-in.
+    Based on CHECK-IN DATE only.
+    - Check in today = counted today
+    - Check out tomorrow = NOT counted tomorrow
     """
     today = datetime.now().strftime("%Y-%m-%d")
     
@@ -4256,8 +4241,6 @@ async def record_daily_occupancy():
     
     record_data = {
         "railroad_guests": occupancy["railroad_guests"],
-        "railroad_checkins_today": occupancy.get("railroad_checkins_today", 0),
-        "carryover_from_previous": occupancy.get("carryover_from_previous", 0),
         "non_railroad_guests": occupancy["non_railroad_guests"],
         "total_occupied": occupancy["total_occupied"],
         "occupancy_percent": occupancy["occupancy_percent"],
