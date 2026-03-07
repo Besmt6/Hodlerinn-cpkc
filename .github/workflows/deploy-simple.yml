@@ -1,0 +1,35 @@
+name: Deploy to AWS (Simple SSH)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.EC2_USERNAME }}/hodlerinn
+            
+            # Pull latest code
+            git pull origin main
+            
+            # Rebuild and restart containers
+            docker-compose down
+            docker-compose up -d --build
+            
+            # Clean up old images
+            docker image prune -f
+            
+            # Show status
+            docker-compose ps
+            
+            echo "Deployment complete!"
