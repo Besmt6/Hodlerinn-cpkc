@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -248,6 +248,21 @@ export default function AdminDashboard() {
   const [employeeScanEndDate, setEmployeeScanEndDate] = useState("");
   
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Persist activeView to URL hash for refresh support
+  useEffect(() => {
+    const hash = location.hash.replace('#', '');
+    if (hash && ['dashboard', 'signin', 'billing', 'rooms', 'employees', 'guests', 'guarantee', 'settings'].includes(hash)) {
+      setActiveView(hash);
+    }
+  }, [location.hash]);
+
+  // Update URL when activeView changes
+  const handleViewChange = (view) => {
+    setActiveView(view);
+    window.history.replaceState(null, '', `#${view}`);
+  };
 
   useEffect(() => {
     const isAuth = sessionStorage.getItem("adminAuth");
@@ -1341,14 +1356,14 @@ export default function AdminDashboard() {
         <nav className="space-y-2 flex-1">
           <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveView('dashboard')}
+            onClick={() => handleViewChange('dashboard')}
           >
             <LayoutDashboard className="w-4 h-4" />
             <span className="font-manrope text-sm">Dashboard</span>
           </div>
           <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'signin' ? 'active' : ''}`}
-            onClick={() => setActiveView('signin')}
+            onClick={() => handleViewChange('signin')}
             data-testid="nav-signin-view-btn"
           >
             <ClipboardList className="w-4 h-4" />
@@ -1356,7 +1371,7 @@ export default function AdminDashboard() {
           </div>
           <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'billing' ? 'active' : ''}`}
-            onClick={() => setActiveView('billing')}
+            onClick={() => handleViewChange('billing')}
             data-testid="nav-billing-view-btn"
           >
             <Receipt className="w-4 h-4" />
@@ -1364,7 +1379,7 @@ export default function AdminDashboard() {
           </div>
           <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'rooms' ? 'active' : ''}`}
-            onClick={() => setActiveView('rooms')}
+            onClick={() => handleViewChange('rooms')}
             data-testid="nav-rooms-view-btn"
           >
             <Bed className="w-4 h-4" />
@@ -1372,7 +1387,7 @@ export default function AdminDashboard() {
           </div>
           <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'employees' ? 'active' : ''}`}
-            onClick={() => setActiveView('employees')}
+            onClick={() => handleViewChange('employees')}
             data-testid="nav-employees-view-btn"
           >
             <Users className="w-4 h-4" />
@@ -1380,7 +1395,7 @@ export default function AdminDashboard() {
           </div>
           <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'guests' ? 'active' : ''}`}
-            onClick={() => setActiveView('guests')}
+            onClick={() => handleViewChange('guests')}
             data-testid="nav-guests-view-btn"
           >
             <UserCheck className="w-4 h-4" />
@@ -1388,7 +1403,7 @@ export default function AdminDashboard() {
           </div>
           <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'guarantee' ? 'active' : ''}`}
-            onClick={() => setActiveView('guarantee')}
+            onClick={() => handleViewChange('guarantee')}
             data-testid="nav-guarantee-view-btn"
           >
             <FileBarChart className="w-4 h-4" />
@@ -1396,7 +1411,7 @@ export default function AdminDashboard() {
           </div>
           <div 
             className={`admin-nav-item cursor-pointer ${activeView === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveView('settings')}
+            onClick={() => handleViewChange('settings')}
             data-testid="nav-settings-view-btn"
           >
             <Settings className="w-4 h-4" />
@@ -1444,37 +1459,37 @@ export default function AdminDashboard() {
         {/* Mobile Nav Tabs */}
         <div className="flex gap-2 mt-3 overflow-x-auto">
           <button 
-            onClick={() => setActiveView('dashboard')}
+            onClick={() => handleViewChange('dashboard')}
             className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'dashboard' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
           >
             Dashboard
           </button>
           <button 
-            onClick={() => setActiveView('signin')}
+            onClick={() => handleViewChange('signin')}
             className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'signin' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
           >
             Sign-In Sheet
           </button>
           <button 
-            onClick={() => setActiveView('billing')}
+            onClick={() => handleViewChange('billing')}
             className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'billing' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
           >
             Billing Report
           </button>
           <button 
-            onClick={() => setActiveView('rooms')}
+            onClick={() => handleViewChange('rooms')}
             className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'rooms' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
           >
             Rooms
           </button>
           <button 
-            onClick={() => setActiveView('guarantee')}
+            onClick={() => handleViewChange('guarantee')}
             className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'guarantee' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
           >
             Guarantee
           </button>
           <button 
-            onClick={() => setActiveView('settings')}
+            onClick={() => handleViewChange('settings')}
             className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${activeView === 'settings' ? 'bg-vault-gold text-black' : 'bg-vault-surface-highlight text-vault-text-secondary'}`}
           >
             Settings
