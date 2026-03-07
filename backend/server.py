@@ -488,116 +488,45 @@ async def auto_sync_task():
 
 
 async def send_daily_status_alert(time_of_day: str):
-    """Send daily status alert at 7 AM and 10 PM with room availability."""
+    """Send simple daily status alert - employees in house, clean/dirty rooms for incoming crew."""
     try:
         # Get room counts
         total_rooms = await db.rooms.count_documents({})
         if total_rooms == 0:
             total_rooms = 28
         
-        # Occupied rooms (railroad + non-railroad)
-        railroad_occupied = await db.bookings.count_documents({"is_checked_out": False})
-        other_occupied = await db.blocked_rooms.count_documents({"is_active": True, "is_reservation": {"$ne": True}})
-        total_occupied = railroad_occupied + other_occupied
+        # Employees currently in house (railroad)
+        employees_in_house = await db.bookings.count_documents({"is_checked_out": False})
         
-        # Available rooms
-        total_available = total_rooms - total_occupied
-        
-        # Clean vs Dirty available rooms
+        # Get occupied room numbers
         occupied_room_numbers = []
-        
-        # Get railroad occupied room numbers
         railroad_bookings = await db.bookings.find({"is_checked_out": False}, {"room_number": 1, "_id": 0}).to_list(100)
         occupied_room_numbers.extend([b["room_number"] for b in railroad_bookings if b.get("room_number")])
         
-        # Get other guest room numbers
+        # Other guests
         blocked = await db.blocked_rooms.find({"is_active": True, "is_reservation": {"$ne": True}}, {"room_number": 1, "_id": 0}).to_list(100)
         occupied_room_numbers.extend([b["room_number"] for b in blocked if b.get("room_number")])
         
-        # Get clean and dirty available rooms
-        clean_available = await db.rooms.count_documents({
+        # Available rooms breakdown
+        clean_ready = await db.rooms.count_documents({
             "room_number": {"$nin": occupied_room_numbers},
             "cleaning_status": "clean"
         })
-        dirty_available = await db.rooms.count_documents({
+        dirty_rooms = await db.rooms.count_documents({
             "room_number": {"$nin": occupied_room_numbers},
             "cleaning_status": {"$ne": "clean"}
         })
         
-        occupancy_percent = round((total_occupied / total_rooms) * 100, 1)
-        
         time_label = "🌅 MORNING" if time_of_day == "morning" else "🌙 EVENING"
         
-        # Check if email alerts are enabled
-        alert_settings = await get_email_alert_settings()
-        recipients = await get_email_recipients()
-        subject_prefix = alert_settings.get("custom_subject_prefix", "Hodler Inn")
-        
-        # Send Email
-        if recipients:
-            settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
-            if settings and settings.get("email_sender") and settings.get("email_password_encrypted"):
-                try:
-                    import smtplib
-                    from email.mime.text import MIMEText
-                    from email.mime.multipart import MIMEMultipart
-                    
-                    smtp_host = settings.get("email_smtp_host", "smtp.zoho.com")
-                    smtp_port = settings.get("email_smtp_port", 587)
-                    sender = settings.get("email_sender")
-                    password = decrypt_data(settings.get("email_password_encrypted"))
-                    
-                    msg = MIMEMultipart()
-                    msg['From'] = sender
-                    msg['To'] = ", ".join(recipients)
-                    msg['Subject'] = f"{subject_prefix} - Daily Status ({time_of_day.capitalize()})"
-                    
-                    body = f"""Hello,
-
-Daily Status Report - {time_of_day.capitalize()}
-
-OCCUPANCY: {occupancy_percent}%
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Total Rooms: {total_rooms}
-Occupied: {total_occupied} ({railroad_occupied} railroad + {other_occupied} other)
-Available: {total_available}
-
-AVAILABLE ROOMS BREAKDOWN:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Clean & Ready: {clean_available}
-🧹 Needs Cleaning: {dirty_available}
-
-Thank you,
-{subject_prefix}
-
----
-This is an automated status report.
-"""
-                    msg.attach(MIMEText(body, 'plain'))
-                    
-                    server = smtplib.SMTP(smtp_host, smtp_port)
-                    server.starttls()
-                    server.login(sender, password)
-                    server.sendmail(sender, recipients, msg.as_string())
-                    server.quit()
-                    
-                    logging.info(f"Daily status alert ({time_of_day}) sent to: {recipients}")
-                    
-                except Exception as e:
-                    logging.error(f"Failed to send daily status email: {e}")
-        
-        # Also send Telegram notification
+        # Send ONLY Telegram notification - simple summary for crew coordination
         await send_telegram_notification(
-            f"{time_label} STATUS REPORT\n"
+            f"{time_label} STATUS\n"
             f"━━━━━━━━━━━━━━━\n"
-            f"📊 <b>Occupancy: {occupancy_percent}%</b>\n\n"
-            f"🏨 Total Rooms: {total_rooms}\n"
-            f"🚂 Railroad: {railroad_occupied}\n"
-            f"👤 Other: {other_occupied}\n"
-            f"📦 Total Occupied: {total_occupied}\n\n"
-            f"<b>AVAILABLE ({total_available}):</b>\n"
-            f"✅ Clean: {clean_available}\n"
-            f"🧹 Dirty: {dirty_available}"
+            f"🚂 <b>Employees in house: {employees_in_house}</b>\n\n"
+            f"<b>ROOMS FOR INCOMING CREW:</b>\n"
+            f"✅ Clean & Ready: {clean_ready}\n"
+            f"🧹 Dirty (available when cleaned): {dirty_rooms}"
         )
         
     except Exception as e:
@@ -692,11 +621,16 @@ def update_auto_sync_schedule(enabled: bool, start_date: str = None):
 
 @app.on_event("startup")
 async def start_scheduler():
+    # Prevent duplicate scheduler initialization
+    if scheduler.running:
+        logging.info("Scheduler already running, skipping initialization")
+        return
+        
     from pytz import timezone
     central_tz = timezone('America/Chicago')
     
     # Run on 1st of every month at 00:00 (midnight)
-    scheduler.add_job(monthly_data_reset, CronTrigger(day=1, hour=0, minute=0))
+    scheduler.add_job(monthly_data_reset, CronTrigger(day=1, hour=0, minute=0), id="monthly_reset", replace_existing=True)
     
     # Daily status alerts at 7 AM and 10 PM Central Time
     # Use wrapper functions that the AsyncIOScheduler can handle
