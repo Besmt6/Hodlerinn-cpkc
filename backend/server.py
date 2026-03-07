@@ -664,6 +664,31 @@ async def start_scheduler():
     )
     logging.info("Auto-dirty checker scheduled every 5 minutes")
     
+    # Auto-upload sign-in sheets to Zoho Drive at 11:59 PM Central Time
+    async def auto_zoho_upload():
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+            logging.info(f"Auto-uploading sign-in sheets to Zoho Drive for {today}")
+            result = await upload_daily_reports_to_zoho(today)
+            if result.get("success"):
+                logging.info(f"Auto Zoho upload successful: {result}")
+                await send_telegram_notification(
+                    f"📤 <b>Auto Upload Complete</b>\n"
+                    f"Sign-in sheets for {today} uploaded to Zoho Drive"
+                )
+            else:
+                logging.error(f"Auto Zoho upload failed: {result}")
+        except Exception as e:
+            logging.error(f"Auto Zoho upload error: {e}")
+    
+    scheduler.add_job(
+        auto_zoho_upload,
+        CronTrigger(hour=23, minute=59, timezone=central_tz),
+        id="auto_zoho_upload",
+        replace_existing=True
+    )
+    logging.info("Auto Zoho upload scheduled for 11:59 PM Central Time")
+    
     scheduler.start()
     logging.info("Monthly reset scheduler started - will reset data on 1st of each month")
     
