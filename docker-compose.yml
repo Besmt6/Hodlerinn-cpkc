@@ -1,46 +1,41 @@
 version: '3.8'
 
 services:
-  # MongoDB Database
-  mongodb:
-    image: mongo:6.0
-    container_name: hodlerinn-mongodb
-    restart: always
-    volumes:
-      - mongodb_data:/data/db
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_DATABASE=hodler_inn
-
   # Backend API
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
     container_name: hodlerinn-backend
-    restart: always
+    restart: unless-stopped
     ports:
       - "8001:8001"
+    env_file:
+      - .env
     environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=hodler_inn
-    depends_on:
-      - mongodb
+      - DB_NAME=${DB_NAME:-hodler_inn}
+      - MONGO_URL=${MONGO_URL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-  # Frontend
+  # Frontend SPA
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
     container_name: hodlerinn-frontend
-    restart: always
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_BACKEND_URL=http://localhost:8001
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-http://localhost:8001}
     depends_on:
-      - backend
-
-volumes:
-  mongodb_data:
+      backend:
+        condition: service_healthy

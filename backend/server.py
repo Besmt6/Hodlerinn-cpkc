@@ -10,6 +10,8 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import uuid
+import hmac
+import hashlib
 from datetime import datetime, timezone, timedelta
 import io
 import csv
@@ -75,6 +77,62 @@ api_router = APIRouter(prefix="/api")
 
 # Admin password (simple protection)
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'hodlerinn2024')
+ADMIN_AUTH_SECRET = os.environ.get('ADMIN_AUTH_SECRET') or ENCRYPTION_KEY or ADMIN_PASSWORD
+ADMIN_SESSION_DURATION_HOURS = int(os.environ.get('ADMIN_SESSION_DURATION_HOURS', '12'))
+
+
+def _create_admin_token() -> str:
+    """Create a signed admin session token."""
+    expires_at = int((datetime.now(timezone.utc) + timedelta(hours=ADMIN_SESSION_DURATION_HOURS)).timestamp())
+    payload = json.dumps({"exp": expires_at}, separators=(",", ":"))
+    payload_b64 = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    signature = hmac.new(
+        ADMIN_AUTH_SECRET.encode(),
+        payload_b64.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{payload_b64}.{signature}"
+
+
+def _verify_admin_token(token: Optional[str]) -> bool:
+    """Verify admin session token signature and expiry."""
+    if not token or "." not in token:
+        return False
+
+    try:
+        payload_b64, signature = token.split(".", 1)
+        expected_signature = hmac.new(
+            ADMIN_AUTH_SECRET.encode(),
+            payload_b64.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(signature, expected_signature):
+            return False
+
+        payload_b64_padded = payload_b64 + "=" * (-len(payload_b64) % 4)
+        payload_raw = base64.urlsafe_b64decode(payload_b64_padded.encode()).decode()
+        payload = json.loads(payload_raw)
+        return int(payload.get("exp", 0)) > int(datetime.now(timezone.utc).timestamp())
+    except Exception:
+        return False
+
+
+@app.middleware("http")
+async def admin_auth_middleware(request, call_next):
+    """Protect all /api/admin endpoints except login with bearer token auth."""
+    path = request.url.path
+    if path.startswith("/api/admin") and path != "/api/admin/login":
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header[7:] if auth_header.startswith("Bearer ") else None
+        if not _verify_admin_token(token):
+            return Response(
+                content=json.dumps({"detail": "Admin authentication required"}),
+                status_code=401,
+                media_type="application/json",
+            )
+
+    return await call_next(request)
 
 # ==================== Health Check Endpoint ====================
 
@@ -2476,7 +2534,13 @@ async def delete_booking(booking_id: str):
 @api_router.post("/admin/login")
 async def admin_login(input: AdminLogin):
     if input.password == ADMIN_PASSWORD:
-        return {"success": True, "message": "Login successful"}
+        token = _create_admin_token()
+        return {
+            "success": True,
+            "message": "Login successful",
+            "token": token,
+            "expires_in_hours": ADMIN_SESSION_DURATION_HOURS
+        }
     raise HTTPException(status_code=401, detail="Invalid password")
 
 # Admin - Get all records (with optional date filtering)

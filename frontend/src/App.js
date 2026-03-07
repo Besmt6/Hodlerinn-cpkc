@@ -8,6 +8,7 @@ import BookNow from "@/pages/BookNow";
 import DemoPortal from "@/pages/DemoPortal";
 import DemoAdmin from "@/pages/DemoAdmin";
 import Documentation from "@/pages/Documentation";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 function App() {
   return (
@@ -16,8 +17,22 @@ function App() {
         <Routes>
           <Route path="/" element={<GuestPortal />} />
           <Route path="/admin" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/docs" element={<Documentation />} />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/docs"
+            element={
+              <ProtectedRoute>
+                <Documentation />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/book" element={<BookNow />} />
           <Route path="/demo" element={<DemoPortal />} />
           <Route path="/demo/admin" element={<DemoAdmin />} />

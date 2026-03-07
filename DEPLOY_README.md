@@ -1,208 +1,109 @@
-# Hodler Inn - Easy Deployment Guide
+# Hodler Inn Deployment Guide (AWS + Hosted MongoDB)
 
-## Quick Start (3 Commands!)
-
-### Step 1: Install Docker on your server
-```bash
-# For Ubuntu/Debian
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
-# Log out and log back in, then:
-sudo apt install docker-compose -y
-```
-
-### Step 2: Clone your code
-```bash
-git clone https://github.com/Besmt6/Hodlerinn-cpkc.git
-cd Hodlerinn-cpkc
-```
-
-### Step 3: Start everything
-```bash
-docker-compose up -d --build
-```
-
-That's it! Your app will be running at:
-- Frontend: http://your-server-ip:3000
-- Backend API: http://your-server-ip:8001
+This repository is now prepared for **hosted MongoDB (Atlas)** and no longer requires a local Mongo container in `docker-compose.yml`.
 
 ---
 
-## For Production (with your domain)
+## 1) Local/Server Runtime with Docker Compose
 
-### Update the frontend environment
-Edit `docker-compose.yml` and change:
-```yaml
-environment:
-  - REACT_APP_BACKEND_URL=https://your-domain.com
-```
+### Prerequisites
+- Docker + Docker Compose plugin
+- A valid MongoDB Atlas connection string
 
-### Set up Nginx (for SSL/HTTPS)
+### Setup
 ```bash
-sudo apt install nginx certbot python3-certbot-nginx -y
+cp .env.example .env
+# Edit .env and set at minimum:
+# - MONGO_URL
+# - ADMIN_PASSWORD
+# - REACT_APP_BACKEND_URL
 ```
 
-Create `/etc/nginx/sites-available/hodlerinn`:
-```nginx
-server {
-    listen 80;
-    server_name cpkc.hodlerinn.com;  # Change to your domain
-
-    # API requests - proxy to backend
-    location /api {
-        proxy_pass http://localhost:8001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    # Frontend - proxy to Node serve (handles SPA routing)
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-Enable and get SSL:
+### Start
 ```bash
-sudo ln -s /etc/nginx/sites-available/hodlerinn /etc/nginx/sites-enabled/
-sudo nginx -t  # Test config
-sudo certbot --nginx -d cpkc.hodlerinn.com
-sudo systemctl restart nginx
+docker compose up -d --build
+```
+
+### Verify
+```bash
+curl -f http://localhost:8001/health
+# expected: {"status":"healthy", ...}
 ```
 
 ---
 
-## IMPORTANT: Fix for /book URL Issue
+## 2) AWS Production Architecture (Recommended)
 
-If `/book` URL redirects to `/` (guest portal), the issue is that `serve` 
-isn't receiving the request properly. Make sure:
-
-1. The frontend container is using `serve -s` (the -s flag handles SPA routing)
-2. Nginx is correctly proxying ALL paths to the frontend
-
-**Quick check:**
-```bash
-# Test if frontend handles /book directly
-curl -I http://localhost:3000/book
-# Should return: HTTP/1.1 200 OK
-
-# Test through nginx
-curl -I http://cpkc.hodlerinn.com/book
-# Should also return: HTTP/1.1 200 OK
-```
-
-**If /book doesn't work, try rebuilding frontend:**
-```bash
-docker-compose up -d --build frontend
-```
+- **ECR**: container image registry
+- **ECS Fargate**: run backend/frontend containers
+- **ALB**: ingress + TLS termination
+- **Route53 + ACM**: DNS + certificates
+- **SSM Parameter Store / Secrets Manager**: secrets (`MONGO_URL`, passwords, keys)
+- **CloudWatch Logs**: logs/metrics
 
 ---
 
-## Useful Commands
+## 3) CI/CD with GitHub Actions
 
-### View logs
-```bash
-docker-compose logs -f
-```
+This repo includes two workflows:
 
-### Restart services
-```bash
-docker-compose restart
-```
+1. **CI** (`.github/workflows/ci.yml`)
+   - Python syntax check for backend.
+   - Frontend install + build.
 
-### Stop everything
-```bash
-docker-compose down
-```
+2. **AWS Deploy** (`.github/workflows/deploy-aws.yml`)
+   - Builds backend/frontend images.
+   - Pushes to ECR.
+   - Updates ECS services.
 
-### Update code and redeploy
-```bash
-git pull
-docker-compose up -d --build
-```
+### Required GitHub Secrets
+- `AWS_ROLE_ARN`
+- `AWS_REGION`
+- `AWS_ACCOUNT_ID`
+- `ECR_BACKEND_REPOSITORY`
+- `ECR_FRONTEND_REPOSITORY`
+- `ECS_CLUSTER`
+- `ECS_BACKEND_SERVICE`
+- `ECS_FRONTEND_SERVICE`
 
-### Rebuild only frontend (after code changes)
-```bash
-docker-compose up -d --build frontend
-```
-
-### Rebuild only backend (after code changes)
-```bash
-docker-compose up -d --build backend
-```
+Use GitHub OIDC with `aws-actions/configure-aws-credentials` (no long-lived AWS keys).
 
 ---
 
-## AWS EC2 Quick Setup
+## 4) Migration Note (MongoDB)
 
-1. Launch EC2 instance:
-   - Ubuntu 22.04 LTS
-   - t3.medium (recommended) or t3.small
-   - 30GB storage
-   - Security Group: Allow ports 22, 80, 443, 3000, 8001
+Old setup used local Mongo (`mongodb://mongodb:27017`).
+Now use Atlas in `.env`:
 
-2. SSH into your server:
-```bash
-ssh -i your-key.pem ubuntu@your-ec2-ip
+```env
+MONGO_URL=mongodb+srv://Hodlerinn:<db_password>@cluster0.hi5zsox.mongodb.net/hodler_inn?retryWrites=true&w=majority&appName=Cluster0
 ```
 
-3. Follow the "Quick Start" steps above!
+> Replace `<db_password>` and avoid committing `.env`.
 
 ---
 
-## Environment Variables (backend/.env)
+## 5) Minimal ECS Environment Variables
 
-Make sure your backend/.env has all required keys:
-```
-MONGO_URL=mongodb://mongodb:27017
-DB_NAME=hodler_inn
-ADMIN_PASSWORD=hodlerinn2024
-EMERGENT_LLM_KEY=sk-emergent-xxxxx
-TELEGRAM_BOT_TOKEN=xxxxx
-TELEGRAM_CHAT_ID=xxxxx
-# ... other keys
-```
+Backend task env vars:
+- `MONGO_URL`
+- `DB_NAME`
+- `ADMIN_PASSWORD`
+- `ENCRYPTION_KEY`
+- `ADMIN_AUTH_SECRET`
+- `CORS_ORIGINS`
+- integration secrets as required
+
+Frontend task env vars:
+- `REACT_APP_BACKEND_URL` (usually ALB/API domain)
 
 ---
 
-## Troubleshooting
+## 6) Operational Checklist
 
-### Check if containers are running
-```bash
-docker ps
-```
-
-### Check container logs
-```bash
-docker logs hodlerinn-backend
-docker logs hodlerinn-frontend
-docker logs hodlerinn-mongodb
-```
-
-### Restart a specific service
-```bash
-docker-compose restart backend
-```
-
-### Check nginx config
-```bash
-sudo nginx -t
-```
-
-### Check nginx logs
-```bash
-sudo tail -f /var/log/nginx/error.log
-```
+- [ ] `CORS_ORIGINS` locked to trusted domains only
+- [ ] `ADMIN_PASSWORD` rotated and strong
+- [ ] `ADMIN_AUTH_SECRET` explicitly set
+- [ ] Atlas network access restricted to VPC egress/NAT IPs
+- [ ] ECS task roles least-privilege
+- [ ] CloudWatch alarms for 5xx / unhealthy targets
