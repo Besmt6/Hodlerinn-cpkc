@@ -1,100 +1,101 @@
 # Hodler Inn - Hotel Management System PRD
 
 ## Original Problem Statement
-Build a comprehensive hotel management system for Hodler Inn that handles:
-- Guest check-in/check-out via kiosk
-- Employee management and verification
-- CPKC railroad crew bookings via email scraping
-- API Global Solutions portal sync for billing verification
-- Admin dashboard for hotel operations
+Build a comprehensive hotel management system for Hodler Inn, serving railroad crew members (CPKC/BNSF) with automated guest check-in, portal synchronization, AI chatbot concierge (Bitsy), and administrative tools.
 
-## User Personas
-1. **Hotel Staff** - Check in/out guests, manage rooms
-2. **Railroad Crew (CPKC)** - Self-service check-in via kiosk
-3. **Hotel Admin** - Manage settings, verify billing, run reports
+## Core Users
+1. **Railroad Guests** - Crew members checking in via kiosk
+2. **Non-Railroad Guests** - Regular hotel guests
+3. **Admin (Kalpesh)** - Hotel owner managing operations
 
-## Core Requirements
-1. Guest Portal (Kiosk) - Self-service check-in/out
-2. Admin Dashboard - Full hotel management
-3. Email Scraper - Parse CPKC booking PDFs
-4. Sync Agent - Verify guests against API Global portal
-5. Reporting - PDF exports, billing reports
+## Implemented Features
 
-## Current Architecture
-```
-/app/
-├── backend/
-│   ├── server.py        # Main FastAPI app (8100+ lines - NEEDS REFACTORING)
-│   ├── sync_agent.py    # Portal sync automation
-│   └── requirements.txt
-└── frontend/
-    └── src/
-        ├── pages/
-        │   ├── AdminDashboard.jsx
-        │   ├── GuestPortal.jsx
-        │   └── BookNow.jsx
-        └── components/
-```
+### Guest Portal & Check-in
+- [x] Guest kiosk interface for railroad crew check-in
+- [x] QR code scanning for guest identification
+- [x] Room assignment system
+- [x] Non-railroad guest check-in flow
 
-## What's Been Implemented
+### AI Concierge (Bitsy)
+- [x] Voice-enabled chatbot on BookNow page
+- [x] GPT-5.2 powered conversations
+- [x] Text-to-speech responses (OpenAI TTS-1)
+- [x] Auto-mic toggle feature
+- [x] Rate card display (shows once)
 
-### March 7, 2026
-- ✅ Fixed sync agent hanging on last entry (added timeouts)
-- ✅ Fixed "No Bill" auto-click (now only verifies matched entries)
-- ✅ Fixed results accumulation bug (reset each sync run)
-- ✅ Added late arrival support (queries prev_day, target, next_day)
-- ✅ Added PDF report export for sync results
-- ✅ Verified Telegram notifications working
+### Sync Agent (Portal Reconciliation)
+- [x] Automated sync with API Global Solutions portal
+- [x] Playwright-based browser automation
+- [x] Date boundary handling (late check-ins after midnight)
+- [x] Duplicate entry detection and handling
+- [x] PDF report generation for sync results
+- [x] 10-minute timeout protection
 
-### Previous Sessions
-- ✅ CPKC Email Scraper (PDF parsing, duplicate handling)
-- ✅ Employee Portal Import (530+ employees)
-- ✅ Chatbot UI cleanup on /book page
-- ✅ Mobile voice fixes (tap-to-start)
-- ✅ Auto-removal from Expected Arrivals on check-in
-- ✅ Guest verification system
-- ✅ Room assignment and billing
+### Admin Dashboard
+- [x] Room management
+- [x] Guest records viewing
+- [x] Sync job controls with date picker
+- [x] PDF report download/view
+- [x] Occupancy tracking (NEW - needs testing)
 
-## Prioritized Backlog
+### Email Scraper
+- [x] Zoho mail integration for CPKC notifications
+- [x] Telegram alerts for new bookings
+- [x] Scheduled scraping via APScheduler
+
+### Documents Created
+- [x] BlockStay Vision Document (SaaS platform vision)
+- [x] Book of Ideas (philosophical insights - 15 chapters)
+
+## Pending Issues (P0-P2)
 
 ### P0 - Critical
-- [ ] Verify email alerts working (scheduled for tomorrow)
+1. **MongoDB Migration** - Production site using wrong database. Need to migrate to user's Atlas instance.
+2. **SALTER Duplicate Handling** - Logic deployed, needs verification on March 4th sync
 
-### P1 - High Priority  
-- [ ] Refactor server.py into smaller modules (8100+ lines)
-- [ ] Production DB sync for cpkc.hodlerinn.com
+### P1 - Important  
+3. **Occupancy Tracking** - UI and endpoints deployed, needs user testing
+4. **Email/Telegram Alerts** - User needs to verify if working
 
-### P2 - Medium Priority
-- [ ] Voice message echo fix on Guest Portal
-- [ ] AI Phone Agent (blocked on PBX details)
-- [ ] Smart Lock Integration (blocked on vendor API)
+### P2 - Low Priority
+5. **Voice Echo on Guest Portal** - Reported but not reproduced
 
-### P3 - Future
-- [ ] HODL Rewards Token system
-- [ ] White-Label SaaS version
-- [ ] Code refactoring for AdminDashboard.jsx
+## Upcoming Features (Blocked)
+- AI Phone Agent - Blocked on SIP/Webhook details from Virtual PBX provider
+- Smart Lock Integration - Blocked on vendor API research
 
-## Technical Stack
-- **Backend:** FastAPI, Python 3.11
-- **Frontend:** React, Tailwind CSS, Shadcn UI
+## Technical Debt (Critical)
+- `server.py` - Monolithic, needs decomposition into routers
+- `AdminDashboard.jsx` - Too large, needs component extraction
+
+## Tech Stack
+- **Backend:** FastAPI, APScheduler, Playwright, reportlab
+- **Frontend:** React, Shadcn/UI, Web Speech API
 - **Database:** MongoDB Atlas
-- **Automation:** Playwright (portal sync)
-- **Notifications:** Telegram Bot API
-- **PDF:** ReportLab
+- **Integrations:** OpenAI GPT-5.2, OpenAI TTS-1, Telegram, Zoho Mail
 
-## Key API Endpoints
-- `/api/admin/sync/run` - Run sync agent
-- `/api/admin/sync/export-pdf` - Download sync report
-- `/api/admin/check-cpkc-emails` - Manual email check
-- `/api/admin/collect-employees` - Import from portal
-- `/api/book-room` - Guest check-in
+## Book of Ideas - Chapters (Dec 2025)
+1. The Evolution of Creation
+2. Bitcoin as Digital Land
+3. The Trust Revolution
+4. Privacy as a Right
+5. Tokens as Micro-Economies
+6. The AI Concierge
+7. The Future We're Building
+8. Principles for Builders
+9. The Sacred Five - Universal Pattern
+10. The Dark Truth and Divine Trinity
+11. Three Foundations - Physical, Spiritual, Virtual
+12. Nature of True Foundations - Flow, Adapt, Accept
+13. Bitcoin - The Five Elements of Virtual World
+14. Chain of Creation - Five Leads to Five
+15. The Borderless Five - Why Human Creations Are Universal
 
-## Environment Variables
-- `MONGO_URL` - MongoDB connection string
-- `TELEGRAM_BOT_TOKEN` - Telegram notifications
-- `TELEGRAM_CHAT_ID` - Notification target
+## Key Philosophical Insights Captured
+- "Bitcoin is Water for the Virtual World"
+- "Bitcoin is Digital Land"
+- "5 Elements → Human → 5 Creations → Tech → 5 Foundations → Virtual World"
+- "Sanatana Dharma is base of all religions, Bitcoin is base of virtual world"
 
-## Known Issues
-1. server.py is 8100+ lines (needs decomposition)
-2. Different MongoDB instances across environments
-3. Late arrivals (after midnight) need special handling
+---
+*Last Updated: December 2025*
