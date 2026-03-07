@@ -564,8 +564,8 @@ export default function BookNow() {
                 ))}
               </AnimatePresence>
 
-              {/* Rate Card - shown in chat after greeting */}
-              {messages.length > 0 && messages[0].role === "assistant" && availability && (
+              {/* Rate Card - shown ONLY once after the initial greeting */}
+              {messages.length === 1 && messages[0].role === "assistant" && availability && !availability.is_sold_out && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
