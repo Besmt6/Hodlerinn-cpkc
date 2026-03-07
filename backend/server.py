@@ -8164,6 +8164,7 @@ import imaplib
 import email
 from email.header import decode_header
 import pdfplumber
+import fitz  # PyMuPDF for detecting text colors
 import re
 # io is already imported at top of file
 
@@ -8171,6 +8172,108 @@ import re
 cpkc_router = APIRouter(prefix="/admin")
 
 CPKC_SENDER_EMAIL = "aces_support@apiglobalsolutions.com"
+
+def is_green_color(color):
+    """Check if a color is green (RGB where G > R and G > B significantly)."""
+    if not color or len(color) < 3:
+        return False
+    r, g, b = color[0], color[1], color[2]
+    # Green color detection: G channel should be dominant
+    # Typical green: R~0, G~0.5-1.0, B~0
+    return g > 0.3 and g > r * 1.5 and g > b * 1.5
+
+def detect_green_highlighted_fields(pdf_data: bytes) -> dict:
+    """
+    Analyze PDF to detect which date fields are highlighted in green.
+    
+    Returns dict with:
+    - is_checkout: True if only check-out is green (skip this email)
+    - is_checkin: True if both check-in and check-out are green (process as arrival)
+    - check_in_green: True if check-in date text is green
+    - check_out_green: True if check-out date text is green
+    
+    Logic based on CPKC voucher format:
+    - CHECK-IN voucher: Both check-in AND check-out dates are highlighted green
+    - CHECK-OUT voucher: Only check-out date is green (check-in is NOT green/black)
+    """
+    result = {
+        "is_checkout": False,
+        "is_checkin": False,
+        "check_in_green": False,
+        "check_out_green": False,
+        "debug_info": []
+    }
+    
+    try:
+        doc = fitz.open(stream=pdf_data, filetype="pdf")
+        
+        # Process first page only - this contains the main booking table
+        if len(doc) > 0:
+            page = doc[0]
+            text_dict = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
+            
+            # Pattern to match date-time strings in the PDF
+            date_pattern = re.compile(r'\d{2}-[A-Za-z]{3}-\d{4}')
+            
+            all_dates = []
+            
+            for block in text_dict.get("blocks", []):
+                if block.get("type") != 0:  # Only text blocks
+                    continue
+                for line in block.get("lines", []):
+                    for span in line.get("spans", []):
+                        span_text = span.get("text", "")
+                        span_color = span.get("color", 0)
+                        
+                        # Convert color int to RGB tuple
+                        if isinstance(span_color, int):
+                            r = ((span_color >> 16) & 0xFF) / 255.0
+                            g = ((span_color >> 8) & 0xFF) / 255.0
+                            b = (span_color & 0xFF) / 255.0
+                            rgb = (r, g, b)
+                        else:
+                            rgb = (0, 0, 0)
+                        
+                        # Check if this span contains a date
+                        if date_pattern.search(span_text):
+                            is_green = is_green_color(rgb)
+                            all_dates.append((span_text.strip(), rgb, is_green))
+                            result["debug_info"].append(f"Date: '{span_text.strip()}' RGB={rgb} green={is_green}")
+        
+        doc.close()
+        
+        logging.info(f"PDF date analysis: found {len(all_dates)} dates, green ones: {[d[0] for d in all_dates if d[2]]}")
+        
+        # Decision logic based on the first two dates found (check-in, check-out)
+        # In the CPKC table format: first date is check-in, second is check-out
+        if len(all_dates) >= 2:
+            checkin_green = all_dates[0][2]  # First date (check-in)
+            checkout_green = all_dates[1][2]  # Second date (check-out)
+            
+            result["check_in_green"] = checkin_green
+            result["check_out_green"] = checkout_green
+            
+            # CHECK-OUT voucher: Only check-out is green, check-in is NOT green
+            if checkout_green and not checkin_green:
+                result["is_checkout"] = True
+                result["is_checkin"] = False
+                logging.info("PDF detected as CHECK-OUT notification (only check-out date is green)")
+            else:
+                # CHECK-IN voucher: Both dates green OR only check-in green
+                result["is_checkin"] = True
+                result["is_checkout"] = False
+                logging.info("PDF detected as CHECK-IN notification (check-in date is green)")
+        else:
+            # Default: if we can't detect dates properly, treat as check-in
+            result["is_checkin"] = True
+            logging.warning("Could not detect date highlighting, defaulting to CHECK-IN")
+        
+    except Exception as e:
+        logging.error(f"Error detecting green highlighting: {e}")
+        # Default to treating as check-in on error
+        result["is_checkin"] = True
+    
+    return result
 
 async def check_cpkc_emails():
     """Check Zoho inbox for new CPKC booking emails."""
@@ -8220,10 +8323,6 @@ async def check_cpkc_emails():
                 if "CPKC Sign-In Sheet" not in subject and "Revise" not in subject:
                     continue
                 
-                # Check if this is a CHECK-OUT notification (skip these - not arrivals)
-                # Check-out emails typically have check-out dates that are today or in the past
-                is_checkout_email = False
-                
                 logging.info(f"Processing CPKC email: {subject}")
                 
                 # Extract booking ID from subject
@@ -8261,10 +8360,28 @@ async def check_cpkc_emails():
         logging.error(f"CPKC email check error: {e}")
 
 async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
-    """Parse CPKC PDF and import expected arrivals."""
+    """Parse CPKC PDF and import expected arrivals.
+    
+    Uses green highlighting detection to determine if this is a check-in or check-out voucher:
+    - CHECK-IN: Both check-in AND check-out dates are highlighted green -> Process as arrival
+    - CHECK-OUT: Only check-out date is highlighted green -> Skip (not an arrival)
+    """
     try:
+        # First, detect if this is a check-out notification using green highlighting
+        color_analysis = detect_green_highlighted_fields(pdf_data)
+        
+        if color_analysis["is_checkout"]:
+            logging.info(f"SKIPPING PDF - detected as CHECK-OUT notification (only check-out date is green)")
+            await send_telegram_notification(
+                f"📧 <b>CPKC CHECK-OUT NOTIFICATION</b>\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"ℹ️ Skipped - Employee checking out\n"
+                f"📋 Booking: {booking_id or 'Unknown'}"
+            )
+            return
+        
         guests_imported = []
-        logging.info(f"Processing PDF for booking: {booking_id}, size: {len(pdf_data)} bytes")
+        logging.info(f"Processing PDF for booking: {booking_id}, size: {len(pdf_data)} bytes (CHECK-IN detected)")
         
         with pdfplumber.open(io.BytesIO(pdf_data)) as pdf:
             # Only process Page 1, Table 1 (main guest list) to avoid duplicates from other tables
@@ -8340,8 +8457,8 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
 async def import_cpkc_guest(emp_id: str, emp_name: str, check_in_str: str, check_out_str: str, booking_id: str):
     """Import a single CPKC guest as expected arrival.
     
-    Only imports if check-in date is today or in the future.
-    Skips check-out notifications (where check-in is in the past).
+    Note: Check-out detection is now done at the PDF level using green highlighting.
+    This function only handles importing valid check-in records.
     """
     try:
         # Parse the check-in date
@@ -8359,9 +8476,10 @@ async def import_cpkc_guest(emp_id: str, emp_name: str, check_in_str: str, check
                 except:
                     continue
         
-        # If check-in date is in the past, this is a check-out notification - skip it
+        # Secondary safeguard: Skip if check-in date is in the past
+        # (Primary detection is via green highlighting at PDF level)
         if check_in_date and check_in_date < today:
-            logging.info(f"Skipping {emp_name} - check-in date {check_in_date} is in the past (check-out notification)")
+            logging.info(f"Skipping {emp_name} - check-in date {check_in_date} is in the past")
             return None
         
         # Parse name format: LASTNAME,(FIRSTNAME)*CODE
