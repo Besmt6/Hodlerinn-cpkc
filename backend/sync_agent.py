@@ -1610,10 +1610,14 @@ class APIGlobalSyncAgent:
                             # Found a match - fill in the details
                             logger.info(f"*** MATCH FOUND: {api_name} <-> {hodler_name} ***")
                             try:
-                                success = await self.verify_entry(
-                                    entry,
-                                    record.get("employee_number", ""),
-                                    record.get("room_number", "")
+                                # Add timeout for verify_entry to prevent hanging
+                                success = await asyncio.wait_for(
+                                    self.verify_entry(
+                                        entry,
+                                        record.get("employee_number", ""),
+                                        record.get("room_number", "")
+                                    ),
+                                    timeout=60  # 60 second timeout per entry
                                 )
                                 if success:
                                     self.results["verified"].append({
@@ -1637,6 +1641,17 @@ class APIGlobalSyncAgent:
                                         "update_name": api_name != hodler_name,
                                         "portal_update_failed": True  # Flag that portal wasn't updated
                                     })
+                            except asyncio.TimeoutError:
+                                logger.error(f"TIMEOUT: verify_entry timed out for {api_name} after 60s")
+                                self.results["verified"].append({
+                                    "api_name": api_name,
+                                    "hodler_name": hodler_name,
+                                    "employee_id": record.get("employee_number"),
+                                    "room": record.get("room_number"),
+                                    "portal_name": api_name,
+                                    "update_name": api_name != hodler_name,
+                                    "portal_update_timeout": True
+                                })
                             except Exception as ve:
                                 logger.error(f"Error in verify_entry: {str(ve)}")
                                 # Still count as verified since name match was confirmed
