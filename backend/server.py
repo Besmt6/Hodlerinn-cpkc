@@ -89,6 +89,84 @@ async def health_check():
         logging.error(f"Health check failed: {e}")
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
+# ==================== Phone Agent Webhook ====================
+
+@api_router.get("/webhook/guests")
+async def webhook_get_registered_guests():
+    """
+    Webhook for phone agent: Returns all currently checked-in guests with room numbers.
+    Used by external phone system to route calls to guest rooms.
+    """
+    try:
+        # Get all active railroad bookings (checked in, not checked out)
+        railroad_bookings = await db.bookings.find(
+            {"is_checked_out": False},
+            {"_id": 0, "employee_number": 1, "room_number": 1, "check_in_date": 1, "check_in_time": 1}
+        ).to_list(100)
+        
+        # Get guest names for each booking
+        guests_with_rooms = []
+        for booking in railroad_bookings:
+            guest = await db.guests.find_one(
+                {"employee_number": booking["employee_number"]},
+                {"_id": 0, "name": 1, "first_name": 1, "last_name": 1}
+            )
+            
+            # Get guest name (handle encrypted or plain)
+            guest_name = "Unknown"
+            if guest:
+                if guest.get("first_name") and guest.get("last_name"):
+                    guest_name = f"{guest['first_name']} {guest['last_name']}"
+                elif guest.get("name"):
+                    # Try to decrypt if encrypted
+                    try:
+                        guest_name = decrypt_data(guest["name"]) if fernet else guest["name"]
+                    except:
+                        guest_name = guest["name"]
+            
+            guests_with_rooms.append({
+                "room": booking["room_number"],
+                "guest_name": guest_name,
+                "employee_id": booking["employee_number"],
+                "check_in_date": booking.get("check_in_date", ""),
+                "check_in_time": booking.get("check_in_time", ""),
+                "type": "railroad"
+            })
+        
+        # Get non-railroad guests (other guests in blocked rooms)
+        other_guests = await db.blocked_rooms.find(
+            {"is_active": True, "guest_type": "other"},
+            {"_id": 0, "room_number": 1, "guest_name": 1, "check_in_date": 1}
+        ).to_list(50)
+        
+        for other in other_guests:
+            guests_with_rooms.append({
+                "room": other["room_number"],
+                "guest_name": other.get("guest_name", "Guest"),
+                "employee_id": None,
+                "check_in_date": other.get("check_in_date", ""),
+                "check_in_time": "",
+                "type": "other"
+            })
+        
+        # Sort by room number
+        guests_with_rooms.sort(key=lambda x: x["room"])
+        
+        return {
+            "status": "success",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "total_guests": len(guests_with_rooms),
+            "guests": guests_with_rooms
+        }
+        
+    except Exception as e:
+        logging.error(f"Webhook guests error: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "guests": []
+        }
+
 # ==================== Encryption Functions ====================
 
 def encrypt_data(data: str) -> str:
