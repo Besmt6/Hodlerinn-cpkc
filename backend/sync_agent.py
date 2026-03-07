@@ -1418,6 +1418,14 @@ class APIGlobalSyncAgent:
         
         self.progress_callback = progress_callback
         
+        # RESET results at the start of each sync run
+        self.results = {
+            "verified": [],
+            "no_bill": [],
+            "missing_in_hodler": [],
+            "errors": []
+        }
+        
         try:
             # Log version at start of sync
             logger.info(f"=" * 50)
