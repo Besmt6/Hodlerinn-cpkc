@@ -2458,40 +2458,77 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* Occupancy & Revenue Stats */}
+              {/* Total Occupancy Overview */}
               {blockedRoomStats && (
                 <Card className="bg-vault-surface border-vault-border mb-6">
                   <CardHeader className="border-b border-vault-border pb-3">
-                    <CardTitle className="font-outfit text-lg text-vault-gold flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5" />
-                      Occupancy & Revenue (Other Guests)
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="font-outfit text-lg text-vault-gold flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5" />
+                        Total Occupancy Overview
+                      </CardTitle>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={async () => {
+                            try {
+                              await axios.post(`${API}/admin/occupancy/record`);
+                              toast.success("Today's occupancy recorded!");
+                            } catch (error) {
+                              toast.error("Failed to record occupancy");
+                            }
+                          }}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-500 text-white"
+                          data-testid="record-occupancy-btn"
+                        >
+                          Record Today
+                        </Button>
+                        <Button
+                          onClick={() => window.open(`${API}/admin/occupancy/export-pdf?days=30`, '_blank')}
+                          size="sm"
+                          variant="outline"
+                          className="border-vault-gold text-vault-gold hover:bg-vault-gold/10"
+                          data-testid="export-occupancy-btn"
+                        >
+                          Export Report
+                        </Button>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="bg-black/30 rounded-lg p-4 text-center">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <div className="bg-gradient-to-br from-vault-gold/20 to-amber-900/20 border border-vault-gold/30 rounded-lg p-4 text-center">
                         <p className="text-3xl font-bold text-vault-gold">{blockedRoomStats.occupancy_percent}%</p>
-                        <p className="text-vault-text-secondary text-sm">Total Occupancy</p>
+                        <p className="text-vault-text-secondary text-sm font-medium">Total Occupancy</p>
                         <p className="text-vault-text-secondary text-xs mt-1">
                           {blockedRoomStats.total_occupied}/{blockedRoomStats.total_rooms} rooms
                         </p>
                       </div>
-                      <div className="bg-black/30 rounded-lg p-4 text-center">
-                        <p className="text-3xl font-bold text-amber-400">{blockedRoomStats.blocked_occupancy_percent}%</p>
-                        <p className="text-vault-text-secondary text-sm">Other Guests</p>
-                        <p className="text-vault-text-secondary text-xs mt-1">
-                          {blockedRoomStats.active_blocked_rooms} rooms blocked
+                      <div className="bg-gradient-to-br from-blue-500/20 to-blue-900/20 border border-blue-500/30 rounded-lg p-4 text-center">
+                        <p className="text-3xl font-bold text-blue-400">{blockedRoomStats.railroad_occupied}</p>
+                        <p className="text-vault-text-secondary text-sm font-medium">Railroad Guests</p>
+                        <p className="text-blue-400/70 text-xs mt-1">
+                          {blockedRoomStats.total_rooms > 0 ? Math.round(blockedRoomStats.railroad_occupied / blockedRoomStats.total_rooms * 100) : 0}% of rooms
                         </p>
                       </div>
-                      <div className="bg-black/30 rounded-lg p-4 text-center">
-                        <p className="text-3xl font-bold text-green-400">${blockedRoomStats.active_revenue.toLocaleString()}</p>
-                        <p className="text-vault-text-secondary text-sm">Active Revenue</p>
-                        <p className="text-vault-text-secondary text-xs mt-1">Currently checked in</p>
+                      <div className="bg-gradient-to-br from-amber-500/20 to-amber-900/20 border border-amber-500/30 rounded-lg p-4 text-center">
+                        <p className="text-3xl font-bold text-amber-400">{blockedRoomStats.active_blocked_rooms}</p>
+                        <p className="text-vault-text-secondary text-sm font-medium">Non-Railroad</p>
+                        <p className="text-amber-400/70 text-xs mt-1">
+                          {blockedRoomStats.blocked_occupancy_percent}% of rooms
+                        </p>
                       </div>
-                      <div className="bg-black/30 rounded-lg p-4 text-center">
+                      <div className="bg-gradient-to-br from-green-500/20 to-green-900/20 border border-green-500/30 rounded-lg p-4 text-center">
+                        <p className="text-3xl font-bold text-green-400">{blockedRoomStats.total_rooms - blockedRoomStats.total_occupied}</p>
+                        <p className="text-vault-text-secondary text-sm font-medium">Vacant Rooms</p>
+                        <p className="text-green-400/70 text-xs mt-1">
+                          {blockedRoomStats.total_rooms > 0 ? Math.round((blockedRoomStats.total_rooms - blockedRoomStats.total_occupied) / blockedRoomStats.total_rooms * 100) : 0}% available
+                        </p>
+                      </div>
+                      <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-900/20 border border-emerald-500/30 rounded-lg p-4 text-center">
                         <p className="text-3xl font-bold text-emerald-400">${blockedRoomStats.total_revenue_all_time.toLocaleString()}</p>
-                        <p className="text-vault-text-secondary text-sm">Total Revenue</p>
-                        <p className="text-vault-text-secondary text-xs mt-1">All time</p>
+                        <p className="text-vault-text-secondary text-sm font-medium">Non-Rail Revenue</p>
+                        <p className="text-emerald-400/70 text-xs mt-1">All time</p>
                       </div>
                     </div>
                   </CardContent>

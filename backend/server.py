@@ -4165,6 +4165,219 @@ async def get_blocked_rooms_history(start_date: str = None, end_date: str = None
     }
 
 
+@api_router.get("/admin/occupancy/daily")
+async def get_daily_occupancy(date: str = None):
+    """Get occupancy breakdown for a specific date or today."""
+    if not date:
+        date = datetime.now().strftime("%Y-%m-%d")
+    
+    # Get total rooms
+    total_rooms = await db.rooms.count_documents({})
+    
+    # Get railroad bookings for this date
+    railroad_bookings = await db.bookings.find({
+        "check_in_date": date,
+        "is_checked_out": False
+    }, {"_id": 0}).to_list(1000)
+    
+    # Also get bookings that span this date (checked in before, not checked out)
+    all_railroad = await db.bookings.find({
+        "is_checked_out": False
+    }, {"_id": 0}).to_list(1000)
+    
+    railroad_count = len(all_railroad)
+    
+    # Get non-railroad (blocked rooms) for this date
+    blocked_rooms = await db.blocked_rooms.find({
+        "is_active": True
+    }, {"_id": 0}).to_list(1000)
+    
+    non_railroad_count = len(blocked_rooms)
+    
+    # Calculate totals
+    total_occupied = railroad_count + non_railroad_count
+    occupancy_percent = round((total_occupied / total_rooms * 100), 1) if total_rooms > 0 else 0
+    vacant_rooms = total_rooms - total_occupied
+    
+    return {
+        "date": date,
+        "total_rooms": total_rooms,
+        "railroad_guests": railroad_count,
+        "non_railroad_guests": non_railroad_count,
+        "total_occupied": total_occupied,
+        "vacant_rooms": vacant_rooms,
+        "occupancy_percent": occupancy_percent,
+        "railroad_percent": round((railroad_count / total_rooms * 100), 1) if total_rooms > 0 else 0,
+        "non_railroad_percent": round((non_railroad_count / total_rooms * 100), 1) if total_rooms > 0 else 0
+    }
+
+
+@api_router.post("/admin/occupancy/record")
+async def record_daily_occupancy():
+    """Record today's occupancy snapshot for historical tracking."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Get current occupancy
+    occupancy = await get_daily_occupancy(today)
+    
+    # Check if already recorded today
+    existing = await db.occupancy_history.find_one({"date": today})
+    
+    if existing:
+        # Update existing record
+        await db.occupancy_history.update_one(
+            {"date": today},
+            {"$set": {
+                "railroad_guests": occupancy["railroad_guests"],
+                "non_railroad_guests": occupancy["non_railroad_guests"],
+                "total_occupied": occupancy["total_occupied"],
+                "occupancy_percent": occupancy["occupancy_percent"],
+                "total_rooms": occupancy["total_rooms"],
+                "recorded_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        return {"message": "Occupancy record updated for today", "data": occupancy}
+    else:
+        # Create new record
+        await db.occupancy_history.insert_one({
+            "date": today,
+            "railroad_guests": occupancy["railroad_guests"],
+            "non_railroad_guests": occupancy["non_railroad_guests"],
+            "total_occupied": occupancy["total_occupied"],
+            "occupancy_percent": occupancy["occupancy_percent"],
+            "total_rooms": occupancy["total_rooms"],
+            "recorded_at": datetime.now(timezone.utc).isoformat()
+        })
+        return {"message": "Occupancy record created for today", "data": occupancy}
+
+
+@api_router.get("/admin/occupancy/history")
+async def get_occupancy_history(start_date: str = None, end_date: str = None, days: int = 30):
+    """Get historical occupancy records."""
+    query = {}
+    
+    if start_date and end_date:
+        query["date"] = {"$gte": start_date, "$lte": end_date}
+    elif start_date:
+        query["date"] = {"$gte": start_date}
+    elif end_date:
+        query["date"] = {"$lte": end_date}
+    else:
+        # Default to last N days
+        from_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        query["date"] = {"$gte": from_date}
+    
+    history = await db.occupancy_history.find(query, {"_id": 0}).sort("date", -1).to_list(365)
+    
+    # Calculate averages
+    if history:
+        avg_occupancy = sum(h.get("occupancy_percent", 0) for h in history) / len(history)
+        avg_railroad = sum(h.get("railroad_guests", 0) for h in history) / len(history)
+        avg_non_railroad = sum(h.get("non_railroad_guests", 0) for h in history) / len(history)
+    else:
+        avg_occupancy = avg_railroad = avg_non_railroad = 0
+    
+    return {
+        "history": history,
+        "total_records": len(history),
+        "averages": {
+            "occupancy_percent": round(avg_occupancy, 1),
+            "railroad_guests": round(avg_railroad, 1),
+            "non_railroad_guests": round(avg_non_railroad, 1)
+        }
+    }
+
+
+@api_router.get("/admin/occupancy/export-pdf")
+async def export_occupancy_report_pdf(start_date: str = None, end_date: str = None, days: int = 30):
+    """Export occupancy history as PDF report."""
+    # Get history
+    history_data = await get_occupancy_history(start_date, end_date, days)
+    history = history_data["history"]
+    
+    if not history:
+        raise HTTPException(status_code=404, detail="No occupancy records found for the specified period.")
+    
+    # Create PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=TA_CENTER, spaceAfter=20)
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=12, alignment=TA_CENTER, spaceAfter=10, textColor=colors.grey)
+    
+    elements = []
+    
+    # Title
+    elements.append(Paragraph("Hodler Inn - Occupancy Report", title_style))
+    elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", subtitle_style))
+    if start_date and end_date:
+        elements.append(Paragraph(f"Period: {start_date} to {end_date}", subtitle_style))
+    else:
+        elements.append(Paragraph(f"Last {days} days", subtitle_style))
+    elements.append(Spacer(1, 20))
+    
+    # Summary
+    summary_data = [
+        ["Metric", "Value"],
+        ["Total Records", str(len(history))],
+        ["Avg Occupancy", f"{history_data['averages']['occupancy_percent']}%"],
+        ["Avg Railroad Guests", str(round(history_data['averages']['railroad_guests'], 1))],
+        ["Avg Non-Railroad Guests", str(round(history_data['averages']['non_railroad_guests'], 1))]
+    ]
+    
+    summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 30))
+    
+    # Daily breakdown table
+    elements.append(Paragraph("Daily Occupancy Breakdown", styles['Heading2']))
+    elements.append(Spacer(1, 10))
+    
+    daily_data = [["Date", "Railroad", "Non-Railroad", "Total", "Occupancy %"]]
+    for h in history:
+        daily_data.append([
+            h.get("date", "N/A"),
+            str(h.get("railroad_guests", 0)),
+            str(h.get("non_railroad_guests", 0)),
+            str(h.get("total_occupied", 0)),
+            f"{h.get('occupancy_percent', 0)}%"
+        ])
+    
+    daily_table = Table(daily_data, colWidths=[1.5*inch, 1.2*inch, 1.2*inch, 1*inch, 1.2*inch])
+    daily_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.green),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.Color(0.95, 1, 0.95)])
+    ]))
+    elements.append(daily_table)
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    filename = f"occupancy_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+
+
 # ==================== Email Alert Settings ====================
 
 class EmailAlertSettingsInput(BaseModel):
