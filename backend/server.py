@@ -5416,6 +5416,17 @@ async def run_sync(
                     seen.add(key)
                     unique_verified.append(v)
             all_results["verified"] = unique_verified
+            
+            # Deduplicate missing entries
+            seen_missing = set()
+            unique_missing = []
+            for m in all_results["missing_in_hodler"]:
+                key = m.get("name")
+                if key and key not in seen_missing:
+                    seen_missing.add(key)
+                    unique_missing.append(m)
+            all_results["missing_in_hodler"] = unique_missing
+            
             all_results["agent_version"] = results.get("agent_version", "unknown")
             
             sync_status["last_results"] = all_results

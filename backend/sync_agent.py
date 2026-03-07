@@ -1716,12 +1716,17 @@ class APIGlobalSyncAgent:
                         
                         # DO NOT automatically click "No Bill" - just report for manual review
                         # The agent should only verify matched entries, not mark unmatched as No Bill
-                        logger.info(f"SKIPPING {api_name} - not found in Hodler Inn records (requires manual review)")
-                        self.results["missing_in_hodler"].append({
-                            "name": api_name,
-                            "reason": "Not found in Hodler Inn records - requires manual review",
-                            "best_matches": best_matches
-                        })
+                        # Check if already in missing list (avoid duplicates across passes)
+                        already_in_missing = any(m.get("name") == api_name for m in self.results["missing_in_hodler"])
+                        if not already_in_missing:
+                            logger.info(f"SKIPPING {api_name} - not found in Hodler Inn records (requires manual review)")
+                            self.results["missing_in_hodler"].append({
+                                "name": api_name,
+                                "reason": "Not found in Hodler Inn records - requires manual review",
+                                "best_matches": best_matches
+                            })
+                        else:
+                            logger.info(f"SKIPPING {api_name} - already in missing list")
                     
                     # After each entry, wait a moment for page to stabilize
                     await self.page.wait_for_timeout(500)
