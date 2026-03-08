@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-08-v14"  # Fixed Playwright timeout - use .all() instead of .nth() in loops
+SYNC_AGENT_VERSION = "2026-03-08-v15"  # Optimized row search - use targeted locator instead of iterating all rows
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1032,26 +1032,24 @@ class APIGlobalSyncAgent:
             
             logger.info(f"Searching for '{search_name}' - page height: {page_height}, viewport: {viewport_height}")
             
-            # Scroll through page to find the entry
+            # Scroll through page to find the entry - OPTIMIZED: limit rows checked per scroll
             for scroll_attempt in range(max_scroll_searches):
-                # Search for row at current scroll position - use .all() to get snapshot
-                rows = await self.page.locator('tr').all()
-                
-                for row in rows:
-                    try:
-                        row_text = await row.inner_text()
-                        if search_name.upper() in row_text.upper():
-                            # Check if this row has input fields
-                            inputs = row.locator('input[type="text"]')
-                            if await inputs.count() >= 2:
-                                # Check if row is visible
-                                is_visible = await row.is_visible()
-                                if is_visible:
-                                    target_row = row
-                                    logger.info(f"Found target row for {search_name} at scroll position {current_scroll}")
-                                    break
-                    except:
-                        continue
+                # Use a more targeted locator to find the row with the name
+                # Instead of getting all rows, use text filter
+                try:
+                    matching_row = self.page.locator(f'tr:has-text("{search_name}")').first
+                    if await matching_row.count() > 0:
+                        # Check if this row has input fields
+                        inputs = matching_row.locator('input[type="text"]')
+                        if await inputs.count() >= 2:
+                            # Check if row is visible
+                            is_visible = await matching_row.is_visible()
+                            if is_visible:
+                                target_row = matching_row
+                                logger.info(f"Found target row for {search_name} at scroll position {current_scroll}")
+                                break
+                except Exception as e:
+                    logger.debug(f"Search attempt {scroll_attempt}: {e}")
                 
                 if target_row:
                     break
@@ -1684,7 +1682,7 @@ class APIGlobalSyncAgent:
                                         emp_id,
                                         record.get("room_number", "")
                                     ),
-                                    timeout=60  # 60 second timeout per entry
+                                    timeout=45  # Reduced to 45 second timeout per entry
                                 )
                                 if success:
                                     self.results["verified"].append({
@@ -1709,7 +1707,7 @@ class APIGlobalSyncAgent:
                                         "portal_update_failed": True  # Flag that portal wasn't updated
                                     })
                             except asyncio.TimeoutError:
-                                logger.error(f"TIMEOUT: verify_entry timed out for {api_name} after 60s")
+                                logger.error(f"TIMEOUT: verify_entry timed out for {api_name} after 45s")
                                 self.results["verified"].append({
                                     "api_name": api_name,
                                     "hodler_name": hodler_name,

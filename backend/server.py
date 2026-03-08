@@ -5662,8 +5662,8 @@ async def run_sync(
                 "errors": []
             }
             
-            # Set a timeout for the entire sync operation (10 minutes max)
-            SYNC_TIMEOUT_SECONDS = 600
+            # Set a timeout for the entire sync operation (15 minutes max)
+            SYNC_TIMEOUT_SECONDS = 900
             
             for sync_date in dates_to_sync:
                 # Check if we've exceeded the timeout
