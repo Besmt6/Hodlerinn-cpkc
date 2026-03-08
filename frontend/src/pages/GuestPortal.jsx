@@ -1070,7 +1070,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                   </button>
                 </div>
                 <div 
-                  className="bg-vault-surface border-2 border-amber-500 rounded-lg"
+                  className="bg-white border-2 border-amber-500 rounded-lg"
                   onClick={() => signatureContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
                 >
                   <SignatureCanvas
@@ -1080,11 +1080,11 @@ function CheckInForm({ setView, setSuccessMessage }) {
                       setTimeout(() => signatureContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
                     }}
                     canvasProps={{
-                      className: "signature-canvas w-full bg-transparent",
-                      style: { width: "100%", height: "150px", touchAction: "none" }
+                      className: "signature-canvas w-full",
+                      style: { width: "100%", height: "150px", touchAction: "none", backgroundColor: "white" }
                     }}
                     penColor="#1e40af"
-                    backgroundColor="transparent"
+                    backgroundColor="white"
                     minWidth={3}
                     maxWidth={6}
                   />
