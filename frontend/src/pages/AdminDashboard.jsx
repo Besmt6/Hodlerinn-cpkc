@@ -1327,13 +1327,29 @@ export default function AdminDashboard() {
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    otp: ""
   });
   const [changingPassword, setChangingPassword] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+
+  const handleRequestPasswordChangeOTP = async () => {
+    setSendingOtp(true);
+    try {
+      const response = await axios.post(`${API}/admin/request-otp?purpose=password_change`);
+      toast.success(response.data.message);
+      setOtpSent(true);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to send OTP");
+    } finally {
+      setSendingOtp(false);
+    }
+  };
 
   const handleChangePassword = async () => {
-    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
-      toast.error("Please fill in all fields");
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.otp) {
+      toast.error("Please fill in all fields including OTP");
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -1344,19 +1360,25 @@ export default function AdminDashboard() {
       toast.error("New password must be at least 8 characters");
       return;
     }
+    if (passwordForm.otp.length !== 6) {
+      toast.error("OTP must be 6 digits");
+      return;
+    }
 
     setChangingPassword(true);
     try {
       const token = sessionStorage.getItem("adminToken");
       await axios.post(`${API}/admin/change-password`, {
         current_password: passwordForm.currentPassword,
-        new_password: passwordForm.newPassword
+        new_password: passwordForm.newPassword,
+        otp: passwordForm.otp
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       toast.success("Password changed successfully!");
       setShowPasswordChange(false);
-      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "", otp: "" });
+      setOtpSent(false);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to change password");
     } finally {
@@ -5373,6 +5395,46 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                     </Button>
                   ) : (
                     <div className="space-y-4 bg-black/30 rounded-lg p-4 border border-vault-border">
+                      {/* Step 1: Request OTP */}
+                      {!otpSent && (
+                        <div className="bg-amber-900/20 border border-amber-600/30 rounded-lg p-3 mb-4">
+                          <p className="text-amber-400 text-sm flex items-center gap-2">
+                            <Shield className="w-4 h-4" />
+                            For security, you'll need to verify via email OTP
+                          </p>
+                          <Button
+                            onClick={handleRequestPasswordChangeOTP}
+                            disabled={sendingOtp}
+                            className="mt-3 bg-amber-600 hover:bg-amber-700 text-white"
+                            data-testid="request-password-change-otp-btn"
+                          >
+                            {sendingOtp ? "Sending OTP..." : "Send Verification Code"}
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {/* OTP Sent - Show form */}
+                      {otpSent && (
+                        <>
+                          <div className="bg-emerald-900/20 border border-emerald-600/30 rounded-lg p-3">
+                            <p className="text-emerald-400 text-sm">OTP sent to your email. Enter it below along with your passwords.</p>
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Verification Code (OTP)</label>
+                            <Input
+                              type="text"
+                              value={passwordForm.otp}
+                              onChange={(e) => setPasswordForm({...passwordForm, otp: e.target.value.replace(/\D/g, '').slice(0, 6)})}
+                              placeholder="Enter 6-digit code"
+                              className="bg-vault-surface border-vault-border text-vault-text text-center text-xl tracking-[0.3em] font-mono"
+                              maxLength={6}
+                              data-testid="password-change-otp-input"
+                            />
+                          </div>
+                        </>
+                      )}
+                      
                       <div>
                         <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Current Password</label>
                         <Input
@@ -5409,7 +5471,7 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       <div className="flex gap-2">
                         <Button
                           onClick={handleChangePassword}
-                          disabled={changingPassword}
+                          disabled={changingPassword || !otpSent}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white"
                           data-testid="submit-change-password-btn"
                         >
@@ -5418,7 +5480,8 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                         <Button
                           onClick={() => {
                             setShowPasswordChange(false);
-                            setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                            setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "", otp: "" });
+                            setOtpSent(false);
                           }}
                           variant="outline"
                           className="border-vault-border text-vault-text"
@@ -5426,6 +5489,17 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                         >
                           Cancel
                         </Button>
+                        {otpSent && (
+                          <Button
+                            onClick={handleRequestPasswordChangeOTP}
+                            disabled={sendingOtp}
+                            variant="outline"
+                            className="border-amber-600 text-amber-400"
+                            data-testid="resend-password-change-otp-btn"
+                          >
+                            {sendingOtp ? "Sending..." : "Resend OTP"}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}

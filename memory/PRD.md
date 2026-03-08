@@ -60,6 +60,7 @@ Build a comprehensive hotel management system for Hodler Inn, serving railroad c
 6. **Voice Echo on Guest Portal** - Reported but not reproduced
 
 ## Recently Completed (March 2026)
+- ✅ **OTP Email Verification** - Email-based OTP required for both password change and password recovery (forgot password)
 - ✅ **Security Hardening** - JWT authentication for admin panel, password change feature, removed all hardcoded credentials
 - ✅ **CPKC Check-Out Detection** - Green highlighting detection using PyMuPDF
 - ✅ **Expected Check-Outs List** - New collection + API + UI for tracking check-outs

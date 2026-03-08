@@ -128,6 +128,111 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
     
     return payload
 
+# ==================== OTP (One-Time Password) System ====================
+
+ADMIN_EMAIL = "greencountryinn@gmail.com"
+OTP_EXPIRY_MINUTES = 10
+
+def generate_otp() -> str:
+    """Generate a 6-digit OTP"""
+    import random
+    return ''.join([str(random.randint(0, 9)) for _ in range(6)])
+
+async def send_otp_email(otp: str, purpose: str = "verification") -> bool:
+    """Send OTP to admin email using configured SMTP"""
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    
+    if not settings or not settings.get("email_sender") or not settings.get("email_password_encrypted"):
+        logging.error("Email settings not configured - cannot send OTP")
+        return False
+    
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        smtp_host = settings.get("email_smtp_host", "smtp.zoho.com")
+        smtp_port = settings.get("email_smtp_port", 587)
+        sender = settings.get("email_sender")
+        password = decrypt_data(settings.get("email_password_encrypted"))
+        
+        # Create email
+        subject = f"Hodler Inn Admin - Your OTP Code for {purpose.title()}"
+        body = f"""
+Your One-Time Password (OTP) for {purpose} is:
+
+    {otp}
+
+This code will expire in {OTP_EXPIRY_MINUTES} minutes.
+
+If you did not request this code, please ignore this email and ensure your account is secure.
+
+- Hodler Inn Security
+"""
+        
+        msg = MIMEMultipart()
+        msg['From'] = sender
+        msg['To'] = ADMIN_EMAIL
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Send email
+        server = smtplib.SMTP(smtp_host, smtp_port)
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, [ADMIN_EMAIL], msg.as_string())
+        server.quit()
+        
+        logging.info(f"OTP sent to {ADMIN_EMAIL} for {purpose}")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Failed to send OTP email: {e}")
+        return False
+
+async def store_otp(purpose: str, otp: str):
+    """Store OTP in database with expiry"""
+    expiry = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRY_MINUTES)
+    await db.otp_codes.update_one(
+        {"purpose": purpose},
+        {"$set": {
+            "purpose": purpose,
+            "otp_hash": hash_password(otp),
+            "expires_at": expiry.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "used": False
+        }},
+        upsert=True
+    )
+
+async def verify_otp(purpose: str, otp: str) -> bool:
+    """Verify OTP and mark as used if valid"""
+    record = await db.otp_codes.find_one({"purpose": purpose}, {"_id": 0})
+    
+    if not record:
+        return False
+    
+    # Check if already used
+    if record.get("used"):
+        return False
+    
+    # Check if expired
+    expires_at = datetime.fromisoformat(record["expires_at"].replace("Z", "+00:00"))
+    if datetime.now(timezone.utc) > expires_at:
+        return False
+    
+    # Verify OTP
+    if not verify_password(otp, record["otp_hash"]):
+        return False
+    
+    # Mark as used
+    await db.otp_codes.update_one(
+        {"purpose": purpose},
+        {"$set": {"used": True}}
+    )
+    
+    return True
+
 # ==================== Health Check Endpoint ====================
 
 @api_router.get("/health")
@@ -2366,10 +2471,68 @@ async def admin_login(input: AdminLogin):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
+    otp: str  # OTP required for password change
+
+@api_router.post("/admin/request-otp")
+async def request_otp(purpose: str = Query("password_change", description="Purpose: password_change or password_reset")):
+    """Request OTP for password change or reset - sends to admin email"""
+    if purpose not in ["password_change", "password_reset"]:
+        raise HTTPException(status_code=400, detail="Invalid purpose")
+    
+    # Generate and store OTP
+    otp = generate_otp()
+    await store_otp(purpose, otp)
+    
+    # Send OTP via email
+    sent = await send_otp_email(otp, purpose.replace("_", " "))
+    
+    if not sent:
+        raise HTTPException(status_code=500, detail="Failed to send OTP. Check email settings.")
+    
+    return {
+        "success": True, 
+        "message": f"OTP sent to {ADMIN_EMAIL[:3]}***{ADMIN_EMAIL[-10:]}",
+        "expires_in_minutes": OTP_EXPIRY_MINUTES
+    }
+
+class PasswordReset(BaseModel):
+    new_password: str
+    otp: str
+
+@api_router.post("/admin/forgot-password")
+async def forgot_password(input: PasswordReset):
+    """Reset password using OTP (no login required)"""
+    # Verify OTP
+    if not await verify_otp("password_reset", input.otp):
+        raise HTTPException(status_code=401, detail="Invalid or expired OTP")
+    
+    # Validate new password
+    if len(input.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+    
+    # Hash and store new password
+    new_hash = hash_password(input.new_password)
+    await db.settings.update_one(
+        {"id": "admin_settings"},
+        {"$set": {
+            "id": "admin_settings",
+            "admin_password_hash": new_hash,
+            "password_changed_at": datetime.now(timezone.utc).isoformat(),
+            "password_reset_via_otp": True
+        }},
+        upsert=True
+    )
+    
+    logging.info("Admin password reset via OTP successfully")
+    return {"success": True, "message": "Password reset successfully. You can now login with your new password."}
 
 @api_router.post("/admin/change-password")
 async def change_admin_password(input: PasswordChange, admin: dict = Depends(get_current_admin)):
-    """Change admin password (requires authentication)"""
+    """Change admin password (requires authentication + OTP)"""
+    # First verify OTP
+    if not await verify_otp("password_change", input.otp):
+        raise HTTPException(status_code=401, detail="Invalid or expired OTP. Please request a new one.")
+    
     # Verify current password
     settings = await db.settings.find_one({"id": "admin_settings"}, {"_id": 0})
     
@@ -2399,7 +2562,7 @@ async def change_admin_password(input: PasswordChange, admin: dict = Depends(get
         upsert=True
     )
     
-    logging.info("Admin password changed successfully")
+    logging.info("Admin password changed successfully with OTP verification")
     return {"success": True, "message": "Password changed successfully"}
 
 @api_router.post("/admin/verify-token")
