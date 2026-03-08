@@ -7131,19 +7131,21 @@ IMPORTANT BOOKING RULES:
    - Check-out date
    - Room preference
 
-3. After collecting all information, summarize the booking including the total with tax if applicable, and ask for confirmation.
+3. PHONE NUMBER IS MANDATORY: You MUST collect a valid phone number before confirming any booking. If the guest refuses to provide a phone number, politely explain that a phone number is required to complete the reservation so we can contact them for confirmation. Do NOT proceed with booking without a phone number.
 
-4. CRITICAL: When the guest confirms, respond with EXACTLY this JSON format on a new line (the system will parse this):
+4. After collecting all information, summarize the booking including the total with tax if applicable, and ask for confirmation.
+
+5. CRITICAL: When the guest confirms, respond with EXACTLY this JSON format on a new line (the system will parse this):
 BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone":"1234567890","check_in":"YYYY-MM-DD","check_out":"YYYY-MM-DD","room_type":"single","rate":{single_rate}}}
 
-5. Important policies to communicate:
+6. Important policies to communicate:
    - Reservations MUST be confirmed by calling the hotel at (918) 653-7801
    - Unconfirmed reservations will be automatically cancelled 48 hours before arrival
    - No payment is collected online - payment is made at check-in
 
-6. Be conversational, warm, and helpful. ONLY introduce yourself as "I'm Bitsy" in the FIRST greeting message. After that, DO NOT repeat "I'm Bitsy" in subsequent responses - just respond naturally without re-introducing yourself.
+7. Be conversational, warm, and helpful. ONLY introduce yourself as "I'm Bitsy" in the FIRST greeting message. After that, DO NOT repeat "I'm Bitsy" in subsequent responses - just respond naturally without re-introducing yourself.
 
-7. PRIVACY RULES - NEVER reveal:
+8. PRIVACY RULES - NEVER reveal:
    - Exact number of rooms available
    - Number of railroad crew arrivals expected
    - Internal hotel operations details
@@ -7378,9 +7380,13 @@ async def chatbot_message(chat_input: ChatMessage):
                 # Create the reservation in database
                 reservation = await create_chatbot_reservation(booking_data)
                 
-                # Check if guest was blocked
+                # Check if guest was blocked or missing phone
                 if reservation and reservation.get("error") == "blocked":
                     response = reservation.get("message", "We're sorry, but we are unable to process this reservation. Please contact the front desk directly at (918) 653-7801.")
+                    booking_created = False
+                    booking_details = None
+                elif reservation and reservation.get("error") == "no_phone":
+                    response = reservation.get("message", "A valid phone number is required to complete your reservation. Please provide your phone number so we can contact you for confirmation.")
                     booking_created = False
                     booking_details = None
                 elif reservation and reservation.get("success") != False:
@@ -7416,7 +7422,16 @@ async def create_chatbot_reservation(booking_data: dict):
         check_in = booking_data.get("check_in", "")
         check_out = booking_data.get("check_out", "")
         room_type = booking_data.get("room_type", "single")
-        rate = booking_data.get("rate", 85)
+        rate = booking_data.get("rate", 79)
+        
+        # Phone number is REQUIRED - reject booking without it
+        if not phone or len(phone.strip()) < 7:
+            logging.warning(f"Chatbot booking rejected - no phone number: {guest_name}")
+            return {
+                "success": False,
+                "error": "no_phone",
+                "message": "A valid phone number is required to complete your reservation. This allows us to contact you for confirmation."
+            }
         
         # Check if guest is blocked by email or phone
         blocked_guest = None
