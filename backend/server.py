@@ -4722,9 +4722,9 @@ async def get_portal_settings():
             "public_api_key": "",
             "public_api_key_set": False,
             "nightly_rate": 75.0,
-            "single_room_rate": 85.0,
-            "double_room_rate": 95.0,
-            "sales_tax_rate": 0.0,
+            "single_room_rate": 79.0,
+            "double_room_rate": 89.0,
+            "sales_tax_rate": 10.3,
             "chatbot_max_rooms": 3,
             "guaranteed_rooms": 25,
             "email_reports_enabled": False,
@@ -4749,9 +4749,9 @@ async def get_portal_settings():
         "public_api_key": settings.get("public_api_key", ""),
         "public_api_key_set": bool(settings.get("public_api_key")),
         "nightly_rate": settings.get("nightly_rate", 75.0),
-        "single_room_rate": settings.get("single_room_rate", 85.0),
-        "double_room_rate": settings.get("double_room_rate", 95.0),
-        "sales_tax_rate": settings.get("sales_tax_rate", 0.0),
+        "single_room_rate": settings.get("single_room_rate", 79.0),
+        "double_room_rate": settings.get("double_room_rate", 89.0),
+        "sales_tax_rate": settings.get("sales_tax_rate", 10.3),
         "chatbot_max_rooms": settings.get("chatbot_max_rooms", 3),
         "guaranteed_rooms": settings.get("guaranteed_rooms", 25),
         "email_reports_enabled": settings.get("email_reports_enabled", False),
@@ -7070,9 +7070,9 @@ async def get_chatbot_pricing():
     """Get current pricing settings for chatbot."""
     settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
     return {
-        "single_rate": settings.get("single_room_rate", 85.0) if settings else 85.0,
-        "double_rate": settings.get("double_room_rate", 95.0) if settings else 95.0,
-        "tax_rate": settings.get("sales_tax_rate", 0.0) if settings else 0.0
+        "single_rate": settings.get("single_room_rate", 79.0) if settings else 79.0,
+        "double_rate": settings.get("double_room_rate", 89.0) if settings else 89.0,
+        "tax_rate": settings.get("sales_tax_rate", 10.3) if settings else 10.3
     }
 
 def get_chatbot_system_prompt(current_date: str, pricing: dict, availability: dict, returning_guest: dict = None):
@@ -7141,7 +7141,7 @@ BOOKING_CONFIRMED:{{"guest_name":"Full Name","email":"email@example.com","phone"
    - Unconfirmed reservations will be automatically cancelled 48 hours before arrival
    - No payment is collected online - payment is made at check-in
 
-6. Be conversational, warm, and helpful. Introduce yourself as "I'm Bitsy". Don't overwhelm guests with all questions at once - ask naturally in conversation.
+6. Be conversational, warm, and helpful. ONLY introduce yourself as "I'm Bitsy" in the FIRST greeting message. After that, DO NOT repeat "I'm Bitsy" in subsequent responses - just respond naturally without re-introducing yourself.
 
 7. PRIVACY RULES - NEVER reveal:
    - Exact number of rooms available
