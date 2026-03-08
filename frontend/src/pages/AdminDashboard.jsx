@@ -86,6 +86,14 @@ import { clearAdminToken, getAdminToken } from "@/lib/adminAuth";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+const withAdminAuthToken = (url) => {
+  const token = getAdminToken();
+  if (!token) return url;
+
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}auth_token=${encodeURIComponent(token)}`;
+};
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     total_guests: 0,
@@ -2662,7 +2670,7 @@ export default function AdminDashboard() {
                           Record Today
                         </Button>
                         <Button
-                          onClick={() => window.open(`${API}/admin/occupancy/export-pdf?days=30`, '_blank')}
+                          onClick={() => window.open(withAdminAuthToken(`${API}/admin/occupancy/export-pdf?days=30`), '_blank')}
                           size="sm"
                           variant="outline"
                           className="border-vault-gold text-vault-gold hover:bg-vault-gold/10"
@@ -4678,7 +4686,7 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       )}
                       <button
                         onClick={() => {
-                          window.open(`${API}/admin/sync/export-pdf`, '_blank');
+                          window.open(withAdminAuthToken(`${API}/admin/sync/export-pdf`), '_blank');
                         }}
                         className="mt-3 w-full px-4 py-2 bg-vault-gold/20 hover:bg-vault-gold/30 text-vault-gold border border-vault-gold/50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                         data-testid="download-sync-report-btn"
@@ -4691,7 +4699,7 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                       <div className="flex gap-2 mt-2">
                         <button
                           onClick={() => {
-                            window.open(`${API}/admin/sync/view-pdf`, '_blank');
+                            window.open(withAdminAuthToken(`${API}/admin/sync/view-pdf`), '_blank');
                           }}
                           className="flex-1 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                           data-testid="view-sync-report-btn"
