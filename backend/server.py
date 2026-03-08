@@ -7099,6 +7099,13 @@ async def admin_auth_middleware(request, call_next):
     if path.startswith("/api/admin") and path != "/api/admin/login":
         auth_header = request.headers.get("Authorization", "")
         token = auth_header[7:] if auth_header.startswith("Bearer ") else None
+
+        # Some admin flows open API URLs directly in a new browser tab/window.
+        # Those requests cannot include axios-injected Authorization headers.
+        # Accepting a query token preserves those existing export/view actions.
+        if not token:
+            token = request.query_params.get("auth_token")
+
         # Accept both HMAC session tokens and JWT tokens
         if not _verify_admin_token(token):
             # Also try JWT verification
