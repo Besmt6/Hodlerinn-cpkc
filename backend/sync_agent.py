@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-08-v15"  # Optimized row search - use targeted locator instead of iterating all rows
+SYNC_AGENT_VERSION = "2026-03-08-v16"  # Added 3s timeout per row search, reduced scroll attempts
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1018,7 +1018,7 @@ class APIGlobalSyncAgent:
             logger.info("Step 1: Finding input fields in table row (with scroll search)...")
             
             target_row = None
-            max_scroll_searches = 30  # Maximum scroll attempts to find the entry
+            max_scroll_searches = 15  # Reduced from 30 - faster fail if not found
             
             # First scroll to top
             await self.page.evaluate('window.scrollTo(0, 0)')
@@ -1032,22 +1032,29 @@ class APIGlobalSyncAgent:
             
             logger.info(f"Searching for '{search_name}' - page height: {page_height}, viewport: {viewport_height}")
             
-            # Scroll through page to find the entry - OPTIMIZED: limit rows checked per scroll
+            # Scroll through page to find the entry - with FAST timeout to prevent hanging
             for scroll_attempt in range(max_scroll_searches):
                 # Use a more targeted locator to find the row with the name
-                # Instead of getting all rows, use text filter
                 try:
+                    # Set a short timeout for finding the row
                     matching_row = self.page.locator(f'tr:has-text("{search_name}")').first
-                    if await matching_row.count() > 0:
+                    
+                    # Use wait_for with timeout instead of count() which can hang
+                    try:
+                        await matching_row.wait_for(state="attached", timeout=3000)  # 3 second max
                         # Check if this row has input fields
                         inputs = matching_row.locator('input[type="text"]')
-                        if await inputs.count() >= 2:
+                        input_count = await inputs.count()
+                        if input_count >= 2:
                             # Check if row is visible
                             is_visible = await matching_row.is_visible()
                             if is_visible:
                                 target_row = matching_row
                                 logger.info(f"Found target row for {search_name} at scroll position {current_scroll}")
                                 break
+                    except Exception:
+                        # Row not found at this scroll position, continue scrolling
+                        pass
                 except Exception as e:
                     logger.debug(f"Search attempt {scroll_attempt}: {e}")
                 
