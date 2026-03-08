@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-08-v16"  # Added 3s timeout per row search, reduced scroll attempts
+SYNC_AGENT_VERSION = "2026-03-08-v17"  # Fixed duplicate No Bill - now skips already-processed rows
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1245,7 +1245,7 @@ class APIGlobalSyncAgent:
             
             logger.info(f"Searching for row with name containing: {search_name}")
             
-            # === Scroll-based search to find the row ===
+            # === Scroll-based search to find an UNPROCESSED row ===
             target_row = None
             max_scroll_searches = 30
             
@@ -1272,8 +1272,30 @@ class APIGlobalSyncAgent:
                                 # Check if visible
                                 is_visible = await row.is_visible()
                                 if is_visible:
+                                    # Check if this row is ALREADY processed (has blue checkmark or No Bill already checked)
+                                    row_html = await row.inner_html()
+                                    
+                                    # Skip if already has blue status (verified)
+                                    if 'color:blue' in row_html.lower() or 'color:green' in row_html.lower():
+                                        logger.info(f"Skipping row for {search_name} - already has blue/green status")
+                                        continue
+                                    
+                                    # Check if No Bill checkbox is already checked
+                                    no_bill_already_checked = False
+                                    if len(checkboxes) >= 2:
+                                        # No Bill is typically second checkbox
+                                        no_bill_chk = checkboxes[1]
+                                        chk_html = await no_bill_chk.inner_html() if hasattr(no_bill_chk, 'inner_html') else ""
+                                        if 'ui-state-active' in str(chk_html) or 'checked' in str(chk_html):
+                                            no_bill_already_checked = True
+                                    
+                                    if no_bill_already_checked:
+                                        logger.info(f"Skipping row for {search_name} - No Bill already checked")
+                                        continue
+                                    
+                                    # Found an unprocessed row!
                                     target_row = row
-                                    logger.info(f"Found row for {search_name} at scroll position {current_scroll}")
+                                    logger.info(f"Found unprocessed row for {search_name} at scroll position {current_scroll}")
                                     break
                     except:
                         continue
