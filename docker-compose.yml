@@ -7,34 +7,35 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     container_name: hodlerinn-backend
-    restart: always
+    restart: unless-stopped
     ports:
       - "8001:8001"
     env_file:
-      - ./backend/.env
+      - .env
+    environment:
+      - DB_NAME=${DB_NAME:-hodler_inn}
+      - MONGO_URL=${MONGO_URL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-  # Frontend
+  # Frontend SPA
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
     container_name: hodlerinn-frontend
-    restart: always
+    restart: unless-stopped
     ports:
       - "3000:3000"
-    env_file:
-      - ./frontend/.env
+    environment:
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-http://localhost:8001}
     depends_on:
-      - backend
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+      backend:
+        condition: service_healthy
