@@ -282,9 +282,6 @@ async def upload_to_zoho_drive(file_bytes: bytes, filename: str, folder_id: str 
 
 scheduler = AsyncIOScheduler()
 
-# Auto-sync job ID for managing the scheduled task
-AUTO_SYNC_JOB_ID = "auto_sync_daily"
-
 async def monthly_data_reset():
     """Reset all guest and booking data on 1st of each month"""
     try:
@@ -305,187 +302,6 @@ async def monthly_data_reset():
         )
     except Exception as e:
         logging.error(f"Monthly reset failed: {e}")
-
-async def auto_sync_task():
-    """Automated daily sync at 3 PM - verifies previous day's records"""
-    logging.info("Auto-sync task triggered at 3 PM")
-    try:
-        # Check if auto-sync is still enabled
-        settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
-        if not settings or not settings.get("auto_sync_enabled"):
-            logging.info("Auto-sync is disabled, skipping")
-            return
-        
-        if not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
-            logging.warning("Auto-sync: Portal credentials not configured")
-            return
-        
-        # Get yesterday's date for sync
-        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-        day_before = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
-        
-        # Get Hodler Inn records for yesterday AND day before (for late arrivals)
-        bookings = await db.bookings.find(
-            {"check_in_date": {"$in": [yesterday, day_before]}}, 
-            {"_id": 0}
-        ).to_list(1000)
-        
-        # Get guest names
-        employee_numbers = [b['employee_number'] for b in bookings]
-        guests_list = await db.guests.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
-        guests_dict = {g['employee_number']: g for g in guests_list}
-        
-        # Also get employee names as fallback
-        employees_list = await db.employees.find({"employee_number": {"$in": employee_numbers}}, {"_id": 0}).to_list(1000)
-        employees_dict = {e['employee_number']: e for e in employees_list}
-        
-        # Build records for sync agent
-        hodler_records = []
-        for booking in bookings:
-            guest = guests_dict.get(booking['employee_number'])
-            employee = employees_dict.get(booking['employee_number'])
-            
-            # Determine name to use (prefer employee name from portal, fallback to guest name)
-            name_to_use = ""
-            if employee:
-                name_to_use = employee.get('name', '')
-            if not name_to_use and guest:
-                name_encrypted = guest.get('name_encrypted')
-                if name_encrypted:
-                    name_to_use = decrypt_data(name_encrypted)
-                else:
-                    name_to_use = guest.get('name', '')
-            
-            if name_to_use:
-                hodler_records.append({
-                    "employee_name": name_to_use,
-                    "employee_number": booking['employee_number'],
-                    "room_number": booking['room_number']
-                })
-        
-        logging.info(f"Auto-sync: Processing {len(hodler_records)} Hodler Inn records for {yesterday} (+ {day_before})")
-        
-        # Get name aliases
-        name_aliases = await db.name_aliases.find({}, {"_id": 0}).to_list(100)
-        
-        # Run the sync for BOTH days (yesterday and day before)
-        from sync_agent import APIGlobalSyncAgent
-        username = settings.get("api_global_username")
-        password = decrypt_data(settings.get("api_global_password_encrypted"))
-        
-        all_results = {
-            "verified": [],
-            "no_bill": [],
-            "missing_in_hodler": [],
-            "errors": []
-        }
-        
-        for sync_date in [day_before, yesterday]:  # Sync day before first, then yesterday
-            logging.info(f"Auto-sync: Syncing portal for {sync_date}")
-            agent = APIGlobalSyncAgent(username, password)
-            results = await agent.run_sync(hodler_records, sync_date, name_aliases)
-            
-            all_results["verified"].extend(results.get("verified", []))
-            all_results["no_bill"].extend(results.get("no_bill", []))
-            all_results["errors"].extend(results.get("errors", []))
-            
-            # Only add missing from yesterday
-            if sync_date == yesterday:
-                all_results["missing_in_hodler"].extend(results.get("missing_in_hodler", []))
-        
-        # Deduplicate verified entries
-        seen = set()
-        unique_verified = []
-        for v in all_results["verified"]:
-            key = v.get("employee_id") or v.get("api_name")
-            if key not in seen:
-                seen.add(key)
-                unique_verified.append(v)
-        all_results["verified"] = unique_verified
-        results = all_results
-        
-        # Auto-update employee names to match portal format
-        names_updated = 0
-        if results.get("verified"):
-            for verified in results["verified"]:
-                if verified.get("update_name") and verified.get("portal_name") and verified.get("employee_id"):
-                    portal_name = verified["portal_name"]
-                    employee_id = verified["employee_id"]
-                    
-                    await db.employees.update_one(
-                        {"employee_number": employee_id},
-                        {"$set": {"name": portal_name, "portal_name_synced": True}}
-                    )
-                    await db.guests.update_one(
-                        {"employee_number": employee_id},
-                        {"$set": {"name": portal_name}}
-                    )
-                    names_updated += 1
-                    logging.info(f"Auto-sync: Updated employee name to portal format: {employee_id} -> {portal_name}")
-        
-        # Store sync history
-        await db.sync_history.insert_one({
-            "id": str(uuid.uuid4()),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "target_date": yesterday,
-            "results": results,
-            "auto_triggered": True,
-            "names_updated": names_updated
-        })
-        
-        # Store missing entries record for tracking
-        missing_entries = results.get("missing_in_hodler", [])
-        if missing_entries:
-            for missing in missing_entries:
-                await db.missing_entries.update_one(
-                    {
-                        "name": missing.get("name"),
-                        "date": yesterday
-                    },
-                    {
-                        "$set": {
-                            "name": missing.get("name"),
-                            "date": yesterday,
-                            "reason": missing.get("reason", "Not found in Hodler Inn records"),
-                            "best_matches": missing.get("best_matches", []),
-                            "recorded_at": datetime.now(timezone.utc).isoformat(),
-                            "auto_sync": True,
-                            "resolved": False
-                        }
-                    },
-                    upsert=True
-                )
-            logging.info(f"Auto-sync: Recorded {len(missing_entries)} missing entries")
-        
-        # Update sync status
-        global sync_status
-        sync_status["last_run"] = datetime.now(timezone.utc).isoformat()
-        sync_status["last_results"] = results
-        sync_status["progress"] = "Auto-sync completed"
-        
-        logging.info(f"Auto-sync completed: Verified={len(results.get('verified', []))}, No Bill={len(results.get('no_bill', []))}")
-        
-        # Send Telegram notification about sync results
-        await send_telegram_notification(
-            f"🤖 <b>AUTO-SYNC COMPLETED</b>\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"📅 Date Synced: {yesterday}\n"
-            f"✅ Verified: {len(results.get('verified', []))}\n"
-            f"❌ No Bill: {len(results.get('no_bill', []))}\n"
-            f"⚠️ Missing: {len(results.get('missing_in_hodler', []))}\n"
-            f"🔴 Errors: {len(results.get('errors', []))}\n"
-            f"━━━━━━━━━━━━━━━"
-        )
-        
-    except Exception as e:
-        logging.error(f"Auto-sync failed: {e}")
-        await send_telegram_notification(
-            f"🚨 <b>AUTO-SYNC FAILED</b>\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"❌ Error: {str(e)[:200]}\n"
-            f"━━━━━━━━━━━━━━━"
-        )
-
 
 async def send_daily_status_alert(time_of_day: str):
     """Send simple daily status alert - employees in house, clean/dirty rooms for incoming crew."""
@@ -585,40 +401,6 @@ async def check_and_mark_dirty_rooms():
         logging.error(f"Error in auto-dirty check: {e}")
 
 
-def update_auto_sync_schedule(enabled: bool, start_date: str = None):
-    """Add or remove the auto-sync scheduled job"""
-    try:
-        # Remove existing job if present
-        if scheduler.get_job(AUTO_SYNC_JOB_ID):
-            scheduler.remove_job(AUTO_SYNC_JOB_ID)
-            logging.info("Removed existing auto-sync job")
-        
-        if enabled:
-            # Parse start date if provided
-            trigger_start = None
-            if start_date:
-                trigger_start = datetime.strptime(start_date, "%Y-%m-%d").replace(hour=15, minute=0)
-            
-            # Schedule for 3 PM Central Time (America/Chicago) every day
-            from pytz import timezone
-            central_tz = timezone('America/Chicago')
-            
-            # Pass async function directly - AsyncIOScheduler handles it
-            scheduler.add_job(
-                auto_sync_task,
-                CronTrigger(hour=15, minute=0, start_date=trigger_start, timezone=central_tz),
-                id=AUTO_SYNC_JOB_ID,
-                replace_existing=True
-            )
-            if start_date:
-                logging.info(f"Auto-sync scheduled for 3 PM Central Time daily, starting from {start_date}")
-            else:
-                logging.info("Auto-sync scheduled for 3 PM Central Time daily")
-        else:
-            logging.info("Auto-sync disabled")
-    except Exception as e:
-        logging.error(f"Error updating auto-sync schedule: {e}")
-
 @app.on_event("startup")
 async def start_scheduler():
     # Prevent duplicate scheduler initialization
@@ -690,17 +472,7 @@ async def start_scheduler():
     logging.info("Auto Zoho upload scheduled for 11:59 PM Central Time")
     
     scheduler.start()
-    logging.info("Monthly reset scheduler started - will reset data on 1st of each month")
-    
-    # Check if auto-sync was enabled and restore the schedule
-    try:
-        settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
-        if settings and settings.get("auto_sync_enabled"):
-            start_date = settings.get("auto_sync_start_date")
-            update_auto_sync_schedule(True, start_date)
-            logging.info(f"Auto-sync restored from settings (enabled, start: {start_date or 'immediate'})")
-    except Exception as e:
-        logging.error(f"Failed to restore auto-sync settings: {e}")
+    logging.info("Scheduler started - monthly reset, daily alerts, auto-dirty checker, Zoho upload")
 
 @app.on_event("shutdown")
 async def shutdown_scheduler():
@@ -897,15 +669,12 @@ class PortalSettings(BaseModel):
     api_global_username: Optional[str] = None
     api_global_password: Optional[str] = None  # Will be encrypted
     alert_email: Optional[str] = None
-    auto_sync_enabled: bool = False
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class PortalSettingsUpdate(BaseModel):
     api_global_username: Optional[str] = None
     api_global_password: Optional[str] = None
     alert_email: Optional[str] = None
-    auto_sync_enabled: Optional[bool] = None
-    auto_sync_start_date: Optional[str] = None  # Format: YYYY-MM-DD
     voice_enabled: Optional[bool] = None  # Enable/disable voice messages
     voice_volume: Optional[float] = None  # Voice volume 0.0 to 1.0
     voice_speed: Optional[float] = None  # Voice speed 0.5 to 1.5
@@ -4946,8 +4715,6 @@ async def get_portal_settings():
             "api_global_username": "",
             "api_global_password_set": False,
             "alert_email": "",
-            "auto_sync_enabled": False,
-            "auto_sync_start_date": None,
             "voice_enabled": True,
             "voice_volume": 1.0,
             "voice_speed": 0.85,
@@ -4975,8 +4742,6 @@ async def get_portal_settings():
         "api_global_username": settings.get("api_global_username", ""),
         "api_global_password_set": bool(settings.get("api_global_password_encrypted")),
         "alert_email": settings.get("alert_email", ""),
-        "auto_sync_enabled": settings.get("auto_sync_enabled", False),
-        "auto_sync_start_date": settings.get("auto_sync_start_date"),
         "voice_enabled": settings.get("voice_enabled", True),
         "voice_volume": settings.get("voice_volume", 1.0),
         "voice_speed": settings.get("voice_speed", 0.85),
@@ -5015,12 +4780,6 @@ async def update_portal_settings(input: PortalSettingsUpdate):
     
     if input.alert_email is not None:
         update_data["alert_email"] = input.alert_email
-    
-    if input.auto_sync_enabled is not None:
-        update_data["auto_sync_enabled"] = input.auto_sync_enabled
-    
-    if input.auto_sync_start_date is not None:
-        update_data["auto_sync_start_date"] = input.auto_sync_start_date
     
     if input.voice_enabled is not None:
         update_data["voice_enabled"] = input.voice_enabled
@@ -5087,14 +4846,6 @@ async def update_portal_settings(input: PortalSettingsUpdate):
     else:
         update_data["id"] = "portal_settings"
         await db.settings.insert_one(update_data)
-    
-    # Update auto-sync schedule if the setting changed
-    if input.auto_sync_enabled is not None:
-        # Get the start date from input or existing settings
-        start_date = input.auto_sync_start_date
-        if start_date is None and existing:
-            start_date = existing.get("auto_sync_start_date")
-        update_auto_sync_schedule(input.auto_sync_enabled, start_date)
     
     return {"message": "Settings updated successfully"}
 
@@ -5444,22 +5195,8 @@ async def get_sync_status():
     except:
         agent_version = "unknown"
     
-    # Get next scheduled run time if auto-sync is enabled
-    next_run = None
-    auto_sync_enabled = False
-    
-    try:
-        job = scheduler.get_job(AUTO_SYNC_JOB_ID)
-        if job:
-            next_run = job.next_run_time.isoformat() if job.next_run_time else None
-            auto_sync_enabled = True
-    except:
-        pass
-    
     return {
         **sync_status,
-        "auto_sync_enabled": auto_sync_enabled,
-        "next_scheduled_run": next_run,
         "agent_version": agent_version
     }
 

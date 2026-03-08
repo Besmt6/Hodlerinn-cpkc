@@ -39,7 +39,6 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 CPKC_SENDER_EMAIL = "aces_support@apiglobalsolutions.com"
 
 # Sync Agent Configuration
-AUTO_SYNC_JOB_ID = "auto_sync_daily"
 SYNC_AGENT_VERSION = "2026-03-07-v1"
 
 # Application Constants

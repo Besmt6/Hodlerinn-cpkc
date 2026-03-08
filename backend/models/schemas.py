@@ -135,7 +135,6 @@ class PortalSettings(BaseModel):
     api_global_username: Optional[str] = None
     api_global_password: Optional[str] = None  # Will be encrypted
     alert_email: Optional[str] = None
-    auto_sync_enabled: bool = False
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -143,8 +142,6 @@ class PortalSettingsUpdate(BaseModel):
     api_global_username: Optional[str] = None
     api_global_password: Optional[str] = None
     alert_email: Optional[str] = None
-    auto_sync_enabled: Optional[bool] = None
-    auto_sync_start_date: Optional[str] = None  # Format: YYYY-MM-DD
     voice_enabled: Optional[bool] = None  # Enable/disable voice messages
     voice_volume: Optional[float] = None  # Voice volume 0.0 to 1.0
     voice_speed: Optional[float] = None  # Voice speed 0.5 to 1.5
