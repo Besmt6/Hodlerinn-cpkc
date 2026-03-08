@@ -4014,6 +4014,9 @@ async def block_room_other_guest(input: BlockRoomInput):
     }
     await db.blocked_rooms.insert_one(block_doc)
     
+    # Remove MongoDB's _id before returning (it's added by insert_one)
+    block_doc.pop("_id", None)
+    
     # Only check capacity for immediate check-ins
     if not is_reservation:
         await check_and_send_sold_out_notification()
