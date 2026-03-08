@@ -937,6 +937,10 @@ async def root():
 # Guest Registration (no signature - signature is captured at check-in)
 @api_router.post("/guests/register", response_model=GuestRegistration)
 async def register_guest(input: GuestRegistrationCreate):
+    # Validate employee number is numeric only
+    if not input.employee_number or not input.employee_number.strip().isdigit():
+        raise HTTPException(status_code=400, detail="Employee number must contain only numbers")
+    
     # Verify employee ID is in the admin's approved list
     valid_employee = await db.employees.find_one({
         "employee_number": input.employee_number,
@@ -979,6 +983,10 @@ async def register_guest(input: GuestRegistrationCreate):
 async def register_guest_pending(input: GuestRegistrationCreate):
     """Register a guest as pending verification - allows check-in without admin approval.
     Admin can verify later through bulk verification."""
+    
+    # Validate employee number is numeric only
+    if not input.employee_number or not input.employee_number.strip().isdigit():
+        raise HTTPException(status_code=400, detail="Employee number must contain only numbers")
     
     # Check if employee already registered as guest
     existing = await db.guests.find_one({"employee_number": input.employee_number}, {"_id": 0})
@@ -1437,6 +1445,10 @@ This is an automated message. Please do not reply to this email.
 async def get_guest(employee_number: str):
     # Clean the employee number
     clean_emp_num = employee_number.strip()
+    
+    # Validate employee number is numeric only
+    if not clean_emp_num or not clean_emp_num.isdigit():
+        raise HTTPException(status_code=400, detail="Employee number must contain only numbers")
     
     guest = await db.guests.find_one({"employee_number": clean_emp_num}, {"_id": 0})
     if not guest:
@@ -2076,6 +2088,10 @@ async def remove_guest(employee_number: str):
 # Check-In (signature captured here)
 @api_router.post("/checkin", response_model=CheckIn)
 async def check_in(input: CheckInCreate):
+    # Validate employee number is numeric only
+    if not input.employee_number or not input.employee_number.strip().isdigit():
+        raise HTTPException(status_code=400, detail="Employee number must contain only numbers")
+    
     # First check if employee is in the admin's employee list (primary source)
     employee = await db.employees.find_one({"employee_number": input.employee_number}, {"_id": 0})
     
@@ -5129,6 +5145,10 @@ async def verify_employee_exists(employee_number: str):
     """Check if an employee number is in the allowed list (public endpoint for check-in)"""
     # Clean the employee number (remove spaces, leading zeros handling)
     clean_emp_num = employee_number.strip()
+    
+    # Validate employee number is numeric only
+    if not clean_emp_num or not clean_emp_num.isdigit():
+        raise HTTPException(status_code=400, detail="Employee number must contain only numbers")
     
     # Try multiple search strategies to be more forgiving
     employee = None

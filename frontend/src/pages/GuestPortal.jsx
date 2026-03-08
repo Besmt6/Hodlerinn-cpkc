@@ -1115,12 +1115,19 @@ function CheckInForm({ setView, setSuccessMessage, t, language }) {
               <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-vault-gold" />
               <Input
                 value={employeeNumber}
-                onChange={(e) => setEmployeeNumber(e.target.value)}
+                onChange={(e) => {
+                  // Only allow numeric characters
+                  const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                  setEmployeeNumber(numericValue);
+                }}
                 onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
                 placeholder={t.tapToEnterNumber}
                 className="vault-input pl-10 input-highlight text-base sm:text-lg h-11 sm:h-12"
                 data-testid="checkin-employee-input"
                 autoFocus
+                inputMode="numeric"
+                pattern="[0-9]*"
+                type="tel"
               />
               {verifying && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
