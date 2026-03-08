@@ -36,16 +36,14 @@ Build a comprehensive hotel management system for Hodler Inn, serving railroad c
 - [x] Guest records viewing
 - [x] Sync job controls with date picker
 - [x] PDF report download/view
-- [x] Occupancy tracking (NEW - needs testing)
+- [x] Occupancy tracking
 
-### Email Scraper
+### Email Scraper & CPKC Integration
 - [x] Zoho mail integration for CPKC notifications
 - [x] Telegram alerts for new bookings
 - [x] Scheduled scraping via APScheduler
-
-### Documents Created
-- [x] BlockStay Vision Document (SaaS platform vision)
-- [x] Book of Ideas (philosophical insights - 15 chapters)
+- [x] Expected Arrivals tracking
+- [x] Expected Check-Outs tracking (green highlighting detection)
 
 ## Pending Issues (P0-P2)
 
@@ -69,43 +67,25 @@ Build a comprehensive hotel management system for Hodler Inn, serving railroad c
 - ✅ **Automated Zoho Upload** - Sign-in sheets uploaded at 11:59 PM daily
 - ✅ **Embeddable Chatbot** - `/bitsy` route for iFrame embedding
 - ✅ **Phone Agent Webhook** - `GET /api/webhook/guests` endpoint
+- ✅ **Backend Refactoring** - Modular structure (config, database, security, models, services, routers, utils)
+- ✅ **CI/CD Setup** - GitHub Actions workflows for AWS deployment
+- ✅ **Repo Cleanup** - Production-ready Docker setup, removed MongoDB from docker-compose
 
 ## Upcoming Features (Blocked)
 - AI Phone Agent - Blocked on SIP/Webhook details from Virtual PBX provider
 - Smart Lock Integration - Blocked on vendor API research
 
-## Technical Debt (Critical)
-- `server.py` - Monolithic, needs decomposition into routers
-- `AdminDashboard.jsx` - Too large, needs component extraction
+## Technical Debt
+- [x] Backend modular structure - DONE
+- [ ] `server.py` - Still large, continue decomposition into routers
+- [ ] `AdminDashboard.jsx` - Too large, needs component extraction
 
 ## Tech Stack
-- **Backend:** FastAPI, APScheduler, Playwright, reportlab
+- **Backend:** FastAPI, APScheduler, Playwright, reportlab, PyMuPDF
 - **Frontend:** React, Shadcn/UI, Web Speech API
 - **Database:** MongoDB Atlas
 - **Integrations:** OpenAI GPT-5.2, OpenAI TTS-1, Telegram, Zoho Mail
-
-## Book of Ideas - Chapters (Dec 2025)
-1. The Evolution of Creation
-2. Bitcoin as Digital Land
-3. The Trust Revolution
-4. Privacy as a Right
-5. Tokens as Micro-Economies
-6. The AI Concierge
-7. The Future We're Building
-8. Principles for Builders
-9. The Sacred Five - Universal Pattern
-10. The Dark Truth and Divine Trinity
-11. Three Foundations - Physical, Spiritual, Virtual
-12. Nature of True Foundations - Flow, Adapt, Accept
-13. Bitcoin - The Five Elements of Virtual World
-14. Chain of Creation - Five Leads to Five
-15. The Borderless Five - Why Human Creations Are Universal
-
-## Key Philosophical Insights Captured
-- "Bitcoin is Water for the Virtual World"
-- "Bitcoin is Digital Land"
-- "5 Elements → Human → 5 Creations → Tech → 5 Foundations → Virtual World"
-- "Sanatana Dharma is base of all religions, Bitcoin is base of virtual world"
+- **Infrastructure:** Docker, AWS EC2, GitHub Actions CI/CD
 
 ---
-*Last Updated: December 2025*
+*Last Updated: March 2026*
