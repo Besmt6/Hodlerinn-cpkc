@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-08-v13"  # Fixed final verification hang - removed slow re-scan
+SYNC_AGENT_VERSION = "2026-03-08-v14"  # Fixed Playwright timeout - use .all() instead of .nth() in loops
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1034,12 +1034,10 @@ class APIGlobalSyncAgent:
             
             # Scroll through page to find the entry
             for scroll_attempt in range(max_scroll_searches):
-                # Search for row at current scroll position
-                rows = self.page.locator('tr')
-                row_count = await rows.count()
+                # Search for row at current scroll position - use .all() to get snapshot
+                rows = await self.page.locator('tr').all()
                 
-                for i in range(row_count):
-                    row = rows.nth(i)
+                for row in rows:
                     try:
                         row_text = await row.inner_text()
                         if search_name.upper() in row_text.upper():
@@ -1188,20 +1186,22 @@ class APIGlobalSyncAgent:
                 # === Step 6: Check for blue checkmark (verify save was successful) ===
                 logger.info("Step 6: Checking for blue checkmark...")
                 
-                # Re-find the row and check status
+                # Re-find the row and check status - use .all() to get snapshot
                 try:
-                    rows = self.page.locator('tr')
-                    for i in range(await rows.count()):
-                        row = rows.nth(i)
-                        row_text = await row.inner_text()
-                        if search_name.upper() in row_text.upper():
-                            row_html = await row.inner_html()
-                            if 'color:blue' in row_html.lower() or 'ui-icon-check' in row_html or 'checkmark' in row_html.lower() or 'color:green' in row_html.lower():
-                                logger.info("✓ Blue checkmark detected - save successful!")
-                                break
-                            elif 'color:red' in row_html.lower() or 'ui-icon-alert' in row_html:
-                                logger.warning("✗ Red status still showing - save may have failed")
-                                break
+                    rows = await self.page.locator('tr').all()
+                    for row in rows:
+                        try:
+                            row_text = await row.inner_text()
+                            if search_name.upper() in row_text.upper():
+                                row_html = await row.inner_html()
+                                if 'color:blue' in row_html.lower() or 'ui-icon-check' in row_html or 'checkmark' in row_html.lower() or 'color:green' in row_html.lower():
+                                    logger.info("✓ Blue checkmark detected - save successful!")
+                                    break
+                                elif 'color:red' in row_html.lower() or 'ui-icon-alert' in row_html:
+                                    logger.warning("✗ Red status still showing - save may have failed")
+                                    break
+                        except:
+                            continue
                 except Exception as status_err:
                     logger.info(f"Could not verify status: {status_err}")
             else:

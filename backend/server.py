@@ -5804,8 +5804,16 @@ async def run_sync(
             elapsed = (datetime.now(timezone.utc) - sync_start_time).total_seconds()
             logging.info(f"Sync task finished in {elapsed:.1f}s. Running={sync_status['running']}, Progress={sync_status['progress']}")
     
-    # Start background task using asyncio.create_task directly
-    asyncio.create_task(run_sync_task_wrapper())
+    # Start background task with proper exception handling
+    async def safe_sync_task():
+        try:
+            await run_sync_task_wrapper()
+        except Exception as e:
+            logging.error(f"Unhandled sync task exception: {e}", exc_info=True)
+            sync_status["running"] = False
+            sync_status["progress"] = f"Sync crashed: {str(e)}"
+    
+    asyncio.create_task(safe_sync_task())
     
     return {
         "message": "Sync started", 
