@@ -653,6 +653,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [employeeStatus, setEmployeeStatus] = useState(null); // 'found', 'not_found', 'new_guest', null
+  const [similarNumbers, setSimilarNumbers] = useState([]); // Similar employee numbers when not found
   const [availableRooms, setAvailableRooms] = useState([]);
   const [signatureReminderSpoken, setSignatureReminderSpoken] = useState(false);
   const [requestingAccess, setRequestingAccess] = useState(false);
@@ -687,11 +688,13 @@ function CheckInForm({ setView, setSuccessMessage }) {
     if (employeeNumber.length < 5) {
       setEmployeeStatus(null);
       setEmployeeName("");
+      setSimilarNumbers([]);
       return;
     }
 
     const verifyEmployee = async () => {
       setVerifying(true);
+      setSimilarNumbers([]);
       try {
         // First check if already registered as a guest
         const response = await axios.get(`${API}/guests/${employeeNumber}`);
@@ -725,11 +728,18 @@ function CheckInForm({ setView, setSuccessMessage }) {
             setTimeout(() => roomInputRef.current?.focus(), 300);
           }
         } catch (empError) {
-          // Employee not in admin list - show request access form
+          // Employee not in admin list - BLOCK check-in, show Yellow Card message
           setEmployeeName("");
           setEmployeeStatus('not_found');
-          // Voice instruction for new employee
-          playVoiceMessage("new_employee_instructions");
+          
+          // Check for similar numbers in the error response
+          const errorDetail = empError.response?.data?.detail;
+          if (errorDetail && typeof errorDetail === 'object' && errorDetail.similar_numbers) {
+            setSimilarNumbers(errorDetail.similar_numbers);
+          }
+          
+          // Play voice message for unregistered employee
+          playVoiceMessage("yellow_card_instructions");
         }
       } finally {
         setVerifying(false);
@@ -941,48 +951,68 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
-                className="mt-2 bg-amber-900/30 border border-amber-600/50 rounded-lg p-3 space-y-3"
+                className="mt-2 bg-amber-900/30 border border-amber-600/50 rounded-lg p-4 space-y-3"
               >
-                <p className="text-amber-400 text-sm">
-                  Employee ID not in system. Enter your details to continue:
-                </p>
-                <div>
-                  <label className="text-amber-300 text-xs uppercase tracking-wide mb-1 block">Full Name</label>
-                  <Input
-                    value={employeeName}
-                    onChange={(e) => setEmployeeName(e.target.value)}
-                    placeholder="Enter your full name"
-                    className="vault-input text-lg border-amber-500/50"
-                    data-testid="request-name-input"
-                  />
+                <div className="text-center">
+                  <p className="text-amber-400 text-lg font-bold mb-2">
+                    ⚠️ Employee ID Not Found
+                  </p>
+                  <p className="text-amber-300 text-sm">
+                    Your employee number is not in our system.
+                  </p>
                 </div>
-                <div>
-                  <label className="text-amber-300 text-xs uppercase tracking-wide mb-1 block">Company Name</label>
-                  <Input
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Enter company name here"
-                    className="vault-input text-lg border-amber-500/50"
-                    data-testid="company-name-input"
-                  />
-                </div>
-                {wrongAttempts >= 2 && (
-                  <div className="bg-red-900/50 border border-red-500 rounded-lg p-3">
-                    <p className="text-red-400 text-sm text-center font-medium">
-                      Please call Help Phone from outside office phone so we know someone need help
+                
+                {/* Similar Numbers Suggestion */}
+                {similarNumbers.length > 0 && (
+                  <div className="bg-blue-900/40 border border-blue-500/50 rounded-lg p-3">
+                    <p className="text-blue-400 text-sm font-medium mb-2">
+                      Did you mean one of these?
+                    </p>
+                    <div className="space-y-2">
+                      {similarNumbers.map((emp, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setEmployeeNumber(emp.employee_number);
+                            setEmployeeStatus(null);
+                            setSimilarNumbers([]);
+                          }}
+                          className="w-full text-left p-2 bg-blue-800/30 hover:bg-blue-700/40 rounded border border-blue-500/30 transition-colors"
+                          data-testid={`similar-number-${idx}`}
+                        >
+                          <span className="text-blue-300 font-mono font-bold">{emp.employee_number}</span>
+                          {emp.name && (
+                            <span className="text-blue-400 text-sm ml-2">- {emp.name}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-blue-300 text-xs mt-2">
+                      Tap the correct number above to use it
                     </p>
                   </div>
                 )}
-                <Button
-                  onClick={handleContinueAsNewEmployee}
-                  disabled={requestingAccess || !employeeName.trim() || !companyName.trim()}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-10 disabled:opacity-50"
-                  data-testid="continue-checkin-btn"
-                >
-                  {requestingAccess ? "Processing..." : "Continue to Check-In"}
-                </Button>
-                <p className="text-amber-300 text-xs text-center">
-                  You can check in now. Admin will verify your information later.
+                
+                {/* Yellow Card Instructions */}
+                <div className="bg-yellow-900/50 border-2 border-yellow-500 rounded-lg p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="bg-yellow-500 w-8 h-8 rounded flex items-center justify-center">
+                      <span className="text-black text-lg">📝</span>
+                    </div>
+                    <p className="text-yellow-400 font-bold text-base">
+                      Please Use Yellow Card
+                    </p>
+                  </div>
+                  <p className="text-yellow-300 text-sm">
+                    Write your <strong>Employee Number</strong> and <strong>Name</strong> on the Yellow Card.
+                  </p>
+                  <p className="text-yellow-300 text-sm mt-1">
+                    Admin will add you to the system.
+                  </p>
+                </div>
+                
+                <p className="text-vault-text-secondary text-xs text-center">
+                  If you believe this is an error, please contact the front desk or call the Help Phone.
                 </p>
               </motion.div>
             )}

@@ -3490,6 +3490,9 @@ VOICE_MESSAGES = {
     # New employee instructions
     "new_employee_instructions": "Please enter your full name and company name, then click Continue to Check-In.",
     
+    # Yellow Card instructions (when employee number not in system)
+    "yellow_card_instructions": "Your employee number was not found in our system. Please use the yellow card on the desk. Write your employee number and your full name on the card. The admin will add you to the system. If you think this is a mistake, please use the help phone.",
+    
     # Help phone message (after wrong company name attempts)
     "help_phone_message": "Please call Help Phone from outside office phone so we know someone need help.",
     
@@ -5050,7 +5053,55 @@ async def verify_employee_exists(employee_number: str):
         employee = await db.employees.find_one({"employee_id": clean_emp_num}, {"_id": 0})
     
     if not employee:
-        raise HTTPException(status_code=404, detail="Employee ID not found in system. Please contact admin.")
+        # Try to find similar employee numbers (for old vs new number detection)
+        # Common pattern: old 200165 -> new 2200165 (added a 2 prefix)
+        similar_numbers = []
+        
+        # Pattern 1: Maybe they entered old number, try adding "2" prefix
+        if len(clean_emp_num) == 6 and clean_emp_num.startswith("2"):
+            potential_new = "2" + clean_emp_num  # 200165 -> 2200165
+            similar = await db.employees.find_one({"employee_number": potential_new}, {"_id": 0})
+            if similar:
+                similar_numbers.append({
+                    "employee_number": potential_new,
+                    "name": similar.get("name", "")
+                })
+        
+        # Pattern 2: Maybe they entered new number without "2" prefix, try 2XXXXXX
+        if len(clean_emp_num) == 6 and not clean_emp_num.startswith("22"):
+            potential_new = "2" + clean_emp_num
+            similar = await db.employees.find_one({"employee_number": potential_new}, {"_id": 0})
+            if similar:
+                similar_numbers.append({
+                    "employee_number": potential_new,
+                    "name": similar.get("name", "")
+                })
+        
+        # Pattern 3: Partial match - find employees with similar numbers
+        if not similar_numbers and len(clean_emp_num) >= 4:
+            # Search for numbers containing the last 5 digits
+            last_digits = clean_emp_num[-5:] if len(clean_emp_num) >= 5 else clean_emp_num
+            regex_pattern = {"$regex": f".*{last_digits}$"}
+            similar_employees = await db.employees.find(
+                {"employee_number": regex_pattern, "is_active": True},
+                {"_id": 0, "employee_number": 1, "name": 1}
+            ).limit(3).to_list(3)
+            
+            for emp in similar_employees:
+                if emp.get("employee_number") != clean_emp_num:
+                    similar_numbers.append({
+                        "employee_number": emp.get("employee_number"),
+                        "name": emp.get("name", "")
+                    })
+        
+        raise HTTPException(
+            status_code=404, 
+            detail={
+                "message": "Employee ID not found in system",
+                "similar_numbers": similar_numbers,
+                "instruction": "Please write your Employee Number and Name on the Yellow Card. Admin will add you to the system."
+            }
+        )
     
     # Get name - handle different field formats
     name = employee.get("name") or f"{employee.get('first_name', '')} {employee.get('last_name', '')}".strip()
