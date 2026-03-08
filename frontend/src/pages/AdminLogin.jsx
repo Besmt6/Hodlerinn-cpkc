@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, ArrowLeft, Mail, KeyRound } from "lucide-react";
-import { setAdminToken, clearAdminToken } from "@/lib/adminAuth";
+import { setAdminToken, clearAdminToken, getAdminToken } from "@/lib/adminAuth";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -24,8 +24,12 @@ export default function AdminLogin() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    clearAdminToken();
-  }, []);
+    // If already logged in, redirect to dashboard instead of clearing token
+    const token = getAdminToken();
+    if (token) {
+      navigate("/admin/dashboard");
+    }
+  }, [navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
