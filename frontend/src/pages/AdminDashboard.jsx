@@ -82,6 +82,7 @@ import {
   MessageCircle,
   Phone
 } from "lucide-react";
+import { clearAdminToken, getAdminToken } from "@/lib/adminAuth";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -264,8 +265,8 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    const isAuth = sessionStorage.getItem("adminAuth");
-    if (!isAuth) {
+    const token = getAdminToken();
+    if (!token) {
       navigate("/admin");
       return;
     }
@@ -1339,8 +1340,7 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem("adminAuth");
-    sessionStorage.removeItem("adminToken");
+    clearAdminToken();
     navigate("/admin");
   };
 
