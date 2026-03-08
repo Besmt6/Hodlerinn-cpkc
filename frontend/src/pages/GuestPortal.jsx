@@ -1083,7 +1083,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                       className: "signature-canvas w-full bg-transparent",
                       style: { width: "100%", height: "150px", touchAction: "none" }
                     }}
-                    penColor="#fbbf24"
+                    penColor="#1e40af"
                     backgroundColor="transparent"
                     minWidth={3}
                     maxWidth={6}
