@@ -32,6 +32,7 @@ import asyncio
 import json
 import jwt
 import hashlib
+import hmac
 import secrets
 
 # Optional telegram import
@@ -82,6 +83,10 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 if not ADMIN_PASSWORD:
     raise ValueError("ADMIN_PASSWORD environment variable must be set")
 
+# Session-based auth config
+ADMIN_AUTH_SECRET = os.environ.get('ADMIN_AUTH_SECRET') or os.environ.get('ENCRYPTION_KEY', '') or ADMIN_PASSWORD
+ADMIN_SESSION_DURATION_HOURS = int(os.environ.get('ADMIN_SESSION_DURATION_HOURS', '12'))
+
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', secrets.token_hex(32))  # Generate random secret if not set
 JWT_ALGORITHM = "HS256"
@@ -127,6 +132,44 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
         raise HTTPException(status_code=403, detail="Not authorized")
     
     return payload
+
+# ==================== HMAC Session Token Functions ====================
+
+def _create_admin_token() -> str:
+    """Create a signed admin session token."""
+    expires_at = int((datetime.now(timezone.utc) + timedelta(hours=ADMIN_SESSION_DURATION_HOURS)).timestamp())
+    payload = json.dumps({"exp": expires_at}, separators=(",", ":"))
+    payload_b64 = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    signature = hmac.new(
+        ADMIN_AUTH_SECRET.encode(),
+        payload_b64.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{payload_b64}.{signature}"
+
+
+def _verify_admin_token(token: Optional[str]) -> bool:
+    """Verify admin session token signature and expiry."""
+    if not token or "." not in token:
+        return False
+
+    try:
+        payload_b64, signature = token.split(".", 1)
+        expected_signature = hmac.new(
+            ADMIN_AUTH_SECRET.encode(),
+            payload_b64.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(signature, expected_signature):
+            return False
+
+        payload_b64_padded = payload_b64 + "=" * (-len(payload_b64) % 4)
+        payload_raw = base64.urlsafe_b64decode(payload_b64_padded.encode()).decode()
+        payload = json.loads(payload_raw)
+        return int(payload.get("exp", 0)) > int(datetime.now(timezone.utc).timestamp())
+    except Exception:
+        return False
 
 # ==================== OTP (One-Time Password) System ====================
 
@@ -2467,12 +2510,22 @@ async def admin_login(input: AdminLogin):
         # Use hashed password from database
         if verify_password(input.password, settings["admin_password_hash"]):
             token = create_jwt_token({"role": "admin", "user": "admin"})
-            return {"success": True, "message": "Login successful", "token": token}
+            return {
+                "success": True,
+                "message": "Login successful",
+                "token": token,
+                "expires_in_hours": ADMIN_SESSION_DURATION_HOURS
+            }
     else:
         # Fallback to env variable (plain text comparison for backwards compatibility)
         if input.password == ADMIN_PASSWORD:
             token = create_jwt_token({"role": "admin", "user": "admin"})
-            return {"success": True, "message": "Login successful", "token": token}
+            return {
+                "success": True,
+                "message": "Login successful",
+                "token": token,
+                "expires_in_hours": ADMIN_SESSION_DURATION_HOURS
+            }
     
     raise HTTPException(status_code=401, detail="Invalid password")
 
@@ -7037,6 +7090,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Admin auth middleware - protect all /api/admin endpoints except login
+@app.middleware("http")
+async def admin_auth_middleware(request, call_next):
+    """Protect all /api/admin endpoints except login with bearer token auth."""
+    path = request.url.path
+    if path.startswith("/api/admin") and path != "/api/admin/login":
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header[7:] if auth_header.startswith("Bearer ") else None
+        # Accept both HMAC session tokens and JWT tokens
+        if not _verify_admin_token(token):
+            # Also try JWT verification
+            try:
+                verify_jwt_token(token) if token else None
+            except:
+                return Response(
+                    content=json.dumps({"detail": "Admin authentication required"}),
+                    status_code=401,
+                    media_type="application/json",
+                )
+
+    return await call_next(request)
 
 # Configure logging
 logging.basicConfig(
