@@ -116,6 +116,7 @@ export default function AdminDashboard() {
   const [isFiltered, setIsFiltered] = useState(false);
   const [showActiveOnly, setShowActiveOnly] = useState(true);  // Default to showing only active/in-house guests
   const [roomSearch, setRoomSearch] = useState("");  // Room number search
+  const [nameSearch, setNameSearch] = useState("");  // Name/Employee ID search
   
   // Room management state
   const [showRoomDialog, setShowRoomDialog] = useState(false);
@@ -784,6 +785,33 @@ export default function AdminDashboard() {
       fetchEmployees();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to delete employee");
+    }
+  };
+
+  // Update booking record (employee number, name, room)
+  const handleUpdateRecord = async () => {
+    if (!editingRecord || !editingRecord.id) {
+      toast.error("No record selected");
+      return;
+    }
+    
+    // Validate employee number is numeric only
+    if (editingRecord.employee_number && !/^\d*$/.test(editingRecord.employee_number)) {
+      toast.error("Employee number must contain only numbers");
+      return;
+    }
+    
+    try {
+      await axios.put(`${API}/admin/bookings/${editingRecord.id}`, {
+        employee_number: editingRecord.employee_number,
+        employee_name: editingRecord.employee_name,
+        room_number: editingRecord.room_number
+      });
+      toast.success("Record updated successfully");
+      setEditingRecord(null);
+      fetchData(startDate || null, endDate || null);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to update record");
     }
   };
 
@@ -1806,7 +1834,8 @@ export default function AdminDashboard() {
                       <FileSpreadsheet className="w-5 h-5 text-vault-gold" />
                       Guest Records
                     </CardTitle>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Room search */}
                       <div className="relative">
                         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
                         <Input
@@ -1814,15 +1843,27 @@ export default function AdminDashboard() {
                           placeholder="Search room #..."
                           value={roomSearch}
                           onChange={(e) => setRoomSearch(e.target.value)}
-                          className="pl-8 w-32 sm:w-40 h-8 bg-black/50 border-vault-border text-vault-text text-sm"
+                          className="pl-8 w-28 sm:w-32 h-8 bg-black/50 border-vault-border text-vault-text text-sm"
                           data-testid="room-search-input"
                         />
                       </div>
-                      {roomSearch && (
+                      {/* Name/ID search */}
+                      <div className="relative">
+                        <User className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
+                        <Input
+                          type="text"
+                          placeholder="Search name or ID..."
+                          value={nameSearch}
+                          onChange={(e) => setNameSearch(e.target.value)}
+                          className="pl-8 w-36 sm:w-44 h-8 bg-black/50 border-vault-border text-vault-text text-sm"
+                          data-testid="name-search-input"
+                        />
+                      </div>
+                      {(roomSearch || nameSearch) && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setRoomSearch("")}
+                          onClick={() => { setRoomSearch(""); setNameSearch(""); }}
                           className="h-8 px-2 text-vault-text-secondary hover:text-vault-text"
                         >
                           <X className="w-4 h-4" />
@@ -1845,18 +1886,24 @@ export default function AdminDashboard() {
                           <TableHead className="text-vault-gold">Nights</TableHead>
                           <TableHead className="text-vault-gold">Status</TableHead>
                           <TableHead className="text-vault-gold">Signature</TableHead>
+                          <TableHead className="text-vault-gold">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {(() => {
-                          const filteredRecords = records.filter(record => 
-                            !roomSearch || record.room_number?.toString().includes(roomSearch)
-                          );
+                          const searchLower = nameSearch.toLowerCase();
+                          const filteredRecords = records.filter(record => {
+                            const roomMatch = !roomSearch || record.room_number?.toString().includes(roomSearch);
+                            const nameMatch = !nameSearch || 
+                              record.employee_name?.toLowerCase().includes(searchLower) ||
+                              record.employee_number?.toString().toLowerCase().includes(searchLower);
+                            return roomMatch && nameMatch;
+                          });
                           if (filteredRecords.length === 0) {
                             return (
                               <TableRow>
-                                <TableCell colSpan={9} className="text-center text-vault-text-secondary py-8">
-                                  {roomSearch ? `No guests found in room ${roomSearch}` : "No records found"}
+                                <TableCell colSpan={10} className="text-center text-vault-text-secondary py-8">
+                                  {roomSearch || nameSearch ? `No guests found matching search criteria` : "No records found"}
                                 </TableCell>
                               </TableRow>
                             );
@@ -1928,6 +1975,22 @@ export default function AdminDashboard() {
                                   </DialogContent>
                                 </Dialog>
                               </TableCell>
+                              <TableCell>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  className="text-vault-text-secondary hover:text-vault-gold"
+                                  onClick={() => setEditingRecord({
+                                    id: record.id,
+                                    employee_number: record.employee_number || "",
+                                    employee_name: record.employee_name || "",
+                                    room_number: record.room_number || ""
+                                  })}
+                                  data-testid={`edit-record-${record.id}`}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
                             </TableRow>
                           ));
                         })()}
@@ -1936,6 +1999,65 @@ export default function AdminDashboard() {
                   </ScrollArea>
                 </CardContent>
               </Card>
+
+              {/* Edit Record Dialog */}
+              <Dialog open={!!editingRecord} onOpenChange={(open) => !open && setEditingRecord(null)}>
+                <DialogContent className="bg-vault-surface border-vault-border">
+                  <DialogHeader>
+                    <DialogTitle className="font-outfit text-vault-text">
+                      Edit Guest Record
+                    </DialogTitle>
+                  </DialogHeader>
+                  {editingRecord && (
+                    <div className="space-y-4 py-4">
+                      <div>
+                        <label className="text-sm text-vault-text-secondary mb-2 block">Employee Number</label>
+                        <Input
+                          value={editingRecord.employee_number}
+                          onChange={(e) => {
+                            // Only allow numeric characters
+                            const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                            setEditingRecord({...editingRecord, employee_number: numericValue});
+                          }}
+                          placeholder="Enter employee number (numbers only)"
+                          className="vault-input font-mono"
+                          inputMode="numeric"
+                          data-testid="edit-record-employee-number"
+                        />
+                        <p className="text-xs text-vault-text-secondary mt-1">Numbers only</p>
+                      </div>
+                      <div>
+                        <label className="text-sm text-vault-text-secondary mb-2 block">Employee Name</label>
+                        <Input
+                          value={editingRecord.employee_name}
+                          onChange={(e) => setEditingRecord({...editingRecord, employee_name: e.target.value})}
+                          placeholder="Enter employee name"
+                          className="vault-input"
+                          data-testid="edit-record-employee-name"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm text-vault-text-secondary mb-2 block">Room Number</label>
+                        <Input
+                          value={editingRecord.room_number}
+                          onChange={(e) => setEditingRecord({...editingRecord, room_number: e.target.value})}
+                          placeholder="Enter room number"
+                          className="vault-input font-mono"
+                          data-testid="edit-record-room-number"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="ghost" className="text-vault-text-secondary">Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleUpdateRecord} className="vault-btn-primary" data-testid="save-record-btn">
+                      Update Record
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </>
           )}
 

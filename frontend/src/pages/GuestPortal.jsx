@@ -1489,18 +1489,21 @@ function CheckOutForm({ setView, setSuccessMessage, t, language }) {
           {!verifiedBooking ? (
             <>
               <div>
-                <label className="vault-label">{t.roomNumber}</label>
+                <label className="vault-label text-lg font-bold">{t.roomNumber}</label>
                 <div className="relative">
-                  <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
+                  <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 text-vault-gold" />
                   <Input
                     value={roomNumber}
                     onChange={(e) => setRoomNumber(e.target.value)}
                     placeholder={t.tapToEnterRoom}
-                    className="vault-input pl-10 input-highlight text-lg"
+                    className="vault-input pl-12 input-highlight text-xl font-bold h-14 border-2 border-vault-gold"
                     data-testid="checkout-room-input"
                     autoFocus
                   />
                 </div>
+                <p className="text-vault-gold text-sm mt-2 font-medium text-center">
+                  {currentLanguage === 'es' ? '⬆️ Ingrese el número de su habitación arriba' : '⬆️ Enter your room number above'}
+                </p>
               </div>
               <Button
                 onClick={handleVerifyCheckout}

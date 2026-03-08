@@ -2482,6 +2482,8 @@ async def check_out(input: CheckOutCreate):
 # ==================== Edit/Delete Bookings ====================
 
 class BookingUpdate(BaseModel):
+    employee_number: Optional[str] = None
+    employee_name: Optional[str] = None
     room_number: Optional[str] = None
     check_in_date: Optional[str] = None
     check_in_time: Optional[str] = None
