@@ -1028,6 +1028,28 @@ export default function AdminDashboard() {
     }
   };
 
+  // Mark entry as No Bill on portal
+  const [markingNoBill, setMarkingNoBill] = useState({});
+  const handleMarkNoBill = async (entry, targetDate) => {
+    const entryKey = `${entry.name}-${targetDate}`;
+    setMarkingNoBill(prev => ({...prev, [entryKey]: true}));
+    try {
+      const token = sessionStorage.getItem("adminToken");
+      await axios.post(`${API}/admin/sync/mark-no-bill`, {
+        name: entry.name || entry.api_name,
+        date: targetDate || syncStatus.last_run?.split('T')[0] || new Date().toISOString().split('T')[0],
+        reason: "Manual no-bill by admin"
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success(`Marking ${entry.name} as No Bill... Check portal to verify.`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to mark as No Bill");
+    } finally {
+      setMarkingNoBill(prev => ({...prev, [entryKey]: false}));
+    }
+  };
+
   // Manual Entry functions
   const handleManualEntry = async () => {
     if (!manualEntryForm.employee_id || !manualEntryForm.first_name || !manualEntryForm.last_name || !manualEntryForm.room_number) {
@@ -1714,6 +1736,55 @@ export default function AdminDashboard() {
                     <div className="mt-4 flex items-center gap-2 text-vault-gold">
                       <RefreshCw className="w-4 h-4 animate-spin" />
                       <span className="text-sm">{syncStatus.progress || "Sync in progress..."}</span>
+                    </div>
+                  )}
+                  
+                  {/* Detailed Sync Results - Missing Entries */}
+                  {syncStatus.last_results?.missing_in_hodler?.length > 0 && !syncStatus.running && (
+                    <div className="mt-4 border-t border-vault-border pt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-blue-400 font-medium flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          Missing in Hodler Inn ({syncStatus.last_results.missing_in_hodler.length})
+                        </h4>
+                        <p className="text-xs text-vault-text-secondary">
+                          Found on portal but not in your records - need "No Bill"
+                        </p>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto space-y-2 bg-black/30 rounded-lg p-3">
+                        {syncStatus.last_results.missing_in_hodler.map((entry, idx) => {
+                          const targetDate = entry.date || syncStatus.last_run?.split('T')[0];
+                          const entryKey = `${entry.name}-${targetDate}`;
+                          return (
+                            <div key={idx} className="flex items-center justify-between p-3 bg-blue-900/20 rounded border border-blue-500/20">
+                              <div className="flex-1">
+                                <p className="text-vault-text font-medium">{entry.name || entry.api_name || 'Unknown'}</p>
+                                <p className="text-xs text-vault-text-secondary">
+                                  {entry.employee_id && `ID: ${entry.employee_id} • `}
+                                  Date: {targetDate || 'Unknown'}
+                                  {entry.best_matches?.length > 0 && (
+                                    <span className="text-amber-400 ml-2">
+                                      Possible: {entry.best_matches.slice(0,2).join(', ')}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => handleMarkNoBill(entry, targetDate)}
+                                disabled={markingNoBill[entryKey]}
+                                className="bg-amber-600 hover:bg-amber-700 text-white text-xs ml-3"
+                                data-testid={`mark-nobill-${idx}`}
+                              >
+                                {markingNoBill[entryKey] ? "Marking..." : "Mark No Bill"}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-vault-text-secondary mt-2">
+                        Click "Mark No Bill" to update the portal entry. The sync agent will connect and mark it automatically.
+                      </p>
                     </div>
                   )}
                 </CardContent>

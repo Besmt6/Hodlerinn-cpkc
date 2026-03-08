@@ -6154,6 +6154,66 @@ async def view_sync_report_pdf():
     )
 
 
+class ManualNoBillRequest(BaseModel):
+    name: str
+    date: str
+    reason: Optional[str] = "Manual no-bill by admin"
+
+@api_router.post("/admin/sync/mark-no-bill")
+async def mark_entry_no_bill(request: ManualNoBillRequest, background_tasks: BackgroundTasks):
+    """Manually mark a portal entry as 'No Bill'. 
+    This connects to the API Global portal and marks the specified entry."""
+    
+    # Get portal credentials
+    settings = await db.settings.find_one({"id": "portal_settings"}, {"_id": 0})
+    if not settings or not settings.get("api_global_username") or not settings.get("api_global_password_encrypted"):
+        raise HTTPException(status_code=400, detail="Portal credentials not configured")
+    
+    username = settings["api_global_username"]
+    password = decrypt_data(settings["api_global_password_encrypted"])
+    
+    async def mark_no_bill_task():
+        try:
+            from sync_agent import APIGlobalSyncAgent
+            
+            agent = APIGlobalSyncAgent(username, password)
+            
+            # Create entry object for the mark_no_bill function
+            entry = {"name": request.name}
+            
+            # Navigate to the correct date page first
+            await agent.login()
+            await agent.navigate_to_date(request.date)
+            
+            # Mark as no bill
+            success = await agent.mark_no_bill(entry)
+            
+            await agent.close()
+            
+            if success:
+                logging.info(f"Successfully marked {request.name} as No Bill for {request.date}")
+                # Update the missing_entries record if it exists
+                await db.missing_entries.update_one(
+                    {"name": request.name, "date": request.date},
+                    {"$set": {"resolved": True, "resolved_at": datetime.now(timezone.utc).isoformat(), "resolution": "marked_no_bill"}}
+                )
+            else:
+                logging.error(f"Failed to mark {request.name} as No Bill")
+                
+        except Exception as e:
+            logging.error(f"Error marking no bill: {e}")
+    
+    # Run in background
+    background_tasks.add_task(mark_no_bill_task)
+    
+    return {"message": f"Marking {request.name} as No Bill for {request.date}... Check portal to verify."}
+
+@api_router.get("/admin/sync/missing-entries")
+async def get_missing_entries(resolved: bool = False):
+    """Get list of missing entries that need to be marked as No Bill."""
+    query = {"resolved": resolved} if not resolved else {}
+    entries = await db.missing_entries.find(query, {"_id": 0}).sort("recorded_at", -1).to_list(100)
+    return entries
 
 
 @api_router.get("/admin/sync/debug-records")
