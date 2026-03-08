@@ -1318,7 +1318,50 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     sessionStorage.removeItem("adminAuth");
+    sessionStorage.removeItem("adminToken");
     navigate("/admin");
+  };
+
+  // Password change state
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error("New passwords don't match");
+      return;
+    }
+    if (passwordForm.newPassword.length < 8) {
+      toast.error("New password must be at least 8 characters");
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const token = sessionStorage.getItem("adminToken");
+      await axios.post(`${API}/admin/change-password`, {
+        current_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("Password changed successfully!");
+      setShowPasswordChange(false);
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to change password");
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const handleEdit = (record) => {
@@ -5303,6 +5346,89 @@ ${baseUrl}/api/public/signin-sheets?api_key=${portalSettings.public_api_key}&sta
                   <p className="text-vault-text-secondary text-xs">
                     Reports include signature images and check-in/out times.
                   </p>
+                </CardContent>
+              </Card>
+
+              {/* Admin Security Section */}
+              <Card className="bg-vault-surface-highlight/50 border-vault-border max-w-2xl mt-6">
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-outfit text-lg font-bold text-vault-gold flex items-center gap-2">
+                      <Shield className="w-5 h-5" />
+                      Admin Security
+                    </h3>
+                  </div>
+                  <p className="text-vault-text-secondary text-sm">
+                    Change your admin password for security. Password must be at least 8 characters.
+                  </p>
+                  
+                  {!showPasswordChange ? (
+                    <Button
+                      onClick={() => setShowPasswordChange(true)}
+                      className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2"
+                      data-testid="show-change-password-btn"
+                    >
+                      <Key className="w-4 h-4" />
+                      Change Password
+                    </Button>
+                  ) : (
+                    <div className="space-y-4 bg-black/30 rounded-lg p-4 border border-vault-border">
+                      <div>
+                        <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Current Password</label>
+                        <Input
+                          type="password"
+                          value={passwordForm.currentPassword}
+                          onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                          placeholder="Enter current password"
+                          className="bg-vault-surface border-vault-border text-vault-text"
+                          data-testid="current-password-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">New Password</label>
+                        <Input
+                          type="password"
+                          value={passwordForm.newPassword}
+                          onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                          placeholder="Enter new password (min 8 characters)"
+                          className="bg-vault-surface border-vault-border text-vault-text"
+                          data-testid="new-password-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-vault-gold uppercase tracking-wider mb-1 block">Confirm New Password</label>
+                        <Input
+                          type="password"
+                          value={passwordForm.confirmPassword}
+                          onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                          placeholder="Confirm new password"
+                          className="bg-vault-surface border-vault-border text-vault-text"
+                          data-testid="confirm-password-input"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleChangePassword}
+                          disabled={changingPassword}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          data-testid="submit-change-password-btn"
+                        >
+                          {changingPassword ? "Changing..." : "Update Password"}
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setShowPasswordChange(false);
+                            setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                          }}
+                          variant="outline"
+                          className="border-vault-border text-vault-text"
+                          data-testid="cancel-change-password-btn"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

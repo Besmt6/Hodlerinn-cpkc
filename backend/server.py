@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Response, Query, BackgroundTasks, File, UploadFile
+from fastapi import FastAPI, APIRouter, HTTPException, Response, Query, BackgroundTasks, File, UploadFile, Depends, Header
 from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -29,6 +30,9 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 import asyncio
 import json
+import jwt
+import hashlib
+import secrets
 
 # Optional telegram import
 try:
@@ -75,6 +79,52 @@ api_router = APIRouter(prefix="/api")
 
 # Admin password (simple protection)
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'hodlerinn2024')
+
+# JWT Configuration
+JWT_SECRET = os.environ.get('JWT_SECRET', secrets.token_hex(32))  # Generate random secret if not set
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRY_HOURS = 24  # Token expires after 24 hours
+
+# Security bearer
+security = HTTPBearer(auto_error=False)
+
+def hash_password(password: str) -> str:
+    """Hash a password using SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash"""
+    return hash_password(plain_password) == hashed_password
+
+def create_jwt_token(data: dict) -> str:
+    """Create a JWT token with expiry"""
+    expire = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_HOURS)
+    to_encode = data.copy()
+    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
+    return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_jwt_token(token: str) -> dict:
+    """Verify and decode a JWT token"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Dependency to verify admin token"""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token = credentials.credentials
+    payload = verify_jwt_token(token)
+    
+    if payload.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    return payload
 
 # ==================== Health Check Endpoint ====================
 
@@ -2293,9 +2343,67 @@ async def delete_booking(booking_id: str):
 # Admin Login
 @api_router.post("/admin/login")
 async def admin_login(input: AdminLogin):
-    if input.password == ADMIN_PASSWORD:
-        return {"success": True, "message": "Login successful"}
+    """Admin login - returns JWT token on success"""
+    # Check stored password in database first, fallback to env variable
+    settings = await db.settings.find_one({"id": "admin_settings"}, {"_id": 0})
+    
+    stored_password = None
+    if settings and settings.get("admin_password_hash"):
+        # Use hashed password from database
+        if verify_password(input.password, settings["admin_password_hash"]):
+            token = create_jwt_token({"role": "admin", "user": "admin"})
+            return {"success": True, "message": "Login successful", "token": token}
+    else:
+        # Fallback to env variable (plain text comparison for backwards compatibility)
+        if input.password == ADMIN_PASSWORD:
+            token = create_jwt_token({"role": "admin", "user": "admin"})
+            return {"success": True, "message": "Login successful", "token": token}
+    
     raise HTTPException(status_code=401, detail="Invalid password")
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+@api_router.post("/admin/change-password")
+async def change_admin_password(input: PasswordChange, admin: dict = Depends(get_current_admin)):
+    """Change admin password (requires authentication)"""
+    # Verify current password
+    settings = await db.settings.find_one({"id": "admin_settings"}, {"_id": 0})
+    
+    is_valid = False
+    if settings and settings.get("admin_password_hash"):
+        is_valid = verify_password(input.current_password, settings["admin_password_hash"])
+    else:
+        # Check against env variable
+        is_valid = input.current_password == ADMIN_PASSWORD
+    
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    # Validate new password
+    if len(input.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+    
+    # Hash and store new password
+    new_hash = hash_password(input.new_password)
+    await db.settings.update_one(
+        {"id": "admin_settings"},
+        {"$set": {
+            "id": "admin_settings",
+            "admin_password_hash": new_hash,
+            "password_changed_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    logging.info("Admin password changed successfully")
+    return {"success": True, "message": "Password changed successfully"}
+
+@api_router.post("/admin/verify-token")
+async def verify_admin_token(admin: dict = Depends(get_current_admin)):
+    """Verify if current token is valid"""
+    return {"valid": True, "user": admin.get("user")}
 
 # Admin - Get all records (with optional date filtering)
 @api_router.get("/admin/records", response_model=List[GuestRecord])

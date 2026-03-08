@@ -24,8 +24,11 @@ export default function AdminLogin() {
 
     setLoading(true);
     try {
-      await axios.post(`${API}/admin/login`, { password });
+      const response = await axios.post(`${API}/admin/login`, { password });
+      // Store JWT token
+      const token = response.data.token;
       sessionStorage.setItem("adminAuth", "true");
+      sessionStorage.setItem("adminToken", token);
       toast.success("Login successful");
       navigate("/admin/dashboard");
     } catch (error) {
