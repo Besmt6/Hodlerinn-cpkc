@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-05-v11"  # Added include_prev_day option to sync both dates
+SYNC_AGENT_VERSION = "2026-03-08-v12"  # Fixed progress stuck issue, improved progress tracking
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
@@ -1525,12 +1525,14 @@ class APIGlobalSyncAgent:
                 for entry_num, entry in enumerate(entries, 1):
                     api_name = entry["name"]
                     
-                    # Report progress for all entries
+                    # Report progress for all entries - update UI immediately
                     if self.progress_callback:
                         try:
-                            await self.progress_callback(entry_num, total_entries, api_name)
-                        except:
-                            pass
+                            await self.progress_callback(entry_num, total_entries, f"Processing: {api_name}")
+                            # Small delay to allow UI update
+                            await asyncio.sleep(0.1)
+                        except Exception as pe:
+                            logger.warning(f"Progress callback error: {pe}")
                     
                     already_verified_on_portal = entry.get("verified") or entry.get("has_blue_status")
                     has_employee_id = entry.get("current_emp_id") and entry.get("current_emp_id") != "NO ID"
@@ -1808,11 +1810,11 @@ class APIGlobalSyncAgent:
             # Update progress to indicate final verification phase
             if self.progress_callback:
                 try:
-                    # Use len(hodler_records) as a fallback for total count
                     final_total = len(hodler_records) if hodler_records else 0
-                    await self.progress_callback(final_total, final_total, "Final verification...")
-                except:
-                    pass
+                    await self.progress_callback(final_total, final_total, "Completing final verification...")
+                    await asyncio.sleep(0.1)
+                except Exception as pe:
+                    logger.warning(f"Progress callback error in final phase: {pe}")
             
             await self.page.evaluate('window.scrollTo(0, 0)')
             await self.page.wait_for_timeout(1000)
