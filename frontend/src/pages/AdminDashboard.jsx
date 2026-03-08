@@ -3058,33 +3058,6 @@ export default function AdminDashboard() {
                     Import from Guest Records
                   </Button>
                   
-                  {/* Date Range Scanner */}
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={employeeScanStartDate}
-                      onChange={(e) => setEmployeeScanStartDate(e.target.value)}
-                      className="px-2 py-1.5 bg-vault-dark border border-vault-border rounded text-vault-text text-sm"
-                      placeholder="Start"
-                    />
-                    <span className="text-vault-text-secondary">to</span>
-                    <input
-                      type="date"
-                      value={employeeScanEndDate}
-                      onChange={(e) => setEmployeeScanEndDate(e.target.value)}
-                      className="px-2 py-1.5 bg-vault-dark border border-vault-border rounded text-vault-text text-sm"
-                    />
-                    <Button
-                      onClick={handleCollectDailyFromPortal}
-                      disabled={collectingEmployees || !employeeScanStartDate || !employeeScanEndDate}
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
-                      data-testid="collect-daily-from-portal-btn"
-                    >
-                      <Calendar className="w-4 h-4 mr-2" />
-                      {collectingEmployees ? "Scanning..." : "Scan Dates"}
-                    </Button>
-                  </div>
-                  
                   <Button
                     onClick={() => setShowBulkImport(true)}
                     className="bg-vault-surface border border-vault-border hover:bg-vault-surface-highlight text-vault-text"
