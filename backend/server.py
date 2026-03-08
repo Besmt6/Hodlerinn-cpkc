@@ -3476,7 +3476,7 @@ async def get_voice_settings():
         "voice_speed": settings.get("voice_speed", 0.85) if settings else 0.85
     }
 
-# Pre-defined voice messages
+# Pre-defined voice messages - English
 VOICE_MESSAGES = {
     # Register welcome
     "register_welcome": "Welcome to Hodler Inn. If you are first time here, please register your employee number and name, then go to check in.",
@@ -3523,26 +3523,87 @@ VOICE_MESSAGES = {
     "bitsy_greeting_sold_out": "Hi there! I'm Bitsy, your hotel concierge at Hodler Inn. Unfortunately, we're currently fully booked online. Please call us to check availability."
 }
 
+# Pre-defined voice messages - Spanish
+VOICE_MESSAGES_ES = {
+    # Register welcome
+    "register_welcome": "Bienvenido a Hodler Inn. Si es su primera vez aquí, por favor registre su número de empleado y nombre, luego vaya a registrarse.",
+    
+    # Check-in welcome with full instructions
+    "checkin_instructions_morning": "Buenos días. Bienvenido de nuevo a Hodler Inn. Por favor ingrese el número de habitación, la hora, firme su nombre y haga clic en Completar Registro.",
+    "checkin_instructions_afternoon": "Buenas tardes. Bienvenido de nuevo a Hodler Inn. Por favor ingrese el número de habitación, la hora, firme su nombre y haga clic en Completar Registro.",
+    "checkin_instructions_evening": "Buenas tardes. Bienvenido de nuevo a Hodler Inn. Por favor ingrese el número de habitación, la hora, firme su nombre y haga clic en Completar Registro.",
+    "checkin_instructions_night": "Buenas noches. Bienvenido de nuevo a Hodler Inn. Por favor ingrese el número de habitación, la hora, firme su nombre y haga clic en Completar Registro.",
+    
+    # New employee instructions
+    "new_employee_instructions": "Por favor ingrese su nombre completo y el nombre de la empresa, luego haga clic en Continuar para Registrarse.",
+    
+    # Yellow Card instructions
+    "yellow_card_instructions": "Su número de empleado no se encontró en nuestro sistema. Por favor use la tarjeta amarilla en el escritorio. Escriba su número de empleado y su nombre completo en la tarjeta. El administrador lo agregará al sistema. Si cree que esto es un error, por favor use el teléfono de ayuda.",
+    
+    # Help phone message
+    "help_phone_message": "Por favor llame al Teléfono de Ayuda desde el teléfono de la oficina exterior para que sepamos que alguien necesita ayuda.",
+    
+    # Check-in welcome (short version)
+    "checkin_welcome_morning": "Buenos días. Bienvenido de nuevo a Hodler Inn.",
+    "checkin_welcome_afternoon": "Buenas tardes. Bienvenido de nuevo a Hodler Inn.",
+    "checkin_welcome_evening": "Buenas tardes. Bienvenido de nuevo a Hodler Inn.",
+    "checkin_welcome_night": "Buenas noches. Bienvenido de nuevo a Hodler Inn.",
+    
+    # Check-in complete
+    "checkin_complete": "Que descanse bien.",
+    
+    # Check-out messages
+    "checkout_morning": "Buenos días! Gracias por hospedarse en Hodler Inn. Que tenga un buen viaje. Por favor deje su llave en la caja de llaves en el salón.",
+    "checkout_afternoon": "Buenas tardes! Gracias por hospedarse en Hodler Inn. Que tenga un buen viaje. Por favor deje su llave en la caja de llaves en el salón.",
+    "checkout_evening": "Buenas tardes! Gracias por hospedarse en Hodler Inn. Que tenga un buen viaje. Por favor deje su llave en la caja de llaves en el salón.",
+    "checkout_night": "Buenas noches! Gracias por hospedarse en Hodler Inn. Que tenga un buen viaje. Por favor deje su llave en la caja de llaves en el salón.",
+    
+    # Check-out found
+    "checkout_found": "Reserva encontrada. Por favor ingrese su hora de servicio y presione Completar salida.",
+    
+    # Other reminders
+    "signature_reminder": "Por favor firme su nombre completo de forma legible. Una simple línea o X no será aceptada.",
+    "room_reminder": "Por favor seleccione el número de habitación de la llave en el escritorio. Escriba su nombre y número de habitación en la tarjeta amarilla.",
+    
+    # Bitsy chatbot greeting
+    "bitsy_greeting": "Hola! Soy Bitsy, su conserje del hotel Hodler Inn. ¿Cómo puedo ayudarle hoy?",
+    "bitsy_greeting_sold_out": "Hola! Soy Bitsy, su conserje del hotel Hodler Inn. Desafortunadamente, estamos completamente reservados en línea. Por favor llámenos para verificar disponibilidad."
+}
+
+def get_voice_messages(lang: str = "en") -> dict:
+    """Get voice messages for the specified language"""
+    if lang == "es":
+        return VOICE_MESSAGES_ES
+    return VOICE_MESSAGES
+
 @api_router.get("/voice/{message_id}")
-async def get_voice_message(message_id: str):
-    """Get pre-generated voice message audio file"""
-    audio_file = AUDIO_DIR / f"{message_id}.mp3"
+async def get_voice_message(message_id: str, lang: str = "en"):
+    """Get pre-generated voice message audio file with language support"""
+    # Get appropriate voice messages based on language
+    voice_messages = get_voice_messages(lang)
+    
+    # For Spanish, use a different cache file
+    file_suffix = f"_{lang}" if lang != "en" else ""
+    audio_file = AUDIO_DIR / f"{message_id}{file_suffix}.mp3"
     
     if audio_file.exists():
         return FileResponse(audio_file, media_type="audio/mpeg")
     
     # Generate the audio if it doesn't exist
-    if message_id not in VOICE_MESSAGES:
-        raise HTTPException(status_code=404, detail="Voice message not found")
+    if message_id not in voice_messages:
+        # Fall back to English if message not found in requested language
+        voice_messages = VOICE_MESSAGES
+        if message_id not in voice_messages:
+            raise HTTPException(status_code=404, detail="Voice message not found")
     
     try:
         from emergentintegrations.llm.openai import OpenAITextToSpeech
         
         tts = OpenAITextToSpeech(api_key=os.getenv("EMERGENT_LLM_KEY"))
         audio_bytes = await tts.generate_speech(
-            text=VOICE_MESSAGES[message_id],
+            text=voice_messages[message_id],
             model="tts-1",
-            voice="nova",  # Friendly, upbeat voice
+            voice="nova",  # Friendly, upbeat voice - works well for both English and Spanish
             speed=0.95
         )
         
@@ -3557,26 +3618,33 @@ async def get_voice_message(message_id: str):
         raise HTTPException(status_code=500, detail="Failed to generate voice message")
 
 @api_router.post("/generate-all-voices")
-async def generate_all_voice_messages():
-    """Pre-generate all voice messages (admin only)"""
+async def generate_all_voice_messages(lang: str = "all"):
+    """Pre-generate all voice messages (admin only). Pass lang='en', 'es', or 'all' for both."""
     try:
         from emergentintegrations.llm.openai import OpenAITextToSpeech
         
         tts = OpenAITextToSpeech(api_key=os.getenv("EMERGENT_LLM_KEY"))
         generated = []
         
-        for message_id, text in VOICE_MESSAGES.items():
-            audio_file = AUDIO_DIR / f"{message_id}.mp3"
-            if not audio_file.exists():
-                audio_bytes = await tts.generate_speech(
-                    text=text,
-                    model="tts-1",
-                    voice="nova",
-                    speed=0.95
-                )
-                with open(audio_file, "wb") as f:
-                    f.write(audio_bytes)
-                generated.append(message_id)
+        # Determine which languages to generate
+        languages = ["en", "es"] if lang == "all" else [lang]
+        
+        for language in languages:
+            voice_messages = get_voice_messages(language)
+            file_suffix = f"_{language}" if language != "en" else ""
+            
+            for message_id, text in voice_messages.items():
+                audio_file = AUDIO_DIR / f"{message_id}{file_suffix}.mp3"
+                if not audio_file.exists():
+                    audio_bytes = await tts.generate_speech(
+                        text=text,
+                        model="tts-1",
+                        voice="nova",
+                        speed=0.95
+                    )
+                    with open(audio_file, "wb") as f:
+                        f.write(audio_bytes)
+                    generated.append(f"{message_id}{file_suffix}")
         
         return {"message": "Voice messages generated", "generated": generated}
         
@@ -3688,35 +3756,59 @@ def fix_pronunciation(name: str) -> str:
     return ' '.join(fixed_words)
 
 @api_router.get("/voice-dynamic/{message_type}/{name}")
-async def get_dynamic_voice(message_type: str, name: str, greeting: str = None):
-    """Generate voice message with dynamic name (for Fully Kiosk compatibility)"""
+async def get_dynamic_voice(message_type: str, name: str, greeting: str = None, lang: str = "en"):
+    """Generate voice message with dynamic name (for Fully Kiosk compatibility) with language support"""
     try:
         from emergentintegrations.llm.openai import OpenAITextToSpeech
         
         # Format name for natural speech (convert "BAKER,(AUSTIN) E" to "Austin Baker")
         spoken_name = format_name_for_speech(name)
         
-        # Use greeting from frontend (user's local time) or fallback to server time
-        if not greeting:
-            hour = datetime.now().hour
-            if 5 <= hour < 12:
-                greeting = "Good morning"
-            elif 12 <= hour < 17:
-                greeting = "Good afternoon"
-            elif 17 <= hour < 21:
-                greeting = "Good evening"
+        # Build message based on type and language
+        if lang == "es":
+            # Spanish greetings
+            if not greeting:
+                hour = datetime.now().hour
+                if 5 <= hour < 12:
+                    greeting = "Buenos días"
+                elif 12 <= hour < 17:
+                    greeting = "Buenas tardes"
+                elif 17 <= hour < 21:
+                    greeting = "Buenas tardes"
+                else:
+                    greeting = "Buenas noches"
+            
+            # Spanish messages
+            if message_type == "checkin":
+                text = f"{greeting}, {spoken_name}. Bienvenido de nuevo a Hodler Inn. Por favor ingrese el número de habitación, la hora, firme su nombre y haga clic en Completar Registro."
+            elif message_type == "checkin_new":
+                text = f"{greeting}, {spoken_name}. Bienvenido a Hodler Inn. Por favor ingrese el número de habitación, la hora, firme su nombre y haga clic en Completar Registro."
+            elif message_type == "checkout_found":
+                text = f"Reserva encontrada para {spoken_name}. Por favor ingrese su hora de servicio y presione Completar salida."
             else:
-                greeting = "Good night"
-        
-        # Build message based on type
-        if message_type == "checkin":
-            text = f"{greeting}, {spoken_name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In."
-        elif message_type == "checkin_new":
-            text = f"{greeting}, {spoken_name}. Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In."
-        elif message_type == "checkout_found":
-            text = f"Booking found for {spoken_name}. Please enter your on duty time and press Complete check out."
+                raise HTTPException(status_code=400, detail="Invalid message type")
         else:
-            raise HTTPException(status_code=400, detail="Invalid message type")
+            # English greetings (default)
+            if not greeting:
+                hour = datetime.now().hour
+                if 5 <= hour < 12:
+                    greeting = "Good morning"
+                elif 12 <= hour < 17:
+                    greeting = "Good afternoon"
+                elif 17 <= hour < 21:
+                    greeting = "Good evening"
+                else:
+                    greeting = "Good night"
+            
+            # English messages
+            if message_type == "checkin":
+                text = f"{greeting}, {spoken_name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In."
+            elif message_type == "checkin_new":
+                text = f"{greeting}, {spoken_name}. Welcome to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In."
+            elif message_type == "checkout_found":
+                text = f"Booking found for {spoken_name}. Please enter your on duty time and press Complete check out."
+            else:
+                raise HTTPException(status_code=400, detail="Invalid message type")
         
         tts = OpenAITextToSpeech(api_key=os.getenv("EMERGENT_LLM_KEY"))
         audio_bytes = await tts.generate_speech(

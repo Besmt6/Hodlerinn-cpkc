@@ -1,284 +1,205 @@
 <analysis>**original_problem_statement:**
-The user requested a series of new features to be added to the Hodler Inn application. The core requirements implemented in this session were:
+The user initially requested a bug fix for a CPKC email parser. This evolved into a large-scale project to professionalize the application, which involved:
+1.  **Security Hardening:** Implementing a robust, server-side token-based authentication system for the admin panel, including a secure password change and recovery flow using email OTPs.
+2.  **Bug Fixing (Sync Agent):** Addressing multiple recurring issues where the sync agent would hang, time out on specific entries (e.g., MIKE EPPS), or fail to handle duplicate records correctly when marking them as No Bill.
+3.  **Feature Enhancement (Guest Portal):** Improving the guest check-in experience by blocking unknown employees from checking in, providing them with instructions, and suggesting correct employee numbers for near-matches to prevent duplicate entries.
+4.  **Deployment & CI/CD:** Overhauling the repository structure to support a professional CI/CD pipeline. This included adding GitHub Actions for CI and AWS deployment, cleaning up environment configuration, and removing the local MongoDB dependency from Docker Compose.
+5.  **Code Refactoring:** Applying numerous patches to improve code quality, security, and maintainability, based on a comprehensive code audit.
 
-**Feature Requests:**
-1.  **Per-Recipient Email Alerts:** Allow admins to customize which email alerts each recipient receives.
-2.  **Email Preview:** Add a feature to preview the content of each email alert before it is sent.
-3.  **Dashboard Room Search:** Implement a search bar on the admin dashboard to filter guest records by room number.
-4.  **AI Booking Chatbot (Bitsy):**
-    *   Create a new  page with a conversational AI chatbot for making reservations.
-    *   The chatbot should be named Bitsy.
-    *   It must handle the entire booking flow: collecting guest details, checking availability, and creating a reservation.
-    *   It should not collect payment but should inform guests to confirm by phone.
-    *   It must send email confirmations and Telegram notifications.
-    *   The chatbot needs to support voice input.
-5.  **Admin-Managed Chatbot Settings:**
-    *   Create a UI for admins to set rates (single/double), sales tax, and the maximum number of rooms the chatbot can sell per day.
-    *   The chatbot must use these settings for real-time pricing and availability checks.
-6.  **Demo Mode:** Create a sandboxed version of the guest and admin portals (, ) that uses a separate test database to allow for safe, interactive demonstrations without affecting production data.
-7.  **Manual Back-Dated Entry:** Add a form in the admin panel to allow for the manual entry of past check-ins, which should be included in billing records.
-8.  **CPKC Email Scraper:**
-    *   Build a service to automatically connect to a Zoho email account, find emails from , and parse the attached PDF booking sheets.
-    *   Import these guests as Expected Arrivals into the system.
-    *   The chatbot's availability logic must be updated to block sales when these arrivals are expected.
-    *   Create a UI in the admin dashboard to view and manage these expected arrivals.
-9.  **Blockchain/Token Rewards Idea:** The user expressed interest in a future loyalty token system. This has been noted but not implemented.
+PRODUCT REQUIREMENTS:
+1.  **Secure Admin Access:** All admin functionality must be protected by a server-enforced session. Password management must be secure and include a recovery option.
+2.  **Reliable Sync Agent:** The data sync with the external portal must be robust, complete without hanging, and correctly handle all edge cases like duplicate entries.
+3.  **Robust Guest Check-in:** The guest portal must prevent the creation of duplicate employee records by validating employee numbers against the existing list and guiding users with incorrect numbers.
+4.  **Production-Ready Deployment:** The repository must be clean, secure, and support an automated CI/CD pipeline for deployments to AWS.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The application is a feature-rich, full-stack platform for managing railroad crew accommodations. In this session, it was significantly expanded with numerous high-level features. Key additions include:
+The application is a full-stack hotel management system (FastAPI + React) that has undergone significant security hardening and bug fixing. A robust server-side authentication system using HMAC-signed session tokens is now in place, protecting all admin routes. It includes a full password change/recovery flow with email-based OTP.
 
-1.  **AI Booking Chatbot (Bitsy):** A complete conversational booking agent at the  endpoint, featuring voice input, dynamic pricing, and real-time availability checks.
-2.  **CPKC Email Scraper:** An automated background service that checks a Zoho inbox every 5 minutes, parses PDF attachments from CPKC, and imports them as Expected Arrivals.
-3.  **Advanced Admin Controls:** New UI sections for managing per-recipient email alerts, chatbot pricing/limits, manual back-dated entries, and viewing expected arrivals.
-4.  **Full Demo Mode:** A complete, interactive, and sandboxed version of the application accessible via  and  routes, using a separate database.
-5.  **UI/UX Enhancements:** A search filter for rooms on the main dashboard and an email preview modal.
-
-The backend monolith () and frontend monolith () have grown substantially to accommodate this new logic.
+The guest portal has been enhanced to prevent duplicate employee entries by validating numbers and guiding users with near-matches. The sync agent has received multiple patches (up to v17) to address hanging, timeouts, and logic errors, though its reliability is still a concern. The project has been restructured for professional deployment with new CI/CD workflows, a cleaned-up Docker setup using a hosted MongoDB (Atlas), and improved documentation.
 
 **Last working item**:
--   **Last item agent was working:** Generating a PDF file containing the HTML/CSS code for embedding the Bitsy chatbot onto a WordPress site.
--   **Status:** FINISHED
--   **Agent Testing Done:** N/A
--   **Which testing method agent to use?** NA
--   **User Testing Done:** Y
+-   **Last item agent was working:** The user was stuck in a login loop where successfully logging in would immediately redirect them back to the login page. The agent diagnosed that a  hook in  was incorrectly clearing the auth token on every page load. The fix was to only clear the token if no valid token already existed.
+-   **Status:** USER VERIFICATION PENDING
+-   **Agent Testing Done:** Y
+-   **Which testing method agent to use?** Manual testing. The user confirmed the fix works in a private browser window. The agent should instruct the user to clear their browser cache and session storage for the application's domain and try again in their normal browser to finalize verification.
+-   **User Testing Done:** Y (Partial, in a private window)
 
 **All Pending/In progress Issue list**:
--   **Issue 1: Final User Verification of Auto-Sync v11 Logic (P0)**
--   **Issue 2: Untested Employee Import Feature (v2) (P1)**
--   **Issue 3: Voice Message Echo and Overlap (P2)**
+-   Issue 1: Sync Agent is unreliable and hangs/times out (P0)
+-   Issue 2: GitHub Actions CI/CD Workflow needs cleanup (P1)
+-   Issue 3: Test Duplicate Entry Handling for SALTER (P1)
+-   Issue 4: Voice Message Echo and Overlap on Guest Portal (P2)
+-   Issue 5: Fix Duplicate Telegram Alerts (P2)
 
 **Issues Detail:**
--   **Issue 1: Final User Verification of Auto-Sync v11 Logic (P0)**
-    -   **Attempted fixes:** The v11 logic was deployed to AWS. The user was supposed to verify if test entries (EWING, HOLLEY) were correctly synced on March 5th.
-    -   **Next debug checklist:** Ask the user for the results of the verification. If it failed, inspect the  logs on the user's AWS server.
-    -   **Why fix this issue and what will be achieved with the fix?** This is the final validation for the app's most critical feature.
-    -   **Status:** USER VERIFICATION PENDING
+-   **Issue 1: Sync Agent is unreliable and hangs/times out (P0)**
+    -   **Attempted fixes:** Multiple versions (v13-v17) were created to address the agent getting stuck. Fixes included: removing slow final verification scans, improving timeout handling, optimizing Playwright search logic ( to ), and adding logic to skip already-processed duplicate entries when clicking No Bill.
+    -   **Next debug checklist:**
+        1.  Confirm with the user if the  deployment was successful.
+        2.  Ask the user to run a sync for a date with known duplicates (e.g., the one with ELLENBURG and MCDONALD).
+        3.  Monitor the sync progress and check the final report for hangs or errors.
+        4.  If it still fails, investigate the Playwright interactions within the  and  functions in  for the specific entry it hangs on.
+    -   **Why fix this issue and what will be achieved with the fix?** This is a core function of the application. A reliable sync is critical for accurate billing and operations.
+    -   **Status:** IN PROGRESS
     -   **Is recurring issue?** Y
-    -   **Should Test frontend/backend/both after fix?** Backend
-    -   **Blocked on other issue:** None
+    -   **Should Test frontend/backend/both after fix?** Backend.
+    -   **Blocked on other issue:** None.
 
--   **Issue 2: Untested Employee Import Feature (v2) (P1)**
-    -   **Attempted fixes:** A new function  was created in .
-    -   **Next debug checklist:** Ask the user to test the Import from Portal button on the admin dashboard and report the results.
-    -   **Why fix this issue and what will be achieved with the fix?** Provides a core required feature for building the employee database.
-    -   **Status:** USER VERIFICATION PENDING
-    -   **Is recurring issue?** Y
-    -   **Should Test frontend/backend/both after fix?** Backend
-    -   **Blocked on other issue:** None
+-   **Issue 2: GitHub Actions CI/CD Workflow needs cleanup (P1)**
+    -   **Attempted fixes:** Agent added new  and  files.
+    -   **Next debug checklist:** The user stated, After sometime we work ci and cd stuff. The agent should confirm with the user if they are ready to proceed. If so, offer to delete the legacy  file from the user's GitHub repository to prevent conflicts.
+    -   **Why fix this issue and what will be achieved with the fix?** To enable a stable, automated CI/CD pipeline to production, which was a primary goal.
+    -   **Status:** NOT STARTED (User deferred)
+    -   **Is recurring issue?** N
+    -   **Should Test frontend/backend/both after fix?** N/A (DevOps task).
+    -   **Blocked on other issue:** None.
 
--   **Issue 3: Voice Message Echo and Overlap (P2)**
-    -   **Attempted fixes:** A fix was implemented in a prior session.
-    -   **Next debug checklist:** Ask the user to test the voice message feature on the guest portal.
-    -   **Why fix this issue and what will be achieved with the fix?** Ensures a smooth user experience on the guest-facing kiosk.
+-   **Issue 3: Test Duplicate Entry Handling for SALTER (P1)**
+    -   **Attempted fixes:** Logic was added in a previous session.
+    -   **Next debug checklist:** This is from the original handoff. Once deployment is stable, ask the user to run a manual sync for **March 4th, 2026**, and verify the report shows one SALTER entry as Verified and the duplicate as No Bill.
     -   **Status:** USER VERIFICATION PENDING
     -   **Is recurring issue?** Y
-    -   **Should Test frontend/backend/both after fix?** Frontend
-    -   **Blocked on other issue:** None
+    -   **Should Test frontend/backend/both after fix?** Backend.
+    -   **Blocked on other issue:** Sync Agent is unreliable.
+
+-   **Issue 4: Voice Message Echo and Overlap on Guest Portal (P2)**
+    -   **Attempted fixes:** None.
+    -   **Next debug checklist:** After deployment, ask the user to test the voice message feature on the Guest Portal () and provide specific steps to reproduce the echo/overlap.
+    -   **Status:** USER VERIFICATION PENDING
+    -   **Is recurring issue?** Y
+    -   **Should Test frontend/backend/both after fix?** Frontend.
+    -   **Blocked on other issue:** None.
+
+-   **Issue 5: Fix Duplicate Telegram Alerts (P2)**
+    -   **Attempted fixes:** Flag-based check added in a previous session.
+    -   **Next debug checklist:** After deployment, ask the user to monitor scheduled alerts to confirm only single alerts are sent.
+    -   **Status:** USER VERIFICATION PENDING
+    -   **Is recurring issue?** Y
+    -   **Should Test frontend/backend/both after fix?** Backend.
+    -   **Blocked on other issue:** None.
 
 **In progress Task List**:
-None. All tasks initiated in this session were completed.
+-   **Task 1: Complete Backend & Frontend Refactoring (P1)**
+    -   **Where to resume:** Continue moving logic out of  and breaking down the  component. Although many security and auth improvements were made, the core files remain monolithic.
+    -   **What will be achieved with this?** A professional, maintainable, and scalable codebase.
+    -   **Status:** IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?** Both.
+    -   **Blocked on something:** None.
 
 **Upcoming and Future Tasks**
-- **Upcoming Tasks:**
-    - (P0) Deploy all newly created features (Chatbot, Demo Mode, Email Scraper, etc.) to the production environment.
-    - (P0) Conduct thorough user verification of all new features on the production environment after deployment.
-    - (P1) AI Phone Agent Implementation (Blocked: pending info from user's Virtual PBX provider).
-    - (P1) Smart Lock Integration (Blocked: pending user research on vendor API).
-
-- **Future Tasks:**
-    - (P2) **HODL Rewards Token:** Implement the discussed blockchain/loyalty token system.
-    - (P2) **Code Refactoring:** Decompose the monolithic  and  files. This is now critical due to the significant additions in this session.
-    - (P3) White-Label SaaS Version.
+-   **Upcoming Tasks:**
+    -   (P0) **Deploy & Verify All Recent Changes:** The user stated they were deploying. The top priority is to confirm the deployment status and then verify that all recent fixes (login loop, guest portal flow, sync agent v17) are working in production.
+    -   (P1) **Twilio SMS OTP Integration:** Blocked pending user providing Twilio credentials.
+    -   (P1) **AI Phone Agent Integration:** Blocked pending phone company confirmation.
+-   **Future Tasks:**
+    -   (P2) **Smart Lock Integration:** Blocked pending user research on a vendor API.
+    -   (P2) **BlockStay SaaS Platform Book:** User has expressed interest.
 
 **Completed work in this session**
-- **Per-Recipient Email Alerts:** Implemented and tested a UI for admins to control which alerts each recipient gets.
-- **Email Preview Modal:** Added a feature to preview alert emails before sending.
-- **Dashboard Room # Search:** Created a search filter on the admin dashboard.
-- **AI Booking Chatbot (Bitsy):** Built a complete conversational booking agent with voice input, dynamic admin-controlled pricing/tax, real-time availability, email/Telegram notifications, and a new  page.
-- **Full Demo Mode:** Created sandboxed  and  routes that use a separate, resettable test database.
-- **Manual Entry Form:** Added a modal for admins to add back-dated guest check-ins.
-- **CPKC Email Scraper:** Built an automated service to check a Zoho inbox, parse PDF attachments, and import Expected Arrivals.
-- **Expected Arrivals UI:** Added a section in the admin dashboard to view and manage guests imported from emails.
-- **Application-wide Address Correction:** Updated the business address to 820 US-59, Heavener, OK 74937 across all relevant parts of the application.
-- **Generated Documentation:** Created a PDF with embed code for the chatbot.
+-   **Security Overhaul:** Implemented server-side HMAC session tokens with middleware to protect all admin API routes. Updated the frontend with  and  interceptors to handle the new token-based auth.
+-   **Password Recovery:** Added a complete Forgot Password and Change Password flow with email OTP verification.
+-   **Guest Portal Check-in Enhancement:** Blocked check-in for unknown employees and added a feature to detect and suggest similar employee numbers to prevent duplicates.
+-   **Sync Agent Fixes (v13-v17):** Addressed multiple sync failures, including hangs, timeouts, and incorrect handling of duplicate No Bill entries.
+-   **Admin Login Fix:** Resolved a login loop caused by improper token clearing in .
+-   **Repository Professionalization:** Applied numerous patches to add CI/CD workflows (, ), overhaul  for a hosted DB, create , and improve all READMEs.
 
 **Earlier issues found/mentioned but not fixed**
-None.
+-   **Issue 1: Voice Message Echo and Overlap on Guest Portal**
+    -   **Debug checklist:** This is a recurring issue from a previous fork, pending user testing and reproduction steps after the next successful deployment.
+    -   **Why to solve this issue and what will be achieved with this?** Improves the guest experience on the kiosk.
+    -   **Should Test frontend/backend/both after fix:** Frontend.
+    -   **Is recurring issue?** Y
 
 **Known issue recurrence from previous fork**
--   **AI Sync Agent Failure:** Verification is still pending. Status: USER VERIFICATION PENDING.
--   ** on AWS:** Believed to be resolved by a  upgrade, but requires long-term monitoring. Status: RESOLVED (pending monitoring).
+-   **AI Sync Agent Failure:** The sync agent continues to be the primary source of bugs. It has been patched multiple times for various timeout, hanging, and logic errors, but remains brittle. Its reliability is a top concern.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Frontend:** React, Tailwind CSS, Shadcn UI
--   **Backend:** FastAPI, , 
--   **Database:** MongoDB Atlas
--   **LLM Integration:**  for GPT-5.2.
--   **Email Scraping:**  (for IMAP) and usage: pdfplumber [-h] [--structure | --structure-text]
-                  [--format {csv,json,text}] [--types TYPES [TYPES ...]]
-                  [--include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]]
-                  [--exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]]
-                  [--laparams LAPARAMS] [--precision PRECISION]
-                  [--pages PAGES [PAGES ...]] [--indent INDENT]
-                  [infile]
-
-positional arguments:
-  infile
-
-options:
-  -h, --help            show this help message and exit
-  --structure           Write the structure tree as JSON. All other arguments
-                        except --pages, --laparams, and --indent will be
-                        ignored
-  --structure-text      Write the structure tree as JSON including text
-                        contents. All other arguments except --pages,
-                        --laparams, and --indent will be ignored
-  --format {csv,json,text}
-  --types TYPES [TYPES ...]
-  --include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]
-                        Include *only* these object attributes in output.
-  --exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]
-                        Exclude these object attributes from output.
-  --laparams LAPARAMS
-  --precision PRECISION
-  --pages PAGES [PAGES ...]
-  --indent INDENT       Indent level for JSON pretty-printing. (for PDF parsing).
--   **Web Automation:** Playwright (for sync agent).
--   **Deployment:** Docker, Docker Compose, AWS EC2.
+-   **Authentication:** **HMAC-signed session tokens**. The backend generates a signed, expiring token on login. Middleware on all  routes verifies this token from the  header or an  query parameter. The frontend uses  interceptors to manage this automatically.
+-   **Backend:** FastAPI, PyMongo, Playwright, .
+-   **Frontend:** React, React Router, , .
+-   **Database:** MongoDB Atlas (hosted).
+-   **CI/CD:** Docker, Docker Compose, GitHub Actions for deploying to AWS (ECR/ECS).
 
 **key DB schema**
--   ****: Heavily modified to include , , , , .
--   ****: (New) Stores guest data parsed from CPKC emails before they check in.
--   ****: (New) Logs instances where the chatbot could not make a sale due to CPKC priority.
--   **Demo Collections**: All collections can now be prefixed with  (e.g., ) when accessed via the demo mode routes.
+-   : A new collection to store temporary, expiring OTPs for password change/recovery.
+-   : Stores the SHA-256 hashed admin password (), which is prioritized over the  password during login.
+
+**changes in tech stack**
+-   The application now exclusively uses a hosted MongoDB (Atlas) and has removed its local MongoDB container dependency.
+-   **HMAC/hashlib** are now used for the new session-based authentication system.
 
 **All files of reference**
--   : Massively expanded with chatbot, demo, manual entry, and email scraping logic.
--   : Massively expanded with UI for all new admin features.
--   : New file for the chatbot interface.
--   : New file, wrapper for demo mode.
--   : New file, wrapper for demo mode.
--   : Modified to include new  and  routes.
--   : Updated with  and usage: pdfplumber [-h] [--structure | --structure-text]
-                  [--format {csv,json,text}] [--types TYPES [TYPES ...]]
-                  [--include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]]
-                  [--exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]]
-                  [--laparams LAPARAMS] [--precision PRECISION]
-                  [--pages PAGES [PAGES ...]] [--indent INDENT]
-                  [infile]
-
-positional arguments:
-  infile
-
-options:
-  -h, --help            show this help message and exit
-  --structure           Write the structure tree as JSON. All other arguments
-                        except --pages, --laparams, and --indent will be
-                        ignored
-  --structure-text      Write the structure tree as JSON including text
-                        contents. All other arguments except --pages,
-                        --laparams, and --indent will be ignored
-  --format {csv,json,text}
-  --types TYPES [TYPES ...]
-  --include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]
-                        Include *only* these object attributes in output.
-  --exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]
-                        Exclude these object attributes from output.
-  --laparams LAPARAMS
-  --precision PRECISION
-  --pages PAGES [PAGES ...]
-  --indent INDENT       Indent level for JSON pretty-printing..
+-   **Heavily Modified:** , , , , .
+-   **Created:** , , , , , , .
+-   **Modified:** , , , .
 
 **Areas that need refactoring**:
--   : Now critically oversized (estimated 3500+ lines). Urgently needs to be broken down into feature-specific routers (e.g., , , ).
--   : Also critically oversized (estimated 5000+ lines). Must be decomposed into smaller, manageable components. The technical debt has increased significantly.
+-   : **CRITICAL.** Remains a monolith despite many additions. Needs to be broken down into modular routers.
+-   : **CRITICAL.** This is a massive component that should be decomposed into smaller, manageable pieces.
 
 **key api endpoints**
--    (POST),  (POST),  (GET)
--    (POST)
--    (POST)
--    (POST)
--    (POST),  (GET/DELETE),  (POST/GET)
--    (GET)
+-   **MODIFIED:**  - Now returns an HMAC session token and its expiry.
+-   **MODIFIED:** All  endpoints - Now protected by server-side HMAC token middleware. PDF export endpoints also accept the token as a query parameter ().
+-   **NEW:** ,  - For Forgot Password flow.
+-   **NEW:**  - For the secure Change Password flow.
+-   **MODIFIED:**  - Now returns suggestions for similar numbers if an exact match is not found.
 
 **Critical Info for New Agent**
--   **Deploy and Verify:** The immediate next step is for the user to deploy the massive number of new features. Post-deployment, a thorough verification of every new feature on the production domain () is the highest priority.
--   **Technical Debt:** Be aware that the two main files (, ) are now extremely large and difficult to maintain. Any future work should ideally start with refactoring.
--   **User Verification Items:** Do not forget the three pending user verification items from previous sessions (v11 sync, employee import, voice echo). These are still high-priority.
--   **Future Ideas:** The user is interested in a blockchain-based rewards token ( or ). This has been saved to memory and should be brought up again after the current feature set is stable.
+-   **Authentication System has been Overhauled:** The admin panel now uses a server-enforced HMAC session token system. The frontend uses a  component and  interceptors. Be aware that the user encountered a login loop due to this change, which was traced to a browser caching issue after the code was fixed.
+-   **The Sync Agent is Brittle:** This is the most significant recurring problem. Multiple patches (v13-v17) have been applied to fix hangs, timeouts, and duplicate handling, but it remains a high-risk component. Any further work should be tested thoroughly.
+-   **Deployment is the Immediate Next Step:** The user's last action was to deploy the latest changes. Your first task is to verify the deployment status and then test the recent fixes (especially the sync agent v17, guest portal flow, and login).
+-   **Repository Structure has Changed:** New CI/CD workflows, documentation, and a  for a hosted DB have been added via patches. Do not rely on the original handoff for deployment info; refer to .
 
 **documents and test reports created in this job**
 -   
 -   
+-   
+-   
+-   
+-    (updated)
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User:** Asks for blockchain/reward token ideas. (Agent provided ideas, user deferred).
-2.  **User:** Confirms how the auto-dirty room status feature works. (Agent confirmed).
-3.  **User:** Asks for the code to add the Bitsy chatbot to their WordPress site. (Agent provided multiple options).
-4.  **User:** Asks for a PDF version of the embed code. (Agent created it).
-5.  **User:** Acknowledges the agent's work with Ok thanks.
-6.  **User:** States they will wait for the verifications at 3 PM Central.
-7.  **User:** Asks what the Enhancement Suggestion was. (Agent explained Email Preview).
-8.  **User:** Approves the implementation of the Email Preview feature.
-9.  **User:** Provides requirements for dashboard search and an AI chatbot for reservations.
-10. **User:** Specifies that the chatbot should open on a Book Now page.
+10. **User:** I fixed manually we wait until tomorrow i deploy now - **Status: Actioned.** Agent acknowledged and prepared for deployment verification.
+9.  **User:** Reports sync PDF with duplicate No Bill entries. - **Status: Completed.** Agent fixed this in v17.
+8.  **User:** what change today why sync agent is not runing good it stuck... - **Status: Completed.** Agent applied multiple fixes (v15, v16) for sync hanging issues.
+7.  **User:** Defers working on CI/CD. - **Status: Acknowledged.**
+6.  **User:** ok thanks - Acknowledging deployment agent's confirmation. - **Status: Acknowledged.**
+5.  **User:** Asks for help with deployment errors. - **Status: Completed.** Agent identified them as old logs and confirmed the code was already fixed.
+4.  **User:** on guest portal we have to stop employee check in... - **Status: Completed.** Agent implemented the new guest portal flow.
+3.  **User:** why i am not able to login to admin panel - **Status: Completed.** Agent diagnosed the login loop.
+2.  **User:** logged in privet window - **Status: Completed.** User confirms the login fix works, indicating a cache issue on their end.
+1.  **User:** Still stuck here - Reporting sync agent progress issue with a screenshot. - **Status: Completed.** Agent investigated and applied fixes.
 
 **Project Health Check:**
--   **Broken:** Nothing is broken in the preview environment. However, a massive number of new, complex, and largely untested (by testing agent) features are pending deployment. There is a high risk of bugs on production.
+-   **Broken:**
+    -   The Sync Agent remains unreliable and prone to hanging/timing out on edge cases, making it the highest priority for stabilization.
 -   **Mocked:** None.
 
 **3rd Party Integrations**
 -   **API Global Solutions - Rail Portal:** Integrated via Playwright.
--   **OpenAI TTS-1 & GPT-5.2:** Integrated via  for voice guidance and the chatbot.
+-   **Zoho Mail:** Used for receiving (IMAP) and sending (SMTP) emails.
+-   **Zoho Drive:** Integrated for report uploads.
+-   **OpenAI TTS-1 & GPT-5.2:** Integrated via .
 -   **Telegram:** Integrated for admin notifications.
--   **Zoho WorkDrive/Mail:** Integrated via  for daily backups and now email scraping.
 -   **MongoDB Atlas:** Primary database.
--   **usage: pdfplumber [-h] [--structure | --structure-text]
-                  [--format {csv,json,text}] [--types TYPES [TYPES ...]]
-                  [--include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]]
-                  [--exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]]
-                  [--laparams LAPARAMS] [--precision PRECISION]
-                  [--pages PAGES [PAGES ...]] [--indent INDENT]
-                  [infile]
-
-positional arguments:
-  infile
-
-options:
-  -h, --help            show this help message and exit
-  --structure           Write the structure tree as JSON. All other arguments
-                        except --pages, --laparams, and --indent will be
-                        ignored
-  --structure-text      Write the structure tree as JSON including text
-                        contents. All other arguments except --pages,
-                        --laparams, and --indent will be ignored
-  --format {csv,json,text}
-  --types TYPES [TYPES ...]
-  --include-attrs INCLUDE_ATTRS [INCLUDE_ATTRS ...]
-                        Include *only* these object attributes in output.
-  --exclude-attrs EXCLUDE_ATTRS [EXCLUDE_ATTRS ...]
-                        Exclude these object attributes from output.
-  --laparams LAPARAMS
-  --precision PRECISION
-  --pages PAGES [PAGES ...]
-  --indent INDENT       Indent level for JSON pretty-printing.**: New dependency for parsing PDF attachments.
+-   **PyMuPDF ():** Used for PDF color analysis.
+-   **PyJWT & HMAC/hashlib:** Used for authentication.
+-   **Twilio:** Planned for SMS OTP.
 
 **Testing status**
--   **Testing agent used after significant changes:** NO. The agent used the testing agent once for the initial email alert feature but did not use it for any of the subsequent, much larger features (chatbot, demo mode, email scraper). This is a significant testing gap.
--   **Troubleshoot agent used after agent stuck in loop:** NO
+-   **Testing agent used after significant changes:** NO.
+-   **Troubleshoot agent used after agent stuck in loop:** NO.
 -   **Test files created:** []
--   **Known regressions:** The employee import feature (v2) is untested and likely non-functional.
+-   **Known regressions:** The sync agent has repeatedly shown regressions where one fix appears to cause or reveal another issue.
 
 **Credentials to test flow:**
--   **Admin Login:** Access at  (or  for demo) with password .
--   **Zoho Credentials:** Required for the email scraper. They are in .
--   **Emergent LLM Key:** Required for the chatbot. It is in .
+-   **Admin Login:** The password is now managed via a hash in the  collection. The user can reset it using the Forgot Password link on the admin login page, which triggers an OTP email to . The original fallback password in the  file is .
 
 **What agent forgot to execute**
-- The agent did not use the  after implementing several large, critical features like the AI chatbot, demo mode, and the email scraper. Self-testing with  and screenshots is insufficient for features of this complexity.
-- The agent continued to add thousands of lines of code to the monolithic  and  files without prioritizing the refactoring task mentioned in the handoff summary. This has significantly worsened the application's technical debt.</analysis>
+-   The agent did not create any automated tests (e.g., pytest) for the new backend logic, especially for the critical and fragile sync agent.
+-   The agent did not proactively ask to delete the legacy  file from the user's repository after adding the new workflows, which could cause CI conflicts.</analysis>

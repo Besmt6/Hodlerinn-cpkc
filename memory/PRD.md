@@ -15,6 +15,7 @@ Build a comprehensive hotel management system for Hodler Inn, serving railroad c
 - [x] QR code scanning for guest identification
 - [x] Room assignment system
 - [x] Non-railroad guest check-in flow
+- [x] **Spanish Language Support** - Full UI and voice translation for Bitsy
 
 ### AI Concierge (Bitsy)
 - [x] Voice-enabled chatbot on BookNow page
@@ -22,6 +23,7 @@ Build a comprehensive hotel management system for Hodler Inn, serving railroad c
 - [x] Text-to-speech responses (OpenAI TTS-1)
 - [x] Auto-mic toggle feature
 - [x] Rate card display (shows once)
+- [x] **Bilingual Support (English/Spanish)** - Voice messages and UI text
 
 ### Sync Agent (Portal Reconciliation)
 - [x] Automated sync with API Global Solutions portal
@@ -60,6 +62,13 @@ Build a comprehensive hotel management system for Hodler Inn, serving railroad c
 6. **Voice Echo on Guest Portal** - Reported but not reproduced
 
 ## Recently Completed (March 2026)
+- ✅ **Spanish Language Support for Bitsy** (March 8, 2026)
+  - Language toggle button (EN/ES) in Guest Portal header
+  - Auto-detect from browser language settings
+  - Full UI translation for check-in/check-out forms
+  - Spanish TTS voice messages via OpenAI
+  - LocalStorage persistence for language preference
+  - Backend `/voice/{id}?lang=es` and `/voice-dynamic/{type}/{name}?lang=es` endpoints
 - ✅ **OTP Email Verification** - Email-based OTP required for both password change and password recovery (forgot password)
 - ✅ **Security Hardening** - JWT authentication for admin panel, password change feature, removed all hardcoded credentials
 - ✅ **CPKC Check-Out Detection** - Green highlighting detection using PyMuPDF
@@ -90,4 +99,4 @@ Build a comprehensive hotel management system for Hodler Inn, serving railroad c
 - **Infrastructure:** Docker, AWS EC2, GitHub Actions CI/CD
 
 ---
-*Last Updated: March 2026*
+*Last Updated: March 8, 2026*

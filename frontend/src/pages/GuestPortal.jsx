@@ -33,13 +33,160 @@ import {
   Maximize,
   Minimize,
   HelpCircle,
-  Filter
+  Filter,
+  Globe
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// Language translations for Bitsy UI text
+const translations = {
+  en: {
+    // Main Menu
+    welcomeTitle: "Welcome to Hodler Inn",
+    railroadCrew: "Railroad Crew Check In Here",
+    selectOption: "Select an option below to continue",
+    checkIn: "Check In",
+    checkOut: "Check Out",
+    viewSignInSheet: "View Sign-In Sheet",
+    howToUseHelp: "How to Use / Help",
+    // Check-in form
+    guestCheckIn: "Guest Check-In",
+    employeeNumber: "Employee Number",
+    tapToEnterNumber: "⬇️ TAP HERE to enter number",
+    name: "Name",
+    nameAutoAppear: "Name will appear automatically",
+    welcome: "Welcome!",
+    roomNumber: "Room Number",
+    tapToEnterRoom: "⬇️ TAP HERE to enter room",
+    date: "Date",
+    time: "Time",
+    signature: "Signature (sign below)",
+    clear: "Clear",
+    completeCheckIn: "Complete Check-In",
+    processing: "Processing...",
+    // Employee not found
+    employeeIdNotFound: "Employee ID Not Found",
+    notInSystem: "Your employee number is not in our system.",
+    didYouMean: "Did you mean one of these?",
+    tapCorrectNumber: "Tap the correct number above to use it",
+    pleaseUseYellowCard: "Please Use Yellow Card",
+    yellowCardInstructions: "Write your Employee Number and Name on the Yellow Card.",
+    adminWillAdd: "Admin will add you to the system.",
+    ifError: "If you believe this is an error, please contact the front desk or call the Help Phone.",
+    // Check-out
+    guestCheckOut: "Guest Check-Out",
+    findMyBooking: "Find My Booking",
+    findingBooking: "Finding booking...",
+    bookingFound: "Booking Found",
+    employeeId: "Employee ID",
+    room: "Room",
+    checkedIn: "Checked in",
+    notYourBooking: "Not your booking? Try again",
+    checkOutDate: "Check-Out Date",
+    onDutyTime: "On Duty Time",
+    completeCheckOut: "Complete Check-Out",
+    // Success
+    haveGoodRest: "Have a good rest 🌙",
+    welcomeToHodlerInn: "Welcome to Hodler Inn",
+    thankYouForStaying: "Thank you for staying at Hodler Inn",
+    haveSafeJourney: "Have a safe journey! 🚂",
+    keyReminder: "Please drop your room key in the Key Drop Box in the Lounge",
+    returnToMenu: "Return to Menu",
+    autoReturning: "Auto-returning in a few seconds...",
+    // Greetings
+    goodMorning: "Good morning",
+    goodAfternoon: "Good afternoon",
+    goodEvening: "Good evening",
+    goodNight: "Good night",
+    // Language
+    language: "EN",
+    back: "Back",
+    backToMenu: "Back to Menu",
+  },
+  es: {
+    // Main Menu
+    welcomeTitle: "Bienvenido a Hodler Inn",
+    railroadCrew: "Registro de Tripulación Ferroviaria Aquí",
+    selectOption: "Seleccione una opción para continuar",
+    checkIn: "Registrarse",
+    checkOut: "Salir",
+    viewSignInSheet: "Ver Hoja de Registro",
+    howToUseHelp: "Cómo Usar / Ayuda",
+    // Check-in form
+    guestCheckIn: "Registro de Huésped",
+    employeeNumber: "Número de Empleado",
+    tapToEnterNumber: "⬇️ TOQUE AQUÍ para ingresar número",
+    name: "Nombre",
+    nameAutoAppear: "El nombre aparecerá automáticamente",
+    welcome: "¡Bienvenido!",
+    roomNumber: "Número de Habitación",
+    tapToEnterRoom: "⬇️ TOQUE AQUÍ para ingresar habitación",
+    date: "Fecha",
+    time: "Hora",
+    signature: "Firma (firme abajo)",
+    clear: "Borrar",
+    completeCheckIn: "Completar Registro",
+    processing: "Procesando...",
+    // Employee not found
+    employeeIdNotFound: "ID de Empleado No Encontrado",
+    notInSystem: "Su número de empleado no está en nuestro sistema.",
+    didYouMean: "¿Quiso decir uno de estos?",
+    tapCorrectNumber: "Toque el número correcto arriba para usarlo",
+    pleaseUseYellowCard: "Por Favor Use la Tarjeta Amarilla",
+    yellowCardInstructions: "Escriba su Número de Empleado y Nombre en la Tarjeta Amarilla.",
+    adminWillAdd: "El administrador lo agregará al sistema.",
+    ifError: "Si cree que esto es un error, por favor contacte a la recepción o llame al Teléfono de Ayuda.",
+    // Check-out
+    guestCheckOut: "Salida de Huésped",
+    findMyBooking: "Buscar Mi Reserva",
+    findingBooking: "Buscando reserva...",
+    bookingFound: "Reserva Encontrada",
+    employeeId: "ID de Empleado",
+    room: "Habitación",
+    checkedIn: "Registrado",
+    notYourBooking: "¿No es su reserva? Intente de nuevo",
+    checkOutDate: "Fecha de Salida",
+    onDutyTime: "Hora de Servicio",
+    completeCheckOut: "Completar Salida",
+    // Success
+    haveGoodRest: "Que descanse bien 🌙",
+    welcomeToHodlerInn: "Bienvenido a Hodler Inn",
+    thankYouForStaying: "Gracias por hospedarse en Hodler Inn",
+    haveSafeJourney: "¡Buen viaje! 🚂",
+    keyReminder: "Por favor deje su llave en la Caja de Llaves en el Salón",
+    returnToMenu: "Volver al Menú",
+    autoReturning: "Regresando automáticamente en unos segundos...",
+    // Greetings
+    goodMorning: "Buenos días",
+    goodAfternoon: "Buenas tardes",
+    goodEvening: "Buenas tardes",
+    goodNight: "Buenas noches",
+    // Language
+    language: "ES",
+    back: "Volver",
+    backToMenu: "Volver al Menú",
+  }
+};
+
+// Get browser language preference
+const getBrowserLanguage = () => {
+  const browserLang = navigator.language || navigator.userLanguage;
+  return browserLang.startsWith('es') ? 'es' : 'en';
+};
+
+// Get stored language or detect from browser
+const getInitialLanguage = () => {
+  const stored = localStorage.getItem('bitsy_language');
+  if (stored) return stored;
+  return getBrowserLanguage();
+};
+
+// Current language state (module level for voice functions)
+let currentLanguage = getInitialLanguage();
 
 // Clean employee name - remove railroad job codes like "E", "BH", "HBW", "BMR", etc.
 const cleanEmployeeName = (name) => {
@@ -146,7 +293,7 @@ const playVoiceMessage = (messageId, onEnd = null) => {
   
   // Small delay to ensure previous audio is fully stopped
   setTimeout(() => {
-    const audio = new Audio(`${API}/voice/${messageId}`);
+    const audio = new Audio(`${API}/voice/${messageId}?lang=${currentLanguage}`);
     audio.volume = voiceSettings.volume;
     currentAudio = audio;
     audioPlaying = true;
@@ -162,7 +309,21 @@ const playVoiceMessage = (messageId, onEnd = null) => {
       currentAudio = null;
       // Fallback to Web Speech API if audio fails
       if ('speechSynthesis' in window) {
-        const messages = {
+        const messages = currentLanguage === 'es' ? {
+          "register_welcome": "Bienvenido a Hodler Inn. Si es su primera vez aquí, por favor registre su número de empleado y nombre.",
+          "checkin_welcome_morning": "Buenos días. Bienvenido de nuevo a Hodler Inn.",
+          "checkin_welcome_afternoon": "Buenas tardes. Bienvenido de nuevo a Hodler Inn.",
+          "checkin_welcome_evening": "Buenas tardes. Bienvenido de nuevo a Hodler Inn.",
+          "checkin_welcome_night": "Buenas noches. Bienvenido de nuevo a Hodler Inn.",
+          "checkin_complete": "Que descanse bien.",
+          "checkout_morning": "Buenos días! Gracias por hospedarse en Hodler Inn. Buen viaje.",
+          "checkout_afternoon": "Buenas tardes! Gracias por hospedarse en Hodler Inn. Buen viaje.",
+          "checkout_evening": "Buenas tardes! Gracias por hospedarse en Hodler Inn. Buen viaje.",
+          "checkout_night": "Buenas noches! Gracias por hospedarse en Hodler Inn. Buen viaje.",
+          "signature_reminder": "Por favor firme su nombre completo de forma legible.",
+          "room_reminder": "Por favor seleccione el número de habitación de la llave en el escritorio.",
+          "checkout_found": "Reserva encontrada. Por favor ingrese su hora de servicio y presione Completar salida."
+        } : {
           "register_welcome": "Welcome to Hodler Inn. If you are first time here, please register your employee number and name, then go to check in.",
           "checkin_welcome_morning": "Good morning. Welcome back to Hodler Inn.",
           "checkin_welcome_afternoon": "Good afternoon. Welcome back to Hodler Inn.",
@@ -182,6 +343,7 @@ const playVoiceMessage = (messageId, onEnd = null) => {
           const utterance = new SpeechSynthesisUtterance(text);
           utterance.volume = voiceSettings.volume;
           utterance.rate = voiceSettings.speed || 0.9;
+          utterance.lang = currentLanguage === 'es' ? 'es-MX' : 'en-US';
           if (onEnd) utterance.onend = onEnd;
           window.speechSynthesis.speak(utterance);
         }
@@ -213,7 +375,7 @@ const playWelcomeWithName = (name, isNewEmployee = false) => {
     const messageType = isNewEmployee ? "checkin_new" : "checkin";
     const encodedName = encodeURIComponent(name);
     const greeting = encodeURIComponent(getTimeBasedGreeting());
-    const audio = new Audio(`${API}/voice-dynamic/${messageType}/${encodedName}?greeting=${greeting}`);
+    const audio = new Audio(`${API}/voice-dynamic/${messageType}/${encodedName}?greeting=${greeting}&lang=${currentLanguage}`);
     audio.volume = voiceSettings.volume;
     currentAudio = audio;
     audioPlaying = true;
@@ -229,9 +391,13 @@ const playWelcomeWithName = (name, isNewEmployee = false) => {
       // Fallback to Web Speech API
       if ('speechSynthesis' in window) {
         const greetingText = getTimeBasedGreeting();
-        const utterance = new SpeechSynthesisUtterance(`${greetingText}, ${name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`);
+        const message = currentLanguage === 'es' 
+          ? `${greetingText}, ${name}. Bienvenido a Hodler Inn. Por favor ingrese el número de habitación, la hora, firme su nombre y haga clic en Completar Registro.`
+          : `${greetingText}, ${name}. Welcome back to Hodler Inn. Please enter room number, time, sign your name, and click Complete Check-In.`;
+        const utterance = new SpeechSynthesisUtterance(message);
         utterance.volume = voiceSettings.volume;
         utterance.rate = voiceSettings.speed || 0.85;
+        utterance.lang = currentLanguage === 'es' ? 'es-MX' : 'en-US';
         window.speechSynthesis.speak(utterance);
       }
     };
@@ -259,7 +425,7 @@ const playCheckoutFoundWithName = (name) => {
   // Small delay to ensure previous audio is fully stopped
   setTimeout(() => {
     const encodedName = encodeURIComponent(name);
-    const audio = new Audio(`${API}/voice-dynamic/checkout_found/${encodedName}`);
+    const audio = new Audio(`${API}/voice-dynamic/checkout_found/${encodedName}?lang=${currentLanguage}`);
     audio.volume = voiceSettings.volume;
     currentAudio = audio;
     audioPlaying = true;
@@ -274,9 +440,13 @@ const playCheckoutFoundWithName = (name) => {
       currentAudio = null;
       // Fallback to Web Speech API
       if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(`Booking found for ${name}. Please enter your on duty time and press Complete check out.`);
+        const message = currentLanguage === 'es'
+          ? `Reserva encontrada para ${name}. Por favor ingrese su hora de servicio y presione Completar salida.`
+          : `Booking found for ${name}. Please enter your on duty time and press Complete check out.`;
+        const utterance = new SpeechSynthesisUtterance(message);
         utterance.volume = voiceSettings.volume;
         utterance.rate = voiceSettings.speed || 0.85;
+        utterance.lang = currentLanguage === 'es' ? 'es-MX' : 'en-US';
         window.speechSynthesis.speak(utterance);
       }
     };
@@ -316,21 +486,34 @@ const speakMessage = (message, rate = null) => {
     const utterance = new SpeechSynthesisUtterance(message);
     utterance.rate = speechRate;
     utterance.volume = voiceSettings.volume;
+    utterance.lang = currentLanguage === 'es' ? 'es-MX' : 'en-US';
     window.speechSynthesis.speak(utterance);
   }
 };
 
-// Get greeting based on time of day
+// Get greeting based on time of day (with language support)
 const getTimeBasedGreeting = () => {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) {
-    return "Good morning";
-  } else if (hour >= 12 && hour < 17) {
-    return "Good afternoon";
-  } else if (hour >= 17 && hour < 21) {
-    return "Good evening";
+  if (currentLanguage === 'es') {
+    if (hour >= 5 && hour < 12) {
+      return "Buenos días";
+    } else if (hour >= 12 && hour < 17) {
+      return "Buenas tardes";
+    } else if (hour >= 17 && hour < 21) {
+      return "Buenas tardes";
+    } else {
+      return "Buenas noches";
+    }
   } else {
-    return "Good night";
+    if (hour >= 5 && hour < 12) {
+      return "Good morning";
+    } else if (hour >= 12 && hour < 17) {
+      return "Good afternoon";
+    } else if (hour >= 17 && hour < 21) {
+      return "Good evening";
+    } else {
+      return "Good night";
+    }
   }
 };
 
@@ -344,7 +527,22 @@ export default function GuestPortal() {
   const [view, setView] = useState("menu"); // menu, register, checkin, checkout, signin, checkin-success, checkout-success
   const [successMessage, setSuccessMessage] = useState({ title: "", message: "", subMessage: "" });
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [language, setLanguage] = useState(getInitialLanguage());
   const navigate = useNavigate();
+
+  // Get translations for current language
+  const t = translations[language];
+
+  // Update module-level language when state changes
+  useEffect(() => {
+    currentLanguage = language;
+    localStorage.setItem('bitsy_language', language);
+  }, [language]);
+
+  const toggleLanguage = () => {
+    const newLang = language === 'en' ? 'es' : 'en';
+    setLanguage(newLang);
+  };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -436,6 +634,16 @@ export default function GuestPortal() {
 
       {/* Top Right Buttons */}
       <div className="absolute top-3 sm:top-6 right-3 sm:right-6 flex items-center gap-2 z-10">
+        {/* Language Toggle Button */}
+        <button 
+          onClick={toggleLanguage}
+          className="flex items-center gap-1 sm:gap-2 text-vault-text-secondary hover:text-vault-gold transition-colors bg-vault-surface px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-gray-300 shadow-sm"
+          data-testid="language-toggle-btn"
+          title={language === 'en' ? 'Cambiar a Español' : 'Switch to English'}
+        >
+          <Globe className="w-4 h-4" />
+          <span className="text-xs sm:text-sm font-mono font-bold">{language === 'en' ? 'EN' : 'ES'}</span>
+        </button>
         {/* Fullscreen/Kiosk Mode Button */}
         <button 
           onClick={toggleFullscreen}
@@ -450,35 +658,35 @@ export default function GuestPortal() {
 
       <AnimatePresence mode="wait">
         {view === "menu" && (
-          <MainMenu key="menu" setView={setView} />
+          <MainMenu key="menu" setView={setView} t={t} language={language} />
         )}
         {view === "register" && (
-          <RegisterForm key="register" setView={setView} />
+          <RegisterForm key="register" setView={setView} t={t} />
         )}
         {view === "checkin" && (
-          <CheckInForm key="checkin" setView={setView} setSuccessMessage={setSuccessMessage} />
+          <CheckInForm key="checkin" setView={setView} setSuccessMessage={setSuccessMessage} t={t} language={language} />
         )}
         {view === "checkout" && (
-          <CheckOutForm key="checkout" setView={setView} setSuccessMessage={setSuccessMessage} />
+          <CheckOutForm key="checkout" setView={setView} setSuccessMessage={setSuccessMessage} t={t} language={language} />
         )}
         {view === "signin" && (
-          <SignInSheetView key="signin" setView={setView} />
+          <SignInSheetView key="signin" setView={setView} t={t} />
         )}
         {view === "help" && (
-          <HelpView key="help" setView={setView} />
+          <HelpView key="help" setView={setView} t={t} />
         )}
         {view === "checkin-success" && (
-          <SuccessScreen key="checkin-success" setView={setView} successMessage={successMessage} />
+          <SuccessScreen key="checkin-success" setView={setView} successMessage={successMessage} t={t} />
         )}
         {view === "checkout-success" && (
-          <SuccessScreen key="checkout-success" setView={setView} successMessage={successMessage} />
+          <SuccessScreen key="checkout-success" setView={setView} successMessage={successMessage} t={t} />
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-function MainMenu({ setView }) {
+function MainMenu({ setView, t, language }) {
   return (
     <motion.div
       variants={pageVariants}
@@ -491,13 +699,13 @@ function MainMenu({ setView }) {
       <Card className="bg-vault-surface border border-vault-border shadow-xl p-8 rounded-2xl" data-testid="main-menu-card">
         <CardHeader className="text-center pb-8">
           <CardTitle className="font-outfit text-3xl font-bold text-vault-text tracking-tight">
-            Welcome to Hodler Inn
+            {t.welcomeTitle}
           </CardTitle>
           <p className="text-red-600 font-bold text-lg mt-3">
-            Railroad Crew Check In Here
+            {t.railroadCrew}
           </p>
           <p className="text-vault-text-secondary font-manrope mt-2">
-            Select an option below to continue
+            {t.selectOption}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -511,7 +719,7 @@ function MainMenu({ setView }) {
             data-testid="checkin-btn"
           >
             <LogIn className="w-5 h-5" />
-            Check In
+            {t.checkIn}
           </Button>
           <Button
             onClick={() => setView("checkout")}
@@ -519,7 +727,7 @@ function MainMenu({ setView }) {
             data-testid="checkout-btn"
           >
             <LogOut className="w-5 h-5" />
-            Check Out
+            {t.checkOut}
           </Button>
           <div className="pt-4 border-t border-vault-border space-y-3">
             <Button
@@ -528,7 +736,7 @@ function MainMenu({ setView }) {
               data-testid="signin-sheet-btn"
             >
               <ClipboardList className="w-5 h-5" />
-              View Sign-In Sheet
+              {t.viewSignInSheet}
             </Button>
             <Button
               onClick={() => setView("help")}
@@ -536,7 +744,7 @@ function MainMenu({ setView }) {
               data-testid="help-btn"
             >
               <HelpCircle className="w-5 h-5" />
-              How to Use / Help
+              {t.howToUseHelp}
             </Button>
           </div>
         </CardContent>
@@ -545,7 +753,7 @@ function MainMenu({ setView }) {
   );
 }
 
-function RegisterForm({ setView }) {
+function RegisterForm({ setView, t }) {
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -640,7 +848,7 @@ function RegisterForm({ setView }) {
   );
 }
 
-function CheckInForm({ setView, setSuccessMessage }) {
+function CheckInForm({ setView, setSuccessMessage, t, language }) {
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [employeeName, setEmployeeName] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
@@ -862,8 +1070,8 @@ function CheckInForm({ setView, setSuccessMessage }) {
       const greeting = getTimeBasedGreeting();
       setSuccessMessage({
         title: `${greeting}!`,
-        message: "Welcome to Hodler Inn",
-        subMessage: "Have a good rest 🌙",
+        message: t.welcomeToHodlerInn,
+        subMessage: t.haveGoodRest,
         type: "checkin"
       });
       setView("checkin-success");
@@ -892,24 +1100,24 @@ function CheckInForm({ setView, setSuccessMessage }) {
             data-testid="back-btn"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {t.back}
           </button>
           <CardTitle className="font-outfit text-xl sm:text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
             <LogIn className="w-5 h-5 sm:w-6 sm:h-6 text-vault-gold" />
-            Guest Check-In
+            {t.guestCheckIn}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 sm:space-y-4">
           {/* Employee Number */}
           <div>
-            <label className="vault-label text-xs sm:text-sm">Employee Number</label>
+            <label className="vault-label text-xs sm:text-sm">{t.employeeNumber}</label>
             <div className="relative">
               <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-vault-gold" />
               <Input
                 value={employeeNumber}
                 onChange={(e) => setEmployeeNumber(e.target.value)}
                 onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
-                placeholder="⬇️ TAP HERE to enter number"
+                placeholder={t.tapToEnterNumber}
                 className="vault-input pl-10 input-highlight text-base sm:text-lg h-11 sm:h-12"
                 data-testid="checkin-employee-input"
                 autoFocus
@@ -924,13 +1132,13 @@ function CheckInForm({ setView, setSuccessMessage }) {
 
           {/* Employee Name - Auto-filled when found */}
           <div>
-            <label className="vault-label text-xs sm:text-sm">Name</label>
+            <label className="vault-label text-xs sm:text-sm">{t.name}</label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-vault-gold" />
               <Input
                 value={employeeName}
                 readOnly
-                placeholder="Name will appear automatically"
+                placeholder={t.nameAutoAppear}
                 className={cn(
                   "vault-input pl-10 text-base sm:text-lg h-11 sm:h-12",
                   employeeStatus === 'found' && "border-emerald-500 bg-emerald-900/20",
@@ -943,7 +1151,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
             {/* Status Messages */}
             {employeeStatus === 'found' && (
               <p className="text-emerald-400 text-sm mt-1 flex items-center gap-1">
-                <span>✓</span> Welcome!
+                <span>✓</span> {t.welcome}
               </p>
             )}
             {employeeStatus === 'not_found' && (
@@ -955,10 +1163,10 @@ function CheckInForm({ setView, setSuccessMessage }) {
               >
                 <div className="text-center">
                   <p className="text-amber-400 text-lg font-bold mb-2">
-                    ⚠️ Employee ID Not Found
+                    ⚠️ {t.employeeIdNotFound}
                   </p>
                   <p className="text-amber-300 text-sm">
-                    Your employee number is not in our system.
+                    {t.notInSystem}
                   </p>
                 </div>
                 
@@ -966,7 +1174,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 {similarNumbers.length > 0 && (
                   <div className="bg-blue-900/40 border border-blue-500/50 rounded-lg p-3">
                     <p className="text-blue-400 text-sm font-medium mb-2">
-                      Did you mean one of these?
+                      {t.didYouMean}
                     </p>
                     <div className="space-y-2">
                       {similarNumbers.map((emp, idx) => (
@@ -988,7 +1196,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                       ))}
                     </div>
                     <p className="text-blue-300 text-xs mt-2">
-                      Tap the correct number above to use it
+                      {t.tapCorrectNumber}
                     </p>
                   </div>
                 )}
@@ -1000,19 +1208,19 @@ function CheckInForm({ setView, setSuccessMessage }) {
                       <span className="text-black text-lg">📝</span>
                     </div>
                     <p className="text-yellow-400 font-bold text-base">
-                      Please Use Yellow Card
+                      {t.pleaseUseYellowCard}
                     </p>
                   </div>
                   <p className="text-yellow-300 text-sm">
-                    Write your <strong>Employee Number</strong> and <strong>Name</strong> on the Yellow Card.
+                    {t.yellowCardInstructions}
                   </p>
                   <p className="text-yellow-300 text-sm mt-1">
-                    Admin will add you to the system.
+                    {t.adminWillAdd}
                   </p>
                 </div>
                 
                 <p className="text-vault-text-secondary text-xs text-center">
-                  If you believe this is an error, please contact the front desk or call the Help Phone.
+                  {t.ifError}
                 </p>
               </motion.div>
             )}
@@ -1023,7 +1231,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
             <>
               {/* Room Number */}
               <div>
-                <label className="vault-label text-xs sm:text-sm">Room Number</label>
+                <label className="vault-label text-xs sm:text-sm">{t.roomNumber}</label>
                 <div className="relative">
                   <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-vault-gold" />
                   <Input
@@ -1031,7 +1239,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                     value={roomNumber}
                     onChange={(e) => setRoomNumber(e.target.value)}
                     onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
-                    placeholder="⬇️ TAP HERE to enter room"
+                    placeholder={t.tapToEnterRoom}
                     className="vault-input pl-10 input-highlight text-base sm:text-lg h-11 sm:h-12"
                     data-testid="checkin-room-input"
                   />
@@ -1042,7 +1250,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
               <div className="grid grid-cols-2 gap-3">
                 {/* Date */}
                 <div>
-                  <label className="vault-label text-xs sm:text-sm">Date</label>
+                  <label className="vault-label text-xs sm:text-sm">{t.date}</label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -1054,7 +1262,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                         data-testid="checkin-date-btn"
                       >
                         <CalendarIcon className="mr-1 sm:mr-2 h-4 w-4 text-vault-text-secondary" />
-                        {date ? format(date, "dd MMM") : "Date"}
+                        {date ? format(date, "dd MMM") : t.date}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
@@ -1071,7 +1279,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
 
                 {/* Time */}
                 <div>
-                  <label className="vault-label text-xs sm:text-sm">Time</label>
+                  <label className="vault-label text-xs sm:text-sm">{t.time}</label>
                   <div className="relative">
                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-vault-text-secondary" />
                     <Input
@@ -1089,14 +1297,14 @@ function CheckInForm({ setView, setSuccessMessage }) {
               {/* Signature */}
               <div ref={signatureContainerRef}>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="vault-label text-xs sm:text-sm mb-0">Signature (sign below)</label>
+                  <label className="vault-label text-xs sm:text-sm mb-0">{t.signature}</label>
                   <button 
                     onClick={clearSignature}
                     className="text-vault-text-secondary hover:text-vault-gold text-xs flex items-center gap-1"
                     data-testid="clear-checkin-signature-btn"
                   >
                     <Eraser className="w-3 h-3" />
-                    Clear
+                    {t.clear}
                   </button>
                 </div>
                 <div 
@@ -1128,7 +1336,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
                 className="w-full vault-btn-primary h-12 sm:h-14 text-base sm:text-lg font-bold"
                 data-testid="submit-checkin-btn"
               >
-                {loading ? "Processing..." : "Complete Check-In"}
+                {loading ? t.processing : t.completeCheckIn}
               </Button>
             </>
           )}
@@ -1138,7 +1346,7 @@ function CheckInForm({ setView, setSuccessMessage }) {
   );
 }
 
-function CheckOutForm({ setView, setSuccessMessage }) {
+function CheckOutForm({ setView, setSuccessMessage, t, language }) {
   const [roomNumber, setRoomNumber] = useState("");
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [date, setDate] = useState(new Date());
@@ -1230,9 +1438,9 @@ function CheckOutForm({ setView, setSuccessMessage }) {
       const greeting = getTimeBasedGreeting();
       setSuccessMessage({
         title: `${greeting}!`,
-        message: "Thank you for staying at Hodler Inn",
-        subMessage: "Have a safe journey! 🚂",
-        keyReminder: "Please drop your room key in the Key Drop Box in the Lounge",
+        message: t.thankYouForStaying,
+        subMessage: t.haveSafeJourney,
+        keyReminder: t.keyReminder,
         type: "checkout"
       });
       setView("checkout-success");
@@ -1263,24 +1471,24 @@ function CheckOutForm({ setView, setSuccessMessage }) {
             data-testid="back-btn"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {t.back}
           </button>
           <CardTitle className="font-outfit text-2xl font-bold text-vault-text tracking-tight flex items-center gap-3">
             <LogOut className="w-6 h-6 text-vault-gold" />
-            Guest Check-Out
+            {t.guestCheckOut}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {!verifiedBooking ? (
             <>
               <div>
-                <label className="vault-label">Room Number</label>
+                <label className="vault-label">{t.roomNumber}</label>
                 <div className="relative">
                   <DoorOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
                   <Input
                     value={roomNumber}
                     onChange={(e) => setRoomNumber(e.target.value)}
-                    placeholder="⬇️ TAP HERE to enter room"
+                    placeholder={t.tapToEnterRoom}
                     className="vault-input pl-10 input-highlight text-lg"
                     data-testid="checkout-room-input"
                     autoFocus
@@ -1293,26 +1501,26 @@ function CheckOutForm({ setView, setSuccessMessage }) {
                 className="w-full vault-btn-primary h-12"
                 data-testid="verify-checkout-btn"
               >
-                {verifying ? "Finding booking..." : "Find My Booking"}
+                {verifying ? t.findingBooking : t.findMyBooking}
               </Button>
             </>
           ) : (
             <>
               <div className="bg-emerald-900/30 border border-emerald-600/50 rounded-lg p-4">
-                <p className="text-emerald-400 text-xs uppercase tracking-wide mb-1">Booking Found</p>
+                <p className="text-emerald-400 text-xs uppercase tracking-wide mb-1">{t.bookingFound}</p>
                 <p className="text-vault-text font-bold text-lg">{verifiedBooking.employee_name}</p>
-                <p className="text-vault-text-secondary text-sm">Employee ID: {verifiedBooking.employee_number}</p>
-                <p className="text-vault-text-secondary text-sm">Room: {verifiedBooking.room_number}</p>
-                <p className="text-vault-text-secondary text-sm">Checked in: {verifiedBooking.check_in_date} at {verifiedBooking.check_in_time}</p>
+                <p className="text-vault-text-secondary text-sm">{t.employeeId}: {verifiedBooking.employee_number}</p>
+                <p className="text-vault-text-secondary text-sm">{t.room}: {verifiedBooking.room_number}</p>
+                <p className="text-vault-text-secondary text-sm">{t.checkedIn}: {verifiedBooking.check_in_date} at {verifiedBooking.check_in_time}</p>
                 <button
                   onClick={handleClearVerification}
                   className="text-vault-text-secondary hover:text-vault-gold text-xs underline mt-2"
                 >
-                  Not your booking? Try again
+                  {t.notYourBooking}
                 </button>
               </div>
               <div>
-                <label className="vault-label">Check-Out Date</label>
+                <label className="vault-label">{t.checkOutDate}</label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -1324,7 +1532,7 @@ function CheckOutForm({ setView, setSuccessMessage }) {
                       data-testid="checkout-date-btn"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4 text-vault-text-secondary" />
-                      {date ? format(date, "dd MMM yyyy") : "Select date"}
+                      {date ? format(date, "dd MMM yyyy") : t.checkOutDate}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 bg-vault-surface border-vault-border" align="start">
@@ -1340,7 +1548,7 @@ function CheckOutForm({ setView, setSuccessMessage }) {
                 </Popover>
               </div>
               <div>
-                <label className="vault-label">On Duty Time</label>
+                <label className="vault-label">{t.onDutyTime}</label>
                 <div className="relative">
                   <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-vault-gold" />
                   <Input
@@ -1359,7 +1567,7 @@ function CheckOutForm({ setView, setSuccessMessage }) {
                 className="w-full vault-btn-primary h-12"
                 data-testid="submit-checkout-btn"
               >
-                {loading ? "Processing..." : "Complete Check-Out"}
+                {loading ? t.processing : t.completeCheckOut}
               </Button>
             </>
           )}
@@ -1370,7 +1578,7 @@ function CheckOutForm({ setView, setSuccessMessage }) {
 }
 
 
-function SignInSheetView({ setView }) {
+function SignInSheetView({ setView, t }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [accessCode, setAccessCode] = useState("");
@@ -1631,7 +1839,7 @@ function SignInSheetView({ setView }) {
   );
 }
 
-function HelpView({ setView }) {
+function HelpView({ setView, t }) {
   return (
     <motion.div
       variants={pageVariants}
@@ -1760,7 +1968,7 @@ function HelpView({ setView }) {
   );
 }
 
-function SuccessScreen({ setView, successMessage }) {
+function SuccessScreen({ setView, successMessage, t }) {
   return (
     <motion.div
       variants={pageVariants}
@@ -1852,10 +2060,10 @@ function SuccessScreen({ setView, successMessage }) {
               className="vault-btn-secondary mt-4"
               data-testid="return-to-menu-btn"
             >
-              Return to Menu
+              {t.returnToMenu}
             </Button>
             <p className="text-vault-text-secondary text-sm mt-2">
-              Auto-returning in a few seconds...
+              {t.autoReturning}
             </p>
           </motion.div>
         </CardContent>
