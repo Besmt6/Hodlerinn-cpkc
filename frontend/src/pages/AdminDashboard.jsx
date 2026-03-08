@@ -3057,15 +3057,6 @@ export default function AdminDashboard() {
                     <Users className="w-4 h-4 mr-2" />
                     Import from Guest Records
                   </Button>
-                  <Button
-                    onClick={handleCollectFromPortal}
-                    disabled={collectingEmployees}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    data-testid="collect-from-portal-btn"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    {collectingEmployees ? "Collecting..." : "Import from Portal"}
-                  </Button>
                   
                   {/* Date Range Scanner */}
                   <div className="flex items-center gap-2">
