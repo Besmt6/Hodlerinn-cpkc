@@ -1392,7 +1392,10 @@ This is an automated message. Please do not reply to this email.
 
 @api_router.get("/guests/{employee_number}")
 async def get_guest(employee_number: str):
-    guest = await db.guests.find_one({"employee_number": employee_number}, {"_id": 0})
+    # Clean the employee number
+    clean_emp_num = employee_number.strip()
+    
+    guest = await db.guests.find_one({"employee_number": clean_emp_num}, {"_id": 0})
     if not guest:
         raise HTTPException(status_code=404, detail="Guest not found")
     
@@ -1402,19 +1405,24 @@ async def get_guest(employee_number: str):
     
     # IMPORTANT: Check if employee name has been updated in the employees collection
     # This ensures the Guest Portal always shows the latest name (e.g., after admin updates to match portal format)
-    employee = await db.employees.find_one({"employee_number": employee_number}, {"_id": 0})
-    if employee and employee.get("name"):
-        employee_name = employee.get("name")
+    employee = await db.employees.find_one({"employee_number": clean_emp_num}, {"_id": 0})
+    # Also check employee_id field for records with different schema
+    if not employee:
+        employee = await db.employees.find_one({"employee_id": clean_emp_num}, {"_id": 0})
+    
+    if employee:
+        # Get name from either 'name' field or first_name/last_name combination
+        employee_name = employee.get("name") or f"{employee.get('first_name', '')} {employee.get('last_name', '')}".strip()
         guest_name = guest.get("name", "")
         
         # If names differ, use the employee name (which is the authoritative source)
-        if employee_name != guest_name:
-            logging.info(f"Guest name sync: Using employee name '{employee_name}' instead of stored guest name '{guest_name}' for employee {employee_number}")
+        if employee_name and employee_name != guest_name:
+            logging.info(f"Guest name sync: Using employee name '{employee_name}' instead of stored guest name '{guest_name}' for employee {clean_emp_num}")
             guest['name'] = employee_name
             
             # Also update the guest record in the background so it stays in sync
             await db.guests.update_one(
-                {"employee_number": employee_number},
+                {"employee_number": clean_emp_num},
                 {"$set": {"name": employee_name, "name_encrypted": encrypt_data(employee_name)}}
             )
     
@@ -4971,10 +4979,31 @@ async def sync_employee_names_to_guests():
 @api_router.get("/employees/verify/{employee_number}")
 async def verify_employee_exists(employee_number: str):
     """Check if an employee number is in the allowed list (public endpoint for check-in)"""
-    employee = await db.employees.find_one({"employee_number": employee_number, "is_active": True}, {"_id": 0})
+    # Clean the employee number (remove spaces, leading zeros handling)
+    clean_emp_num = employee_number.strip()
+    
+    # Try multiple search strategies to be more forgiving
+    employee = None
+    
+    # Strategy 1: Exact match with is_active=True
+    employee = await db.employees.find_one({"employee_number": clean_emp_num, "is_active": True}, {"_id": 0})
+    
+    # Strategy 2: Exact match without is_active check (in case field is missing or False by mistake)
+    if not employee:
+        employee = await db.employees.find_one({"employee_number": clean_emp_num}, {"_id": 0})
+    
+    # Strategy 3: Check employee_id field (some records use different field name)
+    if not employee:
+        employee = await db.employees.find_one({"employee_id": clean_emp_num}, {"_id": 0})
+    
     if not employee:
         raise HTTPException(status_code=404, detail="Employee ID not found in system. Please contact admin.")
-    return {"valid": True, "name": employee["name"], "employee_number": employee["employee_number"]}
+    
+    # Get name - handle different field formats
+    name = employee.get("name") or f"{employee.get('first_name', '')} {employee.get('last_name', '')}".strip()
+    emp_number = employee.get("employee_number") or employee.get("employee_id")
+    
+    return {"valid": True, "name": name, "employee_number": emp_number}
 
 # ==================== Portal Settings ====================
 
