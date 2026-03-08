@@ -77,8 +77,10 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Admin password (simple protection)
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'hodlerinn2024')
+# Admin password (simple protection) - MUST be set in environment
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+if not ADMIN_PASSWORD:
+    raise ValueError("ADMIN_PASSWORD environment variable must be set")
 
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', secrets.token_hex(32))  # Generate random secret if not set

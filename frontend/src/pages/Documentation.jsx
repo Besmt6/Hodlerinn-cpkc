@@ -483,7 +483,7 @@ export default function Documentation() {
                         </p>
                         <div className="space-y-2 mb-4">
                           <p className="text-xs text-vault-text-secondary">Admin Password:</p>
-                          <code className="block px-2 py-1 bg-black/50 rounded text-vault-gold text-sm">hodlerinn2024</code>
+                          <code className="block px-2 py-1 bg-black/50 rounded text-vault-gold text-sm">[Set in Portal Settings]</code>
                         </div>
                         <Button 
                           variant="outline" 

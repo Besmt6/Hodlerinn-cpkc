@@ -30,7 +30,7 @@ ZOHO_FOLDER_ID = os.environ.get('ZOHO_FOLDER_ID', '')
 
 # Security Configuration
 ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', '')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'hodlerinn2024')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')  # Must be set in environment
 
 # OpenAI Configuration
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
