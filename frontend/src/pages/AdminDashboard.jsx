@@ -1448,6 +1448,8 @@ export default function AdminDashboard() {
   const handleEdit = (record) => {
     setEditingRecord(record);
     setEditForm({
+      employee_number: record.employee_number || "",
+      employee_name: record.employee_name || "",
       room_number: record.room_number,
       check_in_date: record.check_in_date,
       check_in_time: record.check_in_time,
@@ -1458,6 +1460,11 @@ export default function AdminDashboard() {
 
   const handleSaveEdit = async () => {
     try {
+      // Validate employee number is numeric only
+      if (editForm.employee_number && !/^\d*$/.test(editForm.employee_number)) {
+        toast.error("Employee number must contain only numbers");
+        return;
+      }
       await axios.put(`${API}/admin/bookings/${editingRecord.id}`, editForm);
       toast.success("Record updated successfully");
       setEditingRecord(null);
