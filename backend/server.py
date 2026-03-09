@@ -8793,6 +8793,7 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
                             
                             # Process first employee
                             if emp_name_1 and check_in_str:
+                                logging.info(f"Processing employee 1: {emp_name_1}, check_in: {check_in_str}")
                                 if is_checkout_pdf:
                                     checkout = await import_cpkc_checkout(emp_id_1, emp_name_1, check_in_str, check_out_str, booking_id)
                                     if checkout:
@@ -8801,9 +8802,12 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
                                     guest = await import_cpkc_guest(emp_id_1, emp_name_1, check_in_str, check_out_str, booking_id)
                                     if guest:
                                         guests_imported.append(guest)
+                                    else:
+                                        logging.warning(f"Guest not imported: {emp_name_1} (returned None)")
                             
                             # Process second employee if exists
                             if emp_name_2 and check_in_str:
+                                logging.info(f"Processing employee 2: {emp_name_2}, check_in: {check_in_str}")
                                 if is_checkout_pdf:
                                     checkout = await import_cpkc_checkout(emp_id_2, emp_name_2, check_in_str, check_out_str, booking_id)
                                     if checkout:
@@ -8812,6 +8816,8 @@ async def process_cpkc_pdf(pdf_data: bytes, booking_id: str, subject: str):
                                     guest = await import_cpkc_guest(emp_id_2, emp_name_2, check_in_str, check_out_str, booking_id)
                                     if guest:
                                         guests_imported.append(guest)
+                                    else:
+                                        logging.warning(f"Guest not imported: {emp_name_2} (returned None)")
                                     
                         except Exception as e:
                             logging.error(f"Error parsing row: {e}")
@@ -8865,17 +8871,32 @@ async def import_cpkc_guest(emp_id: str, emp_name: str, check_in_str: str, check
         # Parse the check-in date
         today = datetime.now().strftime("%Y-%m-%d")
         
-        # Parse check-in date from string (format: "2026-03-07 14:00" or "Mar 7, 2026")
+        # Parse check-in date from string - try multiple formats
+        # Common formats: "06-Mar-2026 10:23", "2026-03-07 14:00", "Mar 7, 2026"
         check_in_date = None
+        check_in_time = None
         if check_in_str:
-            # Try different date formats
-            for fmt in ["%Y-%m-%d %H:%M", "%Y-%m-%d", "%b %d, %Y %H:%M", "%b %d, %Y"]:
+            date_formats = [
+                "%d-%b-%Y %H:%M",  # "06-Mar-2026 10:23" - most common CPKC format
+                "%Y-%m-%d %H:%M",  # "2026-03-07 14:00"
+                "%Y-%m-%d",        # "2026-03-07"
+                "%b %d, %Y %H:%M", # "Mar 7, 2026 14:00"
+                "%b %d, %Y",       # "Mar 7, 2026"
+            ]
+            for fmt in date_formats:
                 try:
-                    parsed = datetime.strptime(check_in_str.strip(), fmt)
-                    check_in_date = parsed.strftime("%Y-%m-%d")
+                    dt = datetime.strptime(check_in_str.strip(), fmt)
+                    check_in_date = dt.strftime("%Y-%m-%d")
+                    if "%H:%M" in fmt:
+                        check_in_time = dt.strftime("%H:%M")
                     break
                 except:
                     continue
+            
+            # If no format matched, use raw string as date
+            if not check_in_date:
+                logging.warning(f"Could not parse check-in date '{check_in_str}' for {emp_name}, using raw string")
+                check_in_date = check_in_str
         
         # Secondary safeguard: Skip if check-in date is in the past
         # (Primary detection is via green highlighting at PDF level)
@@ -8892,23 +8913,16 @@ async def import_cpkc_guest(emp_id: str, emp_name: str, check_in_str: str, check
             last_name = emp_name
             first_name = ""
         
-        # Parse check-in date: "06-Mar-2026 10:23"
-        check_in_date = None
-        check_in_time = None
-        if check_in_str:
-            try:
-                dt = datetime.strptime(check_in_str, "%d-%b-%Y %H:%M")
-                check_in_date = dt.strftime("%Y-%m-%d")
-                check_in_time = dt.strftime("%H:%M")
-            except:
-                check_in_date = check_in_str
-        
         check_out_date = None
         if check_out_str:
-            try:
-                dt = datetime.strptime(check_out_str, "%d-%b-%Y %H:%M")
-                check_out_date = dt.strftime("%Y-%m-%d")
-            except:
+            for fmt in ["%d-%b-%Y %H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%b %d, %Y %H:%M", "%b %d, %Y"]:
+                try:
+                    dt = datetime.strptime(check_out_str.strip(), fmt)
+                    check_out_date = dt.strftime("%Y-%m-%d")
+                    break
+                except:
+                    continue
+            if not check_out_date:
                 check_out_date = check_out_str
         
         # Check if already imported (avoid duplicates) - match by employee name + date only
