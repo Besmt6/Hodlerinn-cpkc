@@ -49,6 +49,8 @@ export default function AdminLogin() {
 
       setAdminToken(token, expiresAt);
       toast.success("Login successful");
+      // Small delay to ensure token is persisted before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
       navigate("/admin/dashboard");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Invalid password");

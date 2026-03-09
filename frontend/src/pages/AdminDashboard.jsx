@@ -721,7 +721,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchData = async (filterStart = null, filterEnd = null) => {
+  const fetchData = async (filterStart = null, filterEnd = null, retryCount = 0) => {
     try {
       let recordsUrl = `${API}/admin/records`;
       const params = new URLSearchParams();
@@ -736,6 +736,11 @@ export default function AdminDashboard() {
       setStats(statsRes.data);
       setRecords(recordsRes.data);
     } catch (error) {
+      // Retry once after a short delay (helps with race conditions on login)
+      if (retryCount < 1 && error.response?.status === 401) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return fetchData(filterStart, filterEnd, retryCount + 1);
+      }
       toast.error("Failed to load data");
     } finally {
       setLoading(false);
