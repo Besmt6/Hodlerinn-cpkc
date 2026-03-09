@@ -1,17 +1,36 @@
 import axios from "axios";
 
 export const ADMIN_TOKEN_KEY = "adminToken";
+export const ADMIN_TOKEN_EXPIRY_KEY = "adminTokenExpiry";
 
 export function getAdminToken() {
-  return sessionStorage.getItem(ADMIN_TOKEN_KEY);
+  const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+  const expiry = localStorage.getItem(ADMIN_TOKEN_EXPIRY_KEY);
+  
+  // Check if token exists and is not expired
+  if (token && expiry) {
+    const expiryTime = new Date(expiry).getTime();
+    if (Date.now() < expiryTime) {
+      return token;
+    }
+    // Token expired, clear it
+    clearAdminToken();
+  }
+  return null;
 }
 
-export function setAdminToken(token) {
+export function setAdminToken(token, expiresAt = null) {
   if (!token) return;
-  sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+  localStorage.setItem(ADMIN_TOKEN_KEY, token);
+  if (expiresAt) {
+    localStorage.setItem(ADMIN_TOKEN_EXPIRY_KEY, expiresAt);
+  }
 }
 
 export function clearAdminToken() {
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
+  localStorage.removeItem(ADMIN_TOKEN_EXPIRY_KEY);
+  // Also clear old sessionStorage keys for backwards compatibility
   sessionStorage.removeItem(ADMIN_TOKEN_KEY);
   sessionStorage.removeItem("adminAuth");
 }

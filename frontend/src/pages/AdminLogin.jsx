@@ -42,12 +42,12 @@ export default function AdminLogin() {
     try {
       const response = await axios.post(`${API}/admin/login`, { password });
       const token = response?.data?.token;
+      const expiresAt = response?.data?.expires_at;
       if (!token) {
         throw new Error("Login response missing token");
       }
 
-      setAdminToken(token);
-      sessionStorage.setItem("adminAuth", "true");
+      setAdminToken(token, expiresAt);
       toast.success("Login successful");
       navigate("/admin/dashboard");
     } catch (error) {
