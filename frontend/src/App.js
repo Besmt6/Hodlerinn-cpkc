@@ -1,5 +1,5 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import GuestPortal from "@/pages/GuestPortal";
 import AdminLogin from "@/pages/AdminLogin";
@@ -13,7 +13,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
           <Route path="/" element={<GuestPortal />} />
           <Route path="/admin" element={<AdminLogin />} />
@@ -37,7 +37,7 @@ function App() {
           <Route path="/demo" element={<DemoPortal />} />
           <Route path="/demo/admin" element={<DemoAdmin />} />
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
       <Toaster position="top-right" richColors />
       <div className="noise-overlay" />
     </div>
