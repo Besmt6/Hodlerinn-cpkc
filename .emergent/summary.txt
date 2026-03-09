@@ -1,205 +1,197 @@
 <analysis>**original_problem_statement:**
-The user initially requested a bug fix for a CPKC email parser. This evolved into a large-scale project to professionalize the application, which involved:
-1.  **Security Hardening:** Implementing a robust, server-side token-based authentication system for the admin panel, including a secure password change and recovery flow using email OTPs.
-2.  **Bug Fixing (Sync Agent):** Addressing multiple recurring issues where the sync agent would hang, time out on specific entries (e.g., MIKE EPPS), or fail to handle duplicate records correctly when marking them as No Bill.
-3.  **Feature Enhancement (Guest Portal):** Improving the guest check-in experience by blocking unknown employees from checking in, providing them with instructions, and suggesting correct employee numbers for near-matches to prevent duplicate entries.
-4.  **Deployment & CI/CD:** Overhauling the repository structure to support a professional CI/CD pipeline. This included adding GitHub Actions for CI and AWS deployment, cleaning up environment configuration, and removing the local MongoDB dependency from Docker Compose.
-5.  **Code Refactoring:** Applying numerous patches to improve code quality, security, and maintainability, based on a comprehensive code audit.
+The user initially requested a bug fix for a CPKC email parser. This evolved into a large-scale project to professionalize the application, including security hardening, extensive bug fixing for a Sync Agent, feature enhancements for a guest portal, and setting up a CI/CD pipeline.
+
+Most recently, the user requested the following features and fixes:
+1.  **Spanish Language Support:** Add Spanish language (UI and voice) to the Bitsy AI assistant on the guest portal.
+2.  **Input Validation:** Restrict the employee number field on the guest portal to accept only numeric characters.
+3.  **Admin Panel Enhancements:** Add the ability to search for guests by name and an Edit button on the sign-in sheet to correct employee numbers.
+4.  **UI Improvement:** Make the Enter Room text on the checkout page bold for better visibility.
+5.  **Bug Fixes:**
+    *   Resolve a deployment error related to MongoDB  serialization.
+    *   Fix routing issues causing a blank admin page by switching to .
+    *   Fix a crash on the admin dashboard caused by a missing icon import.
+    *   Resolve a login loop and a blank screen on hard refresh by moving auth token storage to .
+    *   Investigate multiple application stability issues, including a failed sync agent, missing expected arrivals data in the admin panel, and the hard refresh issue.
+6.  **Documentation:** Create a BlockStay development brief document and provide a shareable link for a new project.
 
 PRODUCT REQUIREMENTS:
-1.  **Secure Admin Access:** All admin functionality must be protected by a server-enforced session. Password management must be secure and include a recovery option.
-2.  **Reliable Sync Agent:** The data sync with the external portal must be robust, complete without hanging, and correctly handle all edge cases like duplicate entries.
-3.  **Robust Guest Check-in:** The guest portal must prevent the creation of duplicate employee records by validating employee numbers against the existing list and guiding users with incorrect numbers.
-4.  **Production-Ready Deployment:** The repository must be clean, secure, and support an automated CI/CD pipeline for deployments to AWS.
+1.  **Secure Admin Access:** All admin functionality must be protected by a server-enforced session.
+2.  **Reliable Sync Agent:** The data sync must be robust, complete without hanging, and correctly handle all edge cases.
+3.  **Robust Guest Check-in:** The guest portal must prevent duplicate employee records.
+4.  **Production-Ready Deployment:** The repository must be clean, secure, and support an automated CI/CD pipeline.
+5.  **Multi-Language Support:** The guest-facing AI assistant must support both English and Spanish.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The application is a full-stack hotel management system (FastAPI + React) that has undergone significant security hardening and bug fixing. A robust server-side authentication system using HMAC-signed session tokens is now in place, protecting all admin routes. It includes a full password change/recovery flow with email-based OTP.
+The application is a full-stack hotel management system (FastAPI + React) with a secure, token-based admin panel and a guest check-in portal.
 
-The guest portal has been enhanced to prevent duplicate employee entries by validating numbers and guiding users with near-matches. The sync agent has received multiple patches (up to v17) to address hanging, timeouts, and logic errors, though its reliability is still a concern. The project has been restructured for professional deployment with new CI/CD workflows, a cleaned-up Docker setup using a hosted MongoDB (Atlas), and improved documentation.
+In this session, several major features and fixes were implemented:
+*   **Spanish Language Support:** The guest portal now features a language toggle (EN/ES) that translates UI text and generates Spanish voice lines using OpenAI TTS.
+*   **Admin Dashboard Features:** The admin panel's Guest Records table now includes a search bar for names/IDs and an Edit button to modify guest records, including their employee number.
+*   **Input Validation:** The guest portal's employee number field now correctly filters out non-numeric characters on the frontend and is validated on the backend.
+*   **Stability Fixes:** Critical bugs causing deployment failures ( serialization), admin panel crashes (), incorrect routing ( fix), and a persistent login loop ( fix) have been resolved.
+*   **Documentation:** A  file was created and made accessible via a public URL.
 
 **Last working item**:
--   **Last item agent was working:** The user was stuck in a login loop where successfully logging in would immediately redirect them back to the login page. The agent diagnosed that a  hook in  was incorrectly clearing the auth token on every page load. The fix was to only clear the token if no valid token already existed.
--   **Status:** USER VERIFICATION PENDING
--   **Agent Testing Done:** Y
--   **Which testing method agent to use?** Manual testing. The user confirmed the fix works in a private browser window. The agent should instruct the user to clear their browser cache and session storage for the application's domain and try again in their normal browser to finalize verification.
--   **User Testing Done:** Y (Partial, in a private window)
+-   **Last item agent was working:** The user reported that the deployed application still showed the Sync Agent as v17, despite recent work. The agent was in the process of updating the version string to v18 in  to reflect the latest changes.
+-   **Status:** IN PROGRESS
+-   **Agent Testing Done:** N
+-   **Which testing method agent to use?** Manual testing. After the change is deployed, the agent needs to check the Sync Agent status card on the admin dashboard to confirm it displays v18.
+-   **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
--   Issue 1: Sync Agent is unreliable and hangs/times out (P0)
--   Issue 2: GitHub Actions CI/CD Workflow needs cleanup (P1)
--   Issue 3: Test Duplicate Entry Handling for SALTER (P1)
--   Issue 4: Voice Message Echo and Overlap on Guest Portal (P2)
--   Issue 5: Fix Duplicate Telegram Alerts (P2)
+-   Issue 1: Sync Agent is unreliable and unstable (P0)
+-   Issue 2: Expected arrivals are not appearing in the admin panel (P1)
+-   Issue 3: GitHub Actions CI/CD Workflow needs cleanup (P1)
+-   Issue 4: Test Duplicate Entry Handling for SALTER (P1)
+-   Issue 5: Voice Message Echo and Overlap on Guest Portal (P2)
+-   Issue 6: Fix Duplicate Telegram Alerts (P2)
 
 **Issues Detail:**
--   **Issue 1: Sync Agent is unreliable and hangs/times out (P0)**
-    -   **Attempted fixes:** Multiple versions (v13-v17) were created to address the agent getting stuck. Fixes included: removing slow final verification scans, improving timeout handling, optimizing Playwright search logic ( to ), and adding logic to skip already-processed duplicate entries when clicking No Bill.
+-   **Issue 1: Sync Agent is unreliable and unstable (P0)**
+    -   **Attempted fixes:** The agent did not attempt a new fix for the instability. Multiple patches (v13-v17) were applied in previous sessions. The current agent was about to update the version string to v18.
     -   **Next debug checklist:**
-        1.  Confirm with the user if the  deployment was successful.
-        2.  Ask the user to run a sync for a date with known duplicates (e.g., the one with ELLENBURG and MCDONALD).
-        3.  Monitor the sync progress and check the final report for hangs or errors.
-        4.  If it still fails, investigate the Playwright interactions within the  and  functions in  for the specific entry it hangs on.
-    -   **Why fix this issue and what will be achieved with the fix?** This is a core function of the application. A reliable sync is critical for accurate billing and operations.
+        1.  Update the  variable in  from v17 to v18.
+        2.  Ask the user to deploy the application.
+        3.  After deployment, ask the user to run a sync for a date that previously caused issues (e.g., March 8th).
+        4.  Monitor backend logs for timeouts, Playwright errors, or hangs.
+        5.  If it still fails, investigate the  and  functions in .
+    -   **Why fix this issue and what will be achieved with the fix?** This is a core, critical function for business operations. A reliable sync is required for accurate billing.
     -   **Status:** IN PROGRESS
     -   **Is recurring issue?** Y
     -   **Should Test frontend/backend/both after fix?** Backend.
-    -   **Blocked on other issue:** None.
+    -   **Blocked on other issue:** none
 
--   **Issue 2: GitHub Actions CI/CD Workflow needs cleanup (P1)**
-    -   **Attempted fixes:** Agent added new  and  files.
-    -   **Next debug checklist:** The user stated, After sometime we work ci and cd stuff. The agent should confirm with the user if they are ready to proceed. If so, offer to delete the legacy  file from the user's GitHub repository to prevent conflicts.
-    -   **Why fix this issue and what will be achieved with the fix?** To enable a stable, automated CI/CD pipeline to production, which was a primary goal.
-    -   **Status:** NOT STARTED (User deferred)
+-   **Issue 2: Expected arrivals are not appearing in the admin panel (P1)**
+    -   **Attempted fixes:** The agent investigated and confirmed the API endpoint () is being called correctly but returns an empty list. The agent concluded this is likely because the production environment was running old code where the email scraper was not saving arrivals correctly.
+    -   **Next debug checklist:**
+        1.  Confirm with the user that the latest deployment (with all the login and stability fixes) is complete and running.
+        2.  Ask the user to check the Expected Arrivals card on the admin dashboard.
+        3.  If it's still empty, review the  function in  to trace the logic for parsing emails and inserting records into the  collection.
+        4.  Check production backend logs for any errors related to email processing.
+    -   **Why fix this issue and what will be achieved with the fix?** This feature provides visibility into upcoming guest arrivals, which is important for front-desk operations.
+    -   **Status:** NOT STARTED
     -   **Is recurring issue?** N
-    -   **Should Test frontend/backend/both after fix?** N/A (DevOps task).
-    -   **Blocked on other issue:** None.
-
--   **Issue 3: Test Duplicate Entry Handling for SALTER (P1)**
-    -   **Attempted fixes:** Logic was added in a previous session.
-    -   **Next debug checklist:** This is from the original handoff. Once deployment is stable, ask the user to run a manual sync for **March 4th, 2026**, and verify the report shows one SALTER entry as Verified and the duplicate as No Bill.
-    -   **Status:** USER VERIFICATION PENDING
-    -   **Is recurring issue?** Y
     -   **Should Test frontend/backend/both after fix?** Backend.
-    -   **Blocked on other issue:** Sync Agent is unreliable.
-
--   **Issue 4: Voice Message Echo and Overlap on Guest Portal (P2)**
-    -   **Attempted fixes:** None.
-    -   **Next debug checklist:** After deployment, ask the user to test the voice message feature on the Guest Portal () and provide specific steps to reproduce the echo/overlap.
-    -   **Status:** USER VERIFICATION PENDING
-    -   **Is recurring issue?** Y
-    -   **Should Test frontend/backend/both after fix?** Frontend.
-    -   **Blocked on other issue:** None.
-
--   **Issue 5: Fix Duplicate Telegram Alerts (P2)**
-    -   **Attempted fixes:** Flag-based check added in a previous session.
-    -   **Next debug checklist:** After deployment, ask the user to monitor scheduled alerts to confirm only single alerts are sent.
-    -   **Status:** USER VERIFICATION PENDING
-    -   **Is recurring issue?** Y
-    -   **Should Test frontend/backend/both after fix?** Backend.
-    -   **Blocked on other issue:** None.
+    -   **Blocked on other issue:** none
 
 **In progress Task List**:
 -   **Task 1: Complete Backend & Frontend Refactoring (P1)**
-    -   **Where to resume:** Continue moving logic out of  and breaking down the  component. Although many security and auth improvements were made, the core files remain monolithic.
-    -   **What will be achieved with this?** A professional, maintainable, and scalable codebase.
+    -   **Where to resume:** Continue modularizing  by breaking it into separate router files. Decompose the large  component into smaller, reusable components.
+    -   **What will be achieved with this?** A more professional, maintainable, and scalable codebase.
     -   **Status:** IN PROGRESS
     -   **Should Test frontend/backend/both after fix?** Both.
     -   **Blocked on something:** None.
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks:**
-    -   (P0) **Deploy & Verify All Recent Changes:** The user stated they were deploying. The top priority is to confirm the deployment status and then verify that all recent fixes (login loop, guest portal flow, sync agent v17) are working in production.
+    -   (P0) **Deploy & Verify Sync Agent v18:** The top priority is to update the agent version and have the user deploy it to see if it resolves the sync timeout issues.
     -   (P1) **Twilio SMS OTP Integration:** Blocked pending user providing Twilio credentials.
     -   (P1) **AI Phone Agent Integration:** Blocked pending phone company confirmation.
 -   **Future Tasks:**
     -   (P2) **Smart Lock Integration:** Blocked pending user research on a vendor API.
-    -   (P2) **BlockStay SaaS Platform Book:** User has expressed interest.
+    -   (P2) **BlockStay SaaS Platform:** The user has the initial development brief and may start this as a separate project.
 
 **Completed work in this session**
--   **Security Overhaul:** Implemented server-side HMAC session tokens with middleware to protect all admin API routes. Updated the frontend with  and  interceptors to handle the new token-based auth.
--   **Password Recovery:** Added a complete Forgot Password and Change Password flow with email OTP verification.
--   **Guest Portal Check-in Enhancement:** Blocked check-in for unknown employees and added a feature to detect and suggest similar employee numbers to prevent duplicates.
--   **Sync Agent Fixes (v13-v17):** Addressed multiple sync failures, including hangs, timeouts, and incorrect handling of duplicate No Bill entries.
--   **Admin Login Fix:** Resolved a login loop caused by improper token clearing in .
--   **Repository Professionalization:** Applied numerous patches to add CI/CD workflows (, ), overhaul  for a hosted DB, create , and improve all READMEs.
+-   **Spanish Language Support:** Implemented a language toggle (EN/ES) on the guest portal for both UI text and TTS voice messages (, ).
+-   **Numeric-Only Employee ID:** Added frontend and backend validation to ensure the employee number field only accepts numbers (, ).
+-   **Admin Search & Edit:** Added a Search by Name input and an Edit button (with a modal) to the Guest Records table on the admin dashboard (, ).
+-   **Checkout UI Improvement:** Made the Room Number input on the checkout form bold and more prominent ().
+-   **Admin Login & Stability Fixes:**
+    -   Resolved hard refresh issues by moving token storage from  to  (, ).
+    -   Fixed a persistent login loop by correcting token retrieval logic and ensuring the backend returns an  timestamp (, ).
+    -   Fixed an admin dashboard crash by importing a missing  icon ().
+    -   Fixed a routing issue causing blank pages by switching to  ().
+    -   Fixed a deployment-blocking  serialization error ().
+-   **Documentation:** Created  and provided a public link.
 
 **Earlier issues found/mentioned but not fixed**
 -   **Issue 1: Voice Message Echo and Overlap on Guest Portal**
-    -   **Debug checklist:** This is a recurring issue from a previous fork, pending user testing and reproduction steps after the next successful deployment.
-    -   **Why to solve this issue and what will be achieved with this?** Improves the guest experience on the kiosk.
+    -   **Debug checklist:** Ask the user to test the voice message feature on the guest portal and provide specific steps to reproduce the echo/overlap.
+    -   **Why to solve this issue and what will be achieved with this?** Improves the guest experience.
     -   **Should Test frontend/backend/both after fix:** Frontend.
     -   **Is recurring issue?** Y
 
 **Known issue recurrence from previous fork**
--   **AI Sync Agent Failure:** The sync agent continues to be the primary source of bugs. It has been patched multiple times for various timeout, hanging, and logic errors, but remains brittle. Its reliability is a top concern.
+-   **AI Sync Agent Failure:** The sync agent remains the most significant source of bugs, with recurring hangs, timeouts, and logic errors. Its reliability is the top priority for the application's stability.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Authentication:** **HMAC-signed session tokens**. The backend generates a signed, expiring token on login. Middleware on all  routes verifies this token from the  header or an  query parameter. The frontend uses  interceptors to manage this automatically.
+-   **Authentication:** HMAC-signed session tokens managed via . The frontend uses  interceptors and a . All admin URLs use hash-based routing (e.g., ).
+-   **Internationalization (i18n):** A basic implementation was added using dictionary lookups for English and Spanish strings for UI text and TTS prompts.
 -   **Backend:** FastAPI, PyMongo, Playwright, .
--   **Frontend:** React, React Router, , .
+-   **Frontend:** React, React Router (), , .
 -   **Database:** MongoDB Atlas (hosted).
--   **CI/CD:** Docker, Docker Compose, GitHub Actions for deploying to AWS (ECR/ECS).
 
 **key DB schema**
--   : A new collection to store temporary, expiring OTPs for password change/recovery.
--   : Stores the SHA-256 hashed admin password (), which is prioritized over the  password during login.
+-   The  Pydantic model was extended to allow updating  and  in the  collection. No new collections were added.
 
 **changes in tech stack**
--   The application now exclusively uses a hosted MongoDB (Atlas) and has removed its local MongoDB container dependency.
--   **HMAC/hashlib** are now used for the new session-based authentication system.
+-   No changes to the core tech stack.
 
 **All files of reference**
+-   **Created:** 
 -   **Heavily Modified:** , , , , .
--   **Created:** , , , , , , .
--   **Modified:** , , , .
+-   **Modified:** .
 
 **Areas that need refactoring**:
--   : **CRITICAL.** Remains a monolith despite many additions. Needs to be broken down into modular routers.
--   : **CRITICAL.** This is a massive component that should be decomposed into smaller, manageable pieces.
+-   : **CRITICAL.** This file is extremely large and complex. It should be broken down into modular routers (e.g., , , ).
+-   : **CRITICAL.** This monolithic component handles too many responsibilities (data fetching, state management for multiple tabs, modals). It should be decomposed into smaller, focused components.
 
 **key api endpoints**
--   **MODIFIED:**  - Now returns an HMAC session token and its expiry.
--   **MODIFIED:** All  endpoints - Now protected by server-side HMAC token middleware. PDF export endpoints also accept the token as a query parameter ().
--   **NEW:** ,  - For Forgot Password flow.
--   **NEW:**  - For the secure Change Password flow.
--   **MODIFIED:**  - Now returns suggestions for similar numbers if an exact match is not found.
+-   **MODIFIED:**  - Now supports updating  and .
+-   **MODIFIED:**  - Now returns an  field for better token expiration handling on the client.
+-   **MODIFIED:**  and  - Now accept a  query parameter for Spanish support.
+-   **VALIDATED:** ,  - Backend validation for numeric employee numbers was added.
 
 **Critical Info for New Agent**
--   **Authentication System has been Overhauled:** The admin panel now uses a server-enforced HMAC session token system. The frontend uses a  component and  interceptors. Be aware that the user encountered a login loop due to this change, which was traced to a browser caching issue after the code was fixed.
--   **The Sync Agent is Brittle:** This is the most significant recurring problem. Multiple patches (v13-v17) have been applied to fix hangs, timeouts, and duplicate handling, but it remains a high-risk component. Any further work should be tested thoroughly.
--   **Deployment is the Immediate Next Step:** The user's last action was to deploy the latest changes. Your first task is to verify the deployment status and then test the recent fixes (especially the sync agent v17, guest portal flow, and login).
--   **Repository Structure has Changed:** New CI/CD workflows, documentation, and a  for a hosted DB have been added via patches. Do not rely on the original handoff for deployment info; refer to .
+-   **The Sync Agent is the #1 Priority:** It is brittle and the primary source of user-reported issues. The user has reported it timed out and is still on v17. Your first action should be to update the version to v18 in  and guide the user through deployment and testing.
+-   **Hash-Based Routing is Used:** All admin panel URLs require a  (e.g., , ). Remind the user of this if they report routing issues.
+-   **Auth Token is in :** The login persistence issue was fixed by moving the token from  to . Any further auth debugging should start there.
+-   **Verify Fixes After Deployment:** The user has experienced multiple issues that only appear post-deployment. It's crucial to confirm with the user that fixes are working in their production environment, as it may have taken time for previous deployments to fully propagate.
 
 **documents and test reports created in this job**
 -   
--   
--   
--   
--   
--    (updated)
 
 **Last 10 User Messages and any pending HUMAN messages**
-10. **User:** I fixed manually we wait until tomorrow i deploy now - **Status: Actioned.** Agent acknowledged and prepared for deployment verification.
-9.  **User:** Reports sync PDF with duplicate No Bill entries. - **Status: Completed.** Agent fixed this in v17.
-8.  **User:** what change today why sync agent is not runing good it stuck... - **Status: Completed.** Agent applied multiple fixes (v15, v16) for sync hanging issues.
-7.  **User:** Defers working on CI/CD. - **Status: Acknowledged.**
-6.  **User:** ok thanks - Acknowledging deployment agent's confirmation. - **Status: Acknowledged.**
-5.  **User:** Asks for help with deployment errors. - **Status: Completed.** Agent identified them as old logs and confirmed the code was already fixed.
-4.  **User:** on guest portal we have to stop employee check in... - **Status: Completed.** Agent implemented the new guest portal flow.
-3.  **User:** why i am not able to login to admin panel - **Status: Completed.** Agent diagnosed the login loop.
-2.  **User:** logged in privet window - **Status: Completed.** User confirms the login fix works, indicating a cache issue on their end.
-1.  **User:** Still stuck here - Reporting sync agent progress issue with a screenshot. - **Status: Completed.** Agent investigated and applied fixes.
+-   **1. i see the sync v17 still not v18** - User reported the sync agent version is outdated on production. **Status: Pending (Agent was about to fix this).**
+-   **2. now working may it took little time** - User confirmed the admin data loading issue resolved itself after the deployment finished propagating. **Status: Completed.**
+-   **3. admin portal** - User specified the failed to load data error was on the admin portal. **Status: Resolved.**
+-   **4. it says failed to load data** - User reported a data loading error after a deployment. **Status: Resolved.**
+-   **5. i deploy one before lets wait for that to finish and deploy again** - User acknowledged the plan to deploy again to get the login fix. **Status: Actioned.**
+-   **6. login toaster message said login successfully but still go back to login screen** - User reported a login loop. **Status: Fixed (code committed, awaiting user's next deployment).**
+-   **7. Use deployment agent to identify the issues...** - User provided deployment logs. **Status: Actioned (Agent determined there was no deployment error).**
+-   **8. if i do hard refresh... application is not stable running** - User reported multiple stability issues: blank page on hard refresh, missing arrivals, and a failed sync. **Status: Partially Addressed (hard refresh fixed, others pending).**
+-   **9. This is what it is oprning** (with image) - User reported the link to the BlockStay document was not working. **Status: Resolved (Agent provided an alternative).**
+-   **10. Can you make clickable link so i can send to agent for new task** - User requested a shareable link for the BlockStay document. **Status: Completed.**
 
 **Project Health Check:**
 -   **Broken:**
-    -   The Sync Agent remains unreliable and prone to hanging/timing out on edge cases, making it the highest priority for stabilization.
+    -   The Sync Agent remains highly unreliable, prone to timeouts, and is running on an outdated version in production. This is the most critical broken component.
 -   **Mocked:** None.
 
 **3rd Party Integrations**
--   **API Global Solutions - Rail Portal:** Integrated via Playwright.
+-   **API Global Solutions - Rail Portal:** Integrated via Playwright for the sync agent.
 -   **Zoho Mail:** Used for receiving (IMAP) and sending (SMTP) emails.
 -   **Zoho Drive:** Integrated for report uploads.
--   **OpenAI TTS-1 & GPT-5.2:** Integrated via .
+-   **OpenAI TTS-1 & GPT-5.2:** Integrated via  for the AI assistant.
 -   **Telegram:** Integrated for admin notifications.
 -   **MongoDB Atlas:** Primary database.
 -   **PyMuPDF ():** Used for PDF color analysis.
 -   **PyJWT & HMAC/hashlib:** Used for authentication.
--   **Twilio:** Planned for SMS OTP.
 
 **Testing status**
--   **Testing agent used after significant changes:** NO.
--   **Troubleshoot agent used after agent stuck in loop:** NO.
+-   **Testing agent used after significant changes:** NO
+-   **Troubleshoot agent used after agent stuck in loop:** NO
 -   **Test files created:** []
--   **Known regressions:** The sync agent has repeatedly shown regressions where one fix appears to cause or reveal another issue.
+-   **Known regressions:** The Sync Agent continues to regress and fail in new ways after patches are applied.
 
 **Credentials to test flow:**
--   **Admin Login:** The password is now managed via a hash in the  collection. The user can reset it using the Forgot Password link on the admin login page, which triggers an OTP email to . The original fallback password in the  file is .
+-   **Admin Login:** The password is now managed via a hash in the  collection in MongoDB. The user can reset it using the Forgot Password link on the admin login page (), which triggers an OTP email to . The original fallback password in the  file is .
 
 **What agent forgot to execute**
--   The agent did not create any automated tests (e.g., pytest) for the new backend logic, especially for the critical and fragile sync agent.
--   The agent did not proactively ask to delete the legacy  file from the user's repository after adding the new workflows, which could cause CI conflicts.</analysis>
+-   The agent did not apply the final change to update the sync agent version string from v17 to v18 in  before the session ended.
+-   The agent did not create any automated tests (e.g., pytest, React Testing Library) for the numerous new features and critical bug fixes, increasing the risk of future regressions.</analysis>

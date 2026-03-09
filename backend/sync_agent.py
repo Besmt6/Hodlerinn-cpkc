@@ -178,7 +178,7 @@ def find_best_matches(api_name: str, hodler_employees: list, top_n: int = 3) -> 
     return scores[:top_n]
 
 
-SYNC_AGENT_VERSION = "2026-03-08-v17"  # Fixed duplicate No Bill - now skips already-processed rows
+SYNC_AGENT_VERSION = "2026-03-08-v18"  # Language support, input validation, admin search/edit, stability fixes
 
 class APIGlobalSyncAgent:
     def __init__(self, username: str, password: str):
