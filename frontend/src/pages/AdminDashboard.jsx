@@ -262,16 +262,24 @@ export default function AdminDashboard() {
 
   // Persist activeView to URL hash for refresh support
   useEffect(() => {
-    const hash = location.hash.replace('#', '');
-    if (hash && ['dashboard', 'signin', 'billing', 'rooms', 'employees', 'guests', 'guarantee', 'settings'].includes(hash)) {
-      setActiveView(hash);
+    // Use search params instead of hash to avoid conflict with HashRouter
+    // In HashRouter, the search params come from the hash portion: /#/admin/dashboard?tab=billing
+    const hashParts = window.location.hash.split('?');
+    const searchStr = hashParts.length > 1 ? hashParts[1] : '';
+    const searchParams = new URLSearchParams(searchStr);
+    const tab = searchParams.get('tab');
+    if (tab && ['dashboard', 'signin', 'billing', 'rooms', 'employees', 'guests', 'guarantee', 'settings'].includes(tab)) {
+      setActiveView(tab);
     }
-  }, [location.hash]);
+  }, [location]);
 
   // Update URL when activeView changes
   const handleViewChange = (view) => {
     setActiveView(view);
-    window.history.replaceState(null, '', `#${view}`);
+    // Use search params for tab navigation to avoid hash conflicts
+    // For HashRouter: /#/admin/dashboard?tab=billing
+    const basePath = window.location.hash.split('?')[0];
+    window.history.replaceState(null, '', `${basePath}?tab=${view}`);
   };
 
   useEffect(() => {
