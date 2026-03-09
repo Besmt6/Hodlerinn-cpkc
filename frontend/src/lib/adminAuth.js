@@ -7,16 +7,23 @@ export function getAdminToken() {
   const token = localStorage.getItem(ADMIN_TOKEN_KEY);
   const expiry = localStorage.getItem(ADMIN_TOKEN_EXPIRY_KEY);
   
-  // Check if token exists and is not expired
-  if (token && expiry) {
-    const expiryTime = new Date(expiry).getTime();
-    if (Date.now() < expiryTime) {
-      return token;
-    }
-    // Token expired, clear it
-    clearAdminToken();
+  // If no token, return null
+  if (!token) {
+    return null;
   }
-  return null;
+  
+  // If we have expiry, check if token is expired
+  if (expiry) {
+    const expiryTime = new Date(expiry).getTime();
+    if (Date.now() >= expiryTime) {
+      // Token expired, clear it
+      clearAdminToken();
+      return null;
+    }
+  }
+  
+  // Return token (even without expiry for backwards compatibility)
+  return token;
 }
 
 export function setAdminToken(token, expiresAt = null) {

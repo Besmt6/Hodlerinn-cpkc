@@ -2528,20 +2528,24 @@ async def admin_login(input: AdminLogin):
         # Use hashed password from database
         if verify_password(input.password, settings["admin_password_hash"]):
             token = create_jwt_token({"role": "admin", "user": "admin"})
+            expires_at = (datetime.now(timezone.utc) + timedelta(hours=ADMIN_SESSION_DURATION_HOURS)).isoformat()
             return {
                 "success": True,
                 "message": "Login successful",
                 "token": token,
+                "expires_at": expires_at,
                 "expires_in_hours": ADMIN_SESSION_DURATION_HOURS
             }
     else:
         # Fallback to env variable (plain text comparison for backwards compatibility)
         if input.password == ADMIN_PASSWORD:
             token = create_jwt_token({"role": "admin", "user": "admin"})
+            expires_at = (datetime.now(timezone.utc) + timedelta(hours=ADMIN_SESSION_DURATION_HOURS)).isoformat()
             return {
                 "success": True,
                 "message": "Login successful",
                 "token": token,
+                "expires_at": expires_at,
                 "expires_in_hours": ADMIN_SESSION_DURATION_HOURS
             }
     
