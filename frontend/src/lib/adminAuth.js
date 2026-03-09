@@ -36,8 +36,9 @@ export function initializeAdminAxiosAuth() {
       const url = error?.config?.url || "";
       if (status === 401 && url.includes("/api/admin") && !url.endsWith("/api/admin/login")) {
         clearAdminToken();
-        if (window.location.pathname !== "/admin") {
-          window.location.href = "/admin";
+        // Use hash-based routing
+        if (!window.location.hash.includes("/admin")) {
+          window.location.href = "/#/admin";
         }
       }
       return Promise.reject(error);
