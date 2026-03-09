@@ -650,18 +650,30 @@ async def start_scheduler():
     async def auto_zoho_upload():
         try:
             today = datetime.now().strftime("%Y-%m-%d")
-            logging.info(f"Auto-uploading sign-in sheets to Zoho Drive for {today}")
+            logging.info(f"[ZOHO AUTO] Starting auto-upload for {today}")
             result = await upload_daily_reports_to_zoho(today)
-            if result.get("success"):
-                logging.info(f"Auto Zoho upload successful: {result}")
+            logging.info(f"[ZOHO AUTO] Upload result: {result}")
+            if result.get("results") and all(r.get("result", {}).get("success") for r in result.get("results", [])):
+                logging.info(f"[ZOHO AUTO] Upload successful: {result}")
                 await send_telegram_notification(
                     f"📤 <b>Auto Upload Complete</b>\n"
                     f"Sign-in sheets for {today} uploaded to Zoho Drive"
                 )
             else:
-                logging.error(f"Auto Zoho upload failed: {result}")
+                error_msg = str(result)
+                logging.error(f"[ZOHO AUTO] Upload failed: {error_msg}")
+                await send_telegram_notification(
+                    f"⚠️ <b>Auto Upload Failed</b>\n"
+                    f"Sign-in sheets for {today} failed to upload\n"
+                    f"Error: {error_msg[:200]}"
+                )
         except Exception as e:
-            logging.error(f"Auto Zoho upload error: {e}")
+            logging.error(f"[ZOHO AUTO] Error: {e}")
+            await send_telegram_notification(
+                f"⚠️ <b>Auto Upload Error</b>\n"
+                f"Sign-in sheets upload failed\n"
+                f"Error: {str(e)[:200]}"
+            )
     
     scheduler.add_job(
         auto_zoho_upload,
