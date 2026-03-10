@@ -8874,25 +8874,38 @@ async def import_cpkc_guest(emp_id: str, emp_name: str, check_in_str: str, check
     This function only handles importing valid check-in records.
     """
     try:
-        # Parse the check-in date
-        today = datetime.now().strftime("%Y-%m-%d")
-        
-        # Parse check-in date from string (format: "2026-03-07 14:00" or "Mar 7, 2026")
+        # Parse check-in date: "06-Mar-2026 10:23" or other formats
         check_in_date = None
+        check_in_time = None
         if check_in_str:
-            # Try different date formats
-            for fmt in ["%Y-%m-%d %H:%M", "%Y-%m-%d", "%b %d, %Y %H:%M", "%b %d, %Y"]:
+            # Try multiple date formats - most common CPKC format first
+            date_formats = [
+                "%d-%b-%Y %H:%M",  # "09-Mar-2026 21:30" - CPKC format
+                "%Y-%m-%d %H:%M",  # "2026-03-09 21:30"
+                "%Y-%m-%d",        # "2026-03-09"
+                "%b %d, %Y %H:%M", # "Mar 9, 2026 21:30"
+                "%b %d, %Y",       # "Mar 9, 2026"
+            ]
+            for fmt in date_formats:
                 try:
-                    parsed = datetime.strptime(check_in_str.strip(), fmt)
-                    check_in_date = parsed.strftime("%Y-%m-%d")
+                    dt = datetime.strptime(check_in_str.strip(), fmt)
+                    check_in_date = dt.strftime("%Y-%m-%d")
+                    if "%H:%M" in fmt:
+                        check_in_time = dt.strftime("%H:%M")
                     break
                 except:
                     continue
+            
+            # If no format worked, use raw string
+            if not check_in_date:
+                check_in_date = check_in_str
         
-        # Secondary safeguard: Skip if check-in date is in the past
-        # (Primary detection is via green highlighting at PDF level)
-        if check_in_date and check_in_date < today:
-            logging.info(f"Skipping {emp_name} - check-in date {check_in_date} is in the past")
+        # Allow arrivals from today and yesterday (for late-night email processing)
+        # Only skip if check-in date is more than 1 day in the past
+        today = datetime.now().strftime("%Y-%m-%d")
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        if check_in_date and check_in_date < yesterday:
+            logging.info(f"Skipping {emp_name} - check-in date {check_in_date} is more than 1 day in the past")
             return None
         
         # Parse name format: LASTNAME,(FIRSTNAME)*CODE
@@ -8904,23 +8917,17 @@ async def import_cpkc_guest(emp_id: str, emp_name: str, check_in_str: str, check
             last_name = emp_name
             first_name = ""
         
-        # Parse check-in date: "06-Mar-2026 10:23"
-        check_in_date = None
-        check_in_time = None
-        if check_in_str:
-            try:
-                dt = datetime.strptime(check_in_str, "%d-%b-%Y %H:%M")
-                check_in_date = dt.strftime("%Y-%m-%d")
-                check_in_time = dt.strftime("%H:%M")
-            except:
-                check_in_date = check_in_str
-        
+        # Parse check-out date
         check_out_date = None
         if check_out_str:
-            try:
-                dt = datetime.strptime(check_out_str, "%d-%b-%Y %H:%M")
-                check_out_date = dt.strftime("%Y-%m-%d")
-            except:
+            for fmt in ["%d-%b-%Y %H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%b %d, %Y %H:%M", "%b %d, %Y"]:
+                try:
+                    dt = datetime.strptime(check_out_str.strip(), fmt)
+                    check_out_date = dt.strftime("%Y-%m-%d")
+                    break
+                except:
+                    continue
+            if not check_out_date:
                 check_out_date = check_out_str
         
         # Check if already imported (avoid duplicates) - match by employee name + date only
